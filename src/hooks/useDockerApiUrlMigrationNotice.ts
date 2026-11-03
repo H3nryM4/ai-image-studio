@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { useStore } from '../store'
 import { readRuntimeEnv } from '../lib/runtimeEnv'
 
-const NOTICE_KEY = 'docker-api-url-migration-notice-v1'
+const NOTICE_KEY = 'ai-image-studio.docker-api-url-migration-notice-v1'
 
 export function useDockerApiUrlMigrationNotice() {
   const setConfirmDialog = useStore((s) => s.setConfirmDialog)

@@ -67,7 +67,7 @@ function newId(prefix: string) {
 }
 
 const ADD_CUSTOM_PROVIDER_VALUE = '__add_custom_provider__'
-const COPY_IMPORT_URL_OPTIONS_STORAGE_KEY = 'gpt-image-playground.copy-import-url-options'
+const COPY_IMPORT_URL_OPTIONS_STORAGE_KEY = 'ai-image-studio.copy-import-url-options'
 
 const DEFAULT_COPY_IMPORT_URL_OPTIONS = {
   useNewApiAddress: false,
@@ -1937,7 +1937,7 @@ export default function SettingsModal() {
                   > 本站点基于开源项目 [GPT Image Playground](https://github.com/CookSleep/gpt_image_playground) ([MIT](https://github.com/CookSleep/gpt_image_playground/blob/main/LICENSE)) 修改。
                 */}
                 <a
-                  href="https://github.com/CookSleep/gpt_image_playground"
+                  href="https://github.com/H3nryM4/ai-image-studio"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="group flex flex-col items-center outline-none"
@@ -1945,11 +1945,18 @@ export default function SettingsModal() {
                   <div className="mb-5 flex h-[88px] w-[88px] items-center justify-center rounded-full border border-transparent bg-black/[0.04] text-gray-800 transition-colors group-hover:bg-black/[0.07] dark:bg-white/[0.06] dark:text-gray-100 dark:group-hover:bg-white/[0.1]">
                     <GithubIcon className="h-11 w-11" />
                   </div>
-                  <h4 className="text-[17px] font-bold text-gray-800 dark:text-gray-100">GPT Image Playground</h4>
+                  <h4 className="text-[17px] font-bold text-gray-800 dark:text-gray-100">AI Image Studio</h4>
                   <p className="mt-1.5 text-[13px] text-gray-500 transition-colors group-hover:text-gray-700 dark:text-gray-400 dark:group-hover:text-gray-300">
-                    @CookSleep
+                    @H3nryM4
                   </p>
                 </a>
+
+                <p className="mt-4 max-w-[360px] text-center text-[13px] leading-relaxed text-gray-500 dark:text-gray-400">
+                  基于 @CookSleep 的开源项目{' '}
+                  <a href="https://github.com/CookSleep/gpt_image_playground" target="_blank" rel="noopener noreferrer" className="underline hover:text-gray-700 dark:hover:text-gray-300">GPT Image Playground</a>
+                  {' '}修改，遵循{' '}
+                  <a href="https://github.com/CookSleep/gpt_image_playground/blob/main/LICENSE" target="_blank" rel="noopener noreferrer" className="underline hover:text-gray-700 dark:hover:text-gray-300">MIT 许可</a>。
+                </p>
                 
                 <p className="mt-8 mb-6 max-w-[360px] text-center text-[13px] leading-relaxed text-gray-500 dark:text-gray-400">
                   本项目的成长离不开每一位用户的使用、反馈、贡献与支持，感谢一路有你。
@@ -1957,7 +1964,7 @@ export default function SettingsModal() {
 
                 <div className="flex flex-wrap items-center justify-center gap-3">
                   <a
-                    href="https://github.com/CookSleep/gpt_image_playground/issues"
+                    href="https://github.com/H3nryM4/ai-image-studio/issues"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-gray-100/80 px-5 py-2.5 text-sm font-medium text-gray-700 transition-all hover:bg-gray-200 hover:text-gray-900 dark:bg-white/[0.06] dark:text-gray-300 dark:hover:bg-white/[0.1] dark:hover:text-white"

@@ -1,7 +1,7 @@
 {
-  "name": "gpt-image-playground",
+  "name": "ai-image-studio",
   "private": true,
-  "version": "0.7.17",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",

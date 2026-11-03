@@ -2,6 +2,7 @@
 
 ## 身份
 
+- 项目名称为 AI Image Studio，技术名称为 `ai-image-studio`，从 v1.0.0 开始独立版本编号。
 - 本仓库是 [CookSleep/gpt_image_playground](https://github.com/CookSleep/gpt_image_playground) 的 fork，远程是 [H3nryM4/ai-image-studio](https://github.com/H3nryM4/ai-image-studio)。
 - 协议是 MIT。保留 `LICENSE`，以及代码和文档里对原项目的许可声明。
 
@@ -11,6 +12,10 @@
 - 不合并上游 `main`。未列出的功能、样式和上游网页改动，先问维护者再决定跟进手改。
 
 ## 已决定
+
+### 独立存储空间
+
+应用存储统一使用 `ai-image-studio` 标识，不读取、迁移或回退到旧项目的数据库及存储键，也不主动删除旧数据库和存储键。沿用现有数据结构、格式版本、备份解析和校验。
 
 ### 不要桌面客户端
 
@@ -24,7 +29,7 @@
 
 ### 去掉赞助和推广
 
-这个决定已定，代码还没改。只删推广，不删功能，也不删原仓库出处。
+这个决定已定，代码还没改，本次 v1.0.0 更名不包含这项清理。后续只删推广，不删功能。
 
 ## 上游核对
 

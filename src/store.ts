@@ -1051,7 +1051,7 @@ export const useStore = create<AppState>()(
       },
     }),
     {
-      name: 'gpt-image-playground',
+      name: 'ai-image-studio',
       version: 2,
       migrate: migratePersistedState,
       partialize: getPersistedState,
@@ -4567,7 +4567,7 @@ export async function exportData(options: ExportOptions = { exportConfig: true, 
       const a = document.createElement('a')
       const suffix = plan.length > 1 ? `_${String(plan.length).padStart(2, '0')}parts_part${String(partNumber).padStart(2, '0')}` : ''
       a.href = url
-      a.download = `gpt-image-playground-backup_${formatExportFileTime(new Date(exportedAt))}${suffix}.zip`
+      a.download = `ai-image-studio-backup_${formatExportFileTime(new Date(exportedAt))}${suffix}.zip`
       document.body.appendChild(a)
       a.click()
       a.remove()

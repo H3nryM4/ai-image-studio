@@ -1,10 +1,12 @@
 <div align="center">
 
-# 🎨 GPT Image Playground
+# 🎨 AI Image Studio
 
-[![GitHub Repo stars](https://img.shields.io/github/stars/CookSleep/gpt_image_playground?style=flat-square&color=eab308)](https://github.com/CookSleep/gpt_image_playground/stargazers)
-[![GitHub forks](https://img.shields.io/github/forks/CookSleep/gpt_image_playground?style=flat-square&color=3b82f6)](https://github.com/CookSleep/gpt_image_playground/network/members)
-[![License](https://img.shields.io/badge/license-MIT-10b981?style=flat-square)](https://github.com/CookSleep/gpt_image_playground/blob/main/LICENSE)
+本项目是 [CookSleep/GPT Image Playground](https://github.com/CookSleep/gpt_image_playground) 的 fork，由 [@H3nryM4](https://github.com/H3nryM4) 维护，遵循 MIT 许可。
+
+[![GitHub Repo stars](https://img.shields.io/github/stars/H3nryM4/ai-image-studio?style=flat-square&color=eab308)](https://github.com/H3nryM4/ai-image-studio/stargazers)
+[![GitHub forks](https://img.shields.io/github/forks/H3nryM4/ai-image-studio?style=flat-square&color=3b82f6)](https://github.com/H3nryM4/ai-image-studio/network/members)
+[![License](https://img.shields.io/badge/license-MIT-10b981?style=flat-square)](LICENSE)
 [![React](https://img.shields.io/badge/React-19-20232A?style=flat-square&logo=react&logoColor=61DAFB)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 
@@ -15,15 +17,17 @@
 
 <br>
 
-[![Vercel 在线体验](https://img.shields.io/badge/Vercel-%E5%9C%A8%E7%BA%BF%E4%BD%93%E9%AA%8C-black?style=for-the-badge&logo=vercel&logoColor=white)](https://gpt-image-playground.cooksleep.dev)
+[![Vercel 上游在线体验](https://img.shields.io/badge/Vercel-%E4%B8%8A%E6%B8%B8%E5%9C%A8%E7%BA%BF%E4%BD%93%E9%AA%8C-black?style=for-the-badge&logo=vercel&logoColor=white)](https://gpt-image-playground.cooksleep.dev)
 &nbsp;&nbsp;&nbsp;
-[![GitHub Pages 在线体验](https://img.shields.io/badge/GitHub%20Pages-%E5%9C%A8%E7%BA%BF%E4%BD%93%E9%AA%8C-222222?style=for-the-badge&logo=github&logoColor=white)](https://cooksleep.github.io/gpt_image_playground)
+[![GitHub Pages 上游在线体验](https://img.shields.io/badge/GitHub%20Pages-%E4%B8%8A%E6%B8%B8%E5%9C%A8%E7%BA%BF%E4%BD%93%E9%AA%8C-222222?style=for-the-badge&logo=github&logoColor=white)](https://cooksleep.github.io/gpt_image_playground)
 
 </div>
 
 <br>
 
-> 💡 **提示**：若需调用非 HTTPS 的内网或本地 HTTP API，请使用 GitHub Pages 版本或自行部署，Vercel 部署的体验版绑定的 `.dev` 域名因安全策略通常要求接口必须为 HTTPS。
+> 💡 **提示**：若需调用非 HTTPS 的内网或本地 HTTP API，请使用上游 GitHub Pages 版本或自行部署，上游 Vercel 体验版绑定的 `.dev` 域名因安全策略通常要求接口必须为 HTTPS。
+
+> **v1.0.0 存储说明**：AI Image Studio 使用独立的本地存储空间，首次打开从初始状态开始，不读取或迁移旧项目的历史、图片及设置。旧数据库和存储键不会被主动删除，备份导入功能继续沿用现有解析方式。
 
 ---
 
@@ -213,7 +217,7 @@ VITE_DEFAULT_API_URL=https://api.openai.com/v1
 
 **初始部署**
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FCookSleep%2Fgpt_image_playground&project-name=gpt-image-playground&repository-name=gpt-image-playground)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FH3nryM4%2Fai-image-studio&project-name=ai-image-studio&repository-name=ai-image-studio)
 
 点击上方按钮导入仓库即可，Vercel 会自动执行构建并部署静态文件。添加或修改环境变量后需要重新部署。
 
@@ -227,7 +231,7 @@ VITE_DEFAULT_API_URL=https://api.openai.com/v1
 2. 在你 Fork 的 GitHub 仓库 **Settings → Secrets and variables → Actions** 中，新建 Secret `VERCEL_DEPLOY_HOOK`，填入刚才的 URL。
 
 配置完成后：
-- **自动更新**：只有在本仓库发布了正式版本（即包含新 Release / 版本号变动）时，在你的 Fork 页面点击 **Sync fork** 才会自动触发 Vercel 构建部署；日常的普通代码提交不会触发部署。
+- **自动更新**：推送 `v*` 标签会触发部署；向 `main` 推送版本号变更时，只有当前仓库已存在对应版本的 Release 才会触发 Vercel 构建部署。日常普通代码提交不会触发部署。
 - **手动触发**：若需立即部署最新代码（包括未发布正式版本的日常提交），可进入仓库顶部的 **Actions** 标签页，在左侧选择 **Deploy to Vercel**，点击右侧的 **Run workflow** 下拉按钮（分支选择 `main`），点击绿色的 **Run workflow** 按钮即可手动部署。
 
 </details>
@@ -252,7 +256,7 @@ VITE_DEFAULT_API_URL=https://api.openai.com/v1
 
 **更新方式**
 
-- **自动更新**：只有在本仓库发布了正式版本（即包含新 Release / 版本号变动）时，在你的 Fork 页面点击 **Sync fork** 才会自动触发构建并部署至 GitHub Pages；日常的普通代码提交不会触发部署。
+- **自动更新**：推送 `v*` 标签会触发部署；向 `main` 推送版本号变更时，只有当前仓库已存在对应版本的 Release 才会触发 GitHub Pages 构建部署。日常普通代码提交不会触发部署。
 - **手动触发**：若需立即部署最新代码（包括未发布正式版本的日常提交），可进入仓库顶部的 **Actions** 标签页，在左侧选择 **Deploy to GitHub Pages**，点击右侧的 **Run workflow** 下拉按钮（分支选择 `main`），点击绿色的 **Run workflow** 按钮即可手动部署。
 
 </details>
@@ -284,7 +288,7 @@ npx wrangler login
 npm run deploy:cf
 ```
 
-部署脚本会先执行 `npm run build`，再通过 `wrangler deploy` 上传 `dist/` 目录。
+部署脚本会先执行 `npm run build`，再通过 `wrangler deploy` 上传 `dist/` 目录，默认 Worker 名称为 `ai-image-studio`。如之前使用旧名称部署，原服务和域名绑定需另行迁移。
 
 </details>
 
@@ -292,7 +296,11 @@ npm run deploy:cf
 <details>
 <summary><strong>🐳 方式四：Docker 部署</strong></summary>
 
-支持通过官方发布的 Docker 镜像在服务器或本地容器环境中快速运行。
+支持通过本仓库发布的 Docker 镜像在服务器或本地容器环境中快速运行。镜像由 GitHub Actions 发布；首次发布前也可在仓库根目录自行构建：
+
+```bash
+docker build -f deploy/Dockerfile -t ghcr.io/h3nrym4/ai-image-studio:latest .
+```
 
 **环境变量**
 
@@ -322,7 +330,7 @@ npm run deploy:cf
 ```bash
 docker run -d -p 8080:80 \
   -e DEFAULT_API_URL=https://api.openai.com/v1 \
-  ghcr.io/cooksleep/gpt_image_playground:latest
+  ghcr.io/h3nrym4/ai-image-studio:latest
 ```
 
 开启代理并隐藏真实地址：
@@ -333,7 +341,7 @@ docker run -d -p 8080:80 \
   -e API_PROXY_URL=https://real-api.example.com/v1 \
   -e ENABLE_API_PROXY=true \
   -e LOCK_API_PROXY=true \
-  ghcr.io/cooksleep/gpt_image_playground:latest
+  ghcr.io/h3nrym4/ai-image-studio:latest
 ```
 
 挂载本地配置文件：
@@ -342,7 +350,7 @@ docker run -d -p 8080:80 \
 docker run -d -p 8080:80 \
   -v ./gpt-image-config.json:/config/gpt-image-config.json:ro \
   -e DEFAULT_API_URL=/config/gpt-image-config.json \
-  ghcr.io/cooksleep/gpt_image_playground:latest
+  ghcr.io/h3nrym4/ai-image-studio:latest
 ```
 
 使用 host 网络加 `--network host`，修改端口用 `-e PORT=28080`。
@@ -351,8 +359,8 @@ docker run -d -p 8080:80 \
 
 ```yaml
 services:
-  gpt-image-playground:
-    image: ghcr.io/cooksleep/gpt_image_playground:latest
+  ai-image-studio:
+    image: ghcr.io/h3nrym4/ai-image-studio:latest
     environment:
       - DEFAULT_API_URL=https://api.openai.com/v1
     ports:
@@ -361,7 +369,7 @@ services:
 ```
 **更新说明：**
 
-使用 `latest` 标签时，重新拉取镜像并重启即可更新（如 `docker compose pull && docker compose up -d`）。若需固定版本可使用官方提供的版本号标签（如 `0.2.x`）。
+使用 `latest` 标签时，重新拉取镜像并重启即可更新（如 `docker compose pull && docker compose up -d`）。若需固定版本可使用本仓库发布的版本号标签（如 `1.0.0`）。
 
 </details>
 
@@ -439,7 +447,7 @@ npm run build
 | `profileId` | 目标配置 ID；匹配到同 ID 配置时直接更新 | `?profileId=my-service` |
 | `transparentBackgroundMethod` | 透明背景实现方式：`api`（原生）或 `local`（本地后处理） | `?transparentBackgroundMethod=local` |
 
-集成示例（New API 聊天系统）：
+集成示例（New API 聊天系统，以下为上游在线体验地址，自行部署时替换为自己的地址）：
 
 ```text
 https://gpt-image-playground.cooksleep.dev?apiUrl={address}&apiKey={key}&model={model}
@@ -573,7 +581,7 @@ Agent 可以选择是否使用独立的 API 配置：
 
 **1. 导入链接（单配置导入，最简单）**
 
-在项目的 [Vercel 在线体验](https://gpt-image-playground.cooksleep.dev) 或 [GitHub Pages 在线体验](https://cooksleep.github.io/gpt_image_playground) 中配置好某个条目后，点击“链接”按钮复制含 `?settings=` 参数的 URL（请勿勾选任何“New API 变量配置”选项），直接填入环境变量即可。
+在项目的 [Vercel 上游在线体验](https://gpt-image-playground.cooksleep.dev) 或 [GitHub Pages 上游在线体验](https://cooksleep.github.io/gpt_image_playground) 中配置好某个条目后，点击“链接”按钮复制含 `?settings=` 参数的 URL（请勿勾选任何“New API 变量配置”选项），直接填入环境变量即可。
 
 
 > 💡 **提示**：页面中的“复制导入配置 URL”按钮导出的是**当前选中的单个配置**及其关联的自定义供应商。如需一次性预置包含多个服务商的列表，请使用下方的本地/仓库文件或远程 URL 方式。
@@ -596,7 +604,7 @@ Docker 需要通过 volume 挂载宿主机文件到容器内路径：
 docker run -d -p 8080:80 \
   -v ./gpt-image-config.json:/config/gpt-image-config.json:ro \
   -e DEFAULT_API_URL=/config/gpt-image-config.json \
-  ghcr.io/cooksleep/gpt_image_playground:latest
+  ghcr.io/h3nrym4/ai-image-studio:latest
 ```
 
 > Docker 环境变量名为 `DEFAULT_API_URL`（不含 `VITE_` 前缀）。
@@ -620,7 +628,7 @@ VITE_DEFAULT_API_URL=https://example.com/gpt-image-config.json
 
 **创建方式：**
 
-1. **在线体验中生成**：打开 [Vercel 在线体验](https://gpt-image-playground.cooksleep.dev) 或 [GitHub Pages 在线体验](https://cooksleep.github.io/gpt_image_playground)，进入 **设置 → API 配置 → 供应商类型 → 创建自定义供应商 → AI 一键生成与导入**，粘贴第三方 API 文档让 AI 生成配置。
+1. **在线体验中生成**：打开 [Vercel 上游在线体验](https://gpt-image-playground.cooksleep.dev) 或 [GitHub Pages 上游在线体验](https://cooksleep.github.io/gpt_image_playground)，进入 **设置 → API 配置 → 供应商类型 → 创建自定义供应商 → AI 一键生成与导入**，粘贴第三方 API 文档让 AI 生成配置。
 2. **应用内导出**：生成完成后，在 **API 配置 → 当前配置** 右侧点击“链接按钮”复制含 `?settings=` 参数的分享 URL，可直接用作环境变量值。
 
 也可以参考 [自定义供应商 LLM 提示词](docs/custom-provider-llm-prompt.md)，将提示词和第三方 API 文档直接发给任意 LLM，手动获取完整 JSON。
@@ -721,11 +729,11 @@ VITE_DEFAULT_API_URL=https://example.com/gpt-image-config.json
 ## ⭐ Star History
 
 <div align="center">
-  <a href="https://www.star-history.com/?repos=CookSleep%2Fgpt_image_playground&type=date&legend=top-left">
+  <a href="https://www.star-history.com/?repos=H3nryM4%2Fai-image-studio&type=date&legend=top-left">
     <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=CookSleep/gpt_image_playground&type=date&theme=dark&legend=top-left&sealed_token=YDhR-bhWDaCuWPSxXgtqShoQoM84wroDOtJOM_4TtQsdxIYcQoVPIykb3dHxXo__YPI7b2HlcrMitDbXkJw0dQi68bJOx5xCCqyz8qVdokdcPKMOSbNWOhsDYv6FKKQW40xKkkOqjme8AnR-T9z3i6bq83j47rR6WiNC1n6uVaVf3Ksm8JOf0y9lpXpj" />
-      <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=CookSleep/gpt_image_playground&type=date&legend=top-left&sealed_token=YDhR-bhWDaCuWPSxXgtqShoQoM84wroDOtJOM_4TtQsdxIYcQoVPIykb3dHxXo__YPI7b2HlcrMitDbXkJw0dQi68bJOx5xCCqyz8qVdokdcPKMOSbNWOhsDYv6FKKQW40xKkkOqjme8AnR-T9z3i6bq83j47rR6WiNC1n6uVaVf3Ksm8JOf0y9lpXpj" />
-      <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=CookSleep/gpt_image_playground&type=date&legend=top-left&sealed_token=YDhR-bhWDaCuWPSxXgtqShoQoM84wroDOtJOM_4TtQsdxIYcQoVPIykb3dHxXo__YPI7b2HlcrMitDbXkJw0dQi68bJOx5xCCqyz8qVdokdcPKMOSbNWOhsDYv6FKKQW40xKkkOqjme8AnR-T9z3i6bq83j47rR6WiNC1n6uVaVf3Ksm8JOf0y9lpXpj" />
+      <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=H3nryM4/ai-image-studio&type=date&theme=dark&legend=top-left" />
+      <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=H3nryM4/ai-image-studio&type=date&legend=top-left" />
+      <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=H3nryM4/ai-image-studio&type=date&legend=top-left" />
     </picture>
   </a>
 </div>

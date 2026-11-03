@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 
-const REPO = 'CookSleep/gpt_image_playground'
+const REPO = 'H3nryM4/ai-image-studio'
 const API_URL = `https://api.github.com/repos/${REPO}/releases/latest`
 
 function compareVersions(a: string, b: string) {
@@ -30,7 +30,7 @@ export interface LatestRelease {
 export function useVersionCheck() {
   const [latestRelease, setLatestRelease] = useState<LatestRelease | null>(null)
   const [dismissed, setDismissed] = useState(() =>
-    sessionStorage.getItem('version-dismissed') === 'true',
+    sessionStorage.getItem('ai-image-studio.version-dismissed') === 'true',
   )
 
   useEffect(() => {
@@ -63,7 +63,7 @@ export function useVersionCheck() {
 
   const dismiss = () => {
     setDismissed(true)
-    sessionStorage.setItem('version-dismissed', 'true')
+    sessionStorage.setItem('ai-image-studio.version-dismissed', 'true')
   }
 
   const hasUpdate = latestRelease !== null && !dismissed
