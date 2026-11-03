@@ -19,7 +19,6 @@ import Toast from './components/Toast'
 import MaskEditorModal from './components/MaskEditorModal'
 import SketchBoardModal from './components/SketchBoardModal'
 import ImageContextMenu from './components/ImageContextMenu'
-import SupportPromptModal from './components/SupportPromptModal'
 import { FavoriteCollectionPickerModal, FavoriteCollectionsView, ManageCollectionsModal } from './components/FavoriteCollections'
 import { useGlobalClickSuppression } from './lib/clickSuppression'
 
@@ -153,7 +152,6 @@ export default function App() {
       <Lightbox />
       <SettingsModal />
       <ConfirmDialog />
-      <SupportPromptModal />
       <FavoriteCollectionPickerModal />
       <ManageCollectionsModal />
       <Toast />

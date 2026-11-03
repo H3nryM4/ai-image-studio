@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { AgentConversation, AppSettings, FavoriteCollection } from '../types'
 import { DEFAULT_PARAMS } from '../types'
-import { DEFAULT_IMAGES_MODEL, DEFAULT_SETTINGS, switchApiProfileProvider } from './apiProfiles'
+import { DEFAULT_IMAGES_MODEL, DEFAULT_SETTINGS, normalizeSettings, switchApiProfileProvider } from './apiProfiles'
 import { DEFAULT_FAVORITE_COLLECTION_ID } from './favoriteState'
 import { createPersistedState, mergePersistedAgentConversations, migratePersistedState, normalizePersistedState } from './persistedState'
 
@@ -40,9 +40,6 @@ function source(settings: AppSettings = DEFAULT_SETTINGS) {
     agentAssetPanelCollapsed: false,
     favoriteCollections: [collectionA],
     defaultFavoriteCollectionId: collectionA.id,
-    supportPromptDismissed: false,
-    supportPromptOpen: false,
-    supportPromptSkippedForImportedData: false,
   }
 }
 
@@ -84,6 +81,46 @@ describe('persisted state codec', () => {
 
   it('retains new defaults when no settings were persisted', () => {
     expect(normalizePersistedState({}, fallback(), 100)!.state.settings.profiles[0].imageGenerationModel).toBe(DEFAULT_IMAGES_MODEL)
+  })
+
+  it.each([false, true])('ignores legacy support prompt state (dismissed=%s) without losing saved data', (supportPromptDismissed) => {
+    const current = source(normalizeSettings({
+      ...DEFAULT_SETTINGS,
+      profiles: [{ ...DEFAULT_SETTINGS.profiles[0], name: '我的配置', baseUrl: 'https://api.example.com/v1', apiKey: 'saved-key' }],
+    }))
+    const legacy = {
+      ...current,
+      supportPromptOpen: !supportPromptDismissed,
+      supportPromptDismissed,
+      supportPromptSkippedForImportedData: true,
+      agentInputDrafts: {
+        'conversation-a': {
+          prompt: 'Agent 草稿',
+          inputImages: [imageA],
+          maskDraft: null,
+          maskEditorImageId: null,
+          updatedAt: 1,
+        },
+      },
+    }
+    const result = normalizePersistedState(legacy, fallback(), 100)!
+    const saved = createPersistedState(result.state, true)
+
+    expect(result.state.settings).toEqual(current.settings)
+    expect(result.state.prompt).toBe(current.prompt)
+    expect(result.state.inputImages).toEqual(current.inputImages)
+    expect(result.state.agentConversations).toEqual(current.agentConversations)
+    expect(result.state.agentInputDrafts).toEqual(legacy.agentInputDrafts)
+    expect(saved.settings).toEqual(current.settings)
+    expect(saved.prompt).toBe(current.prompt)
+    expect(saved.inputImages).toEqual([{ id: imageA.id, dataUrl: '' }])
+    expect(saved.agentConversations).toEqual(current.agentConversations)
+    expect(saved.agentInputDrafts['conversation-a'].prompt).toBe('Agent 草稿')
+    expect(saved.agentInputDrafts['conversation-a'].inputImages).toEqual([{ id: imageA.id, dataUrl: '' }])
+    for (const key of ['supportPromptOpen', 'supportPromptDismissed', 'supportPromptSkippedForImportedData']) {
+      expect(result.state).not.toHaveProperty(key)
+      expect(saved).not.toHaveProperty(key)
+    }
   })
 
   it.each(['xhigh', 'max'] as const)('restores the %s GPT Image 2.5 quality level', (quality) => {
