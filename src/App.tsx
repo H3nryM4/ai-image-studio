@@ -1,11 +1,11 @@
-import { useEffect } from 'react'
-import { initStore, restoreExplicitPresetConfig, useStore } from './store'
-import { buildSettingsFromUrlParams, clearUrlSettingParams, getExplicitUrlSettingsIds, hasUrlSettingParams } from './lib/urlSettings'
+import { useEffect, useState } from 'react'
+import { initStore, useStore } from './store'
+import { clearUrlSettingParams } from './lib/urlSettings'
+import { hasProfileImportUrl } from './lib/profileSharing'
 import { createDefaultOpenAIProfile, hasDefaultPresetConfig, normalizeSettings } from './lib/apiProfiles'
 import { getCustomProviderConfigUrl, hasEmbeddedDefaultConfig, loadCustomProviderSettingsFromUrl, loadEmbeddedDefaultConfig } from './lib/customProviderConfigUrl'
 import { getDefaultPresetProfileId, getPresetProfileIds, isPresetConfigOnlyEnabled, setPresetConfig } from './lib/presetConfig'
 import { useDockerApiUrlMigrationNotice } from './hooks/useDockerApiUrlMigrationNotice'
-import type { AppSettings } from './types'
 import Header from './components/Header'
 import SearchBar from './components/SearchBar'
 import TaskGrid from './components/TaskGrid'
@@ -13,6 +13,7 @@ import InputBar from './components/InputBar'
 import DetailModal from './components/DetailModal'
 import Lightbox from './components/Lightbox'
 import SettingsModal from './components/SettingsModal'
+import ProfileImportModal from './components/settings/ProfileImportModal'
 import ConfirmDialog from './components/ConfirmDialog'
 import Toast from './components/Toast'
 import MaskEditorModal from './components/MaskEditorModal'
@@ -26,6 +27,8 @@ let defaultConfigImportStarted = false
 export default function App() {
   const filterFavorite = useStore((s) => s.filterFavorite)
   const activeFavoriteCollectionId = useStore((s) => s.activeFavoriteCollectionId)
+  const [settingsReady, setSettingsReady] = useState(false)
+  const [profileImportSource, setProfileImportSource] = useState<string | null>(null)
   useDockerApiUrlMigrationNotice()
   useGlobalClickSuppression()
 
@@ -33,33 +36,11 @@ export default function App() {
     if (defaultConfigImportStarted) return
     defaultConfigImportStarted = true
 
-    const searchParams = new URLSearchParams(window.location.search)
     const customProviderConfigUrl = getCustomProviderConfigUrl()
     const embeddedDefaultConfig = hasEmbeddedDefaultConfig()
     const loadDefaultConfig = () => embeddedDefaultConfig
       ? Promise.resolve().then(() => loadEmbeddedDefaultConfig())
       : loadCustomProviderSettingsFromUrl(customProviderConfigUrl)
-
-    const applyUrlSettings = async (baseSettings: Partial<AppSettings>) => {
-      const ids = getExplicitUrlSettingsIds(searchParams)
-      const restored = await restoreExplicitPresetConfig(ids)
-      const restoredSettings = useStore.getState().settings
-      const sourceSettings = restored
-        ? { ...restoredSettings, ...baseSettings, customProviders: restoredSettings.customProviders, profiles: restoredSettings.profiles }
-        : baseSettings
-      const nextSettings = buildSettingsFromUrlParams(sourceSettings, searchParams)
-      return Object.keys(nextSettings).length ? nextSettings : sourceSettings
-    }
-
-    const clearAppliedUrlSettings = () => {
-      if (!hasUrlSettingParams(searchParams)) return
-
-      clearUrlSettingParams(searchParams)
-
-      const nextSearch = searchParams.toString()
-      const nextUrl = `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ''}${window.location.hash}`
-      window.history.replaceState(null, '', nextUrl)
-    }
 
     void initStore()
       .then(async () => {
@@ -101,19 +82,38 @@ export default function App() {
                 : defaultPresetId ?? [...presetIds][0],
             })
           : current.settings
-        current.setSettings(await applyUrlSettings(settings))
-        clearAppliedUrlSettings()
+        current.setSettings(settings)
       })
       .catch((error) => {
         console.warn('Failed to import preset config:', error)
         setPresetConfig(null)
-        const state = useStore.getState()
-        void applyUrlSettings(state.settings).then((settings) => {
-          useStore.getState().setSettings(settings)
-          clearAppliedUrlSettings()
-        })
       })
+      .finally(() => setSettingsReady(true))
   }, [])
+
+  useEffect(() => {
+    if (!settingsReady) return
+    const previewUrlImport = () => {
+      const url = new URL(window.location.href)
+      if (!hasProfileImportUrl(url)) return
+      useStore.getState().setShowSettings(false)
+      setProfileImportSource(url.toString())
+      clearUrlSettingParams(url.searchParams)
+      const hash = new URLSearchParams(url.hash.slice(1))
+      if (hash.has('config')) {
+        hash.delete('config')
+        url.hash = hash.toString()
+      }
+      window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`)
+    }
+    previewUrlImport()
+    window.addEventListener('hashchange', previewUrlImport)
+    window.addEventListener('popstate', previewUrlImport)
+    return () => {
+      window.removeEventListener('hashchange', previewUrlImport)
+      window.removeEventListener('popstate', previewUrlImport)
+    }
+  }, [settingsReady])
 
   useEffect(() => {
     const preventPageImageDrag = (e: DragEvent) => {
@@ -138,7 +138,8 @@ export default function App() {
       <InputBar />
       <DetailModal />
       <Lightbox />
-      <SettingsModal />
+      <SettingsModal onImportProfile={(source) => setProfileImportSource(source ?? '')} />
+      {profileImportSource !== null && <ProfileImportModal key={profileImportSource} source={profileImportSource} onClose={() => setProfileImportSource(null)} />}
       <ConfirmDialog />
       <FavoriteCollectionPickerModal />
       <ManageCollectionsModal />

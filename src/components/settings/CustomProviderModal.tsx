@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
+import { useCloseOnEscape } from '../../hooks/useCloseOnEscape'
 import ViewportTooltip from '../ViewportTooltip'
 import { CloseIcon, LinkIcon } from '../icons'
 
@@ -38,6 +39,7 @@ export default function CustomProviderModal({
   }
 
   useEffect(() => () => clearLlmPromptTooltipTimer(), [])
+  useCloseOnEscape(true, onClose)
 
   return createPortal(
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
@@ -68,7 +70,7 @@ export default function CustomProviderModal({
               AI 一键生成与导入
             </div>
             <div data-selectable-text className="mb-4 text-xs leading-relaxed text-gray-500 dark:text-gray-400">
-              复制提示词发给 LLM，可根据 API 文档自动生成完整的配置（包含服务商、模型、URL 等）。复制 LLM 输出的 JSON 后，点击“从剪贴板粘贴并导入”即可一键生效。
+              将提示词和 API 文档交给 LLM，生成 JSON 后从剪贴板读取。包含 API 配置时，会先显示导入预览。
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <span className="relative inline-flex">
@@ -113,7 +115,7 @@ export default function CustomProviderModal({
                     导入中...
                   </>
                 ) : (
-                  '从剪贴板粘贴并导入'
+                  '从剪贴板读取 JSON'
                 )}
               </button>
             </div>

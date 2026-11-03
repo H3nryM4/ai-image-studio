@@ -376,9 +376,17 @@ npm run build
 ---
 
 <a id="url-quick-fill"></a>
-## 🛠️ URL 传参快速填充
+## 🛠️ 配置分享与导入
 
-通过 URL 查询参数快速填入 OpenAI 兼容配置，适合创建书签或集成分享。
+在 **设置 → API 配置 → 配置详情 → 分享** 中复制完整配置链接，或复制配置 JSON、导出 JSON 文件。分享默认不包含 API Key，接收方可在导入预览中填写。
+
+打开分享链接会先显示配置预览，确认后才保存和切换。默认添加为新配置；连接相同的配置可以选择复用，也可以明确选择覆盖某个已有配置。自定义服务商定义随配置一起导入，同 ID 的不同服务商会另存，不会自动覆盖本地定义。
+
+在 **配置管理 → 导入** 中可以粘贴分享链接、配置 JSON，或选择 JSON 文件。新分享链接使用 `#config=` 承载配置；旧版 `?settings=` 和下面的查询参数链接仍可导入，也会先显示预览。仅展示预置配置的部署只允许更新匹配预置配置中允许修改的字段。
+
+### 兼容查询参数与 New API 集成
+
+以下参数保留用于旧链接与外部集成。需要 New API 变量时，在分享弹窗中展开 **高级：New API 接入链接**。
 
 | 参数 | 说明 | 示例 |
 |------|------|------|
@@ -392,7 +400,7 @@ npm run build
 | `codexCli` | Codex CLI 兼容模式 | `?codexCli=true` |
 | `streamImages` | 流式传输 | `?streamImages=true` |
 | `streamPartialImages` | 中间步骤图像数（需配合 streamImages） | `?streamPartialImages=2` |
-| `profileId` | 目标配置 ID；匹配到同 ID 配置时直接更新 | `?profileId=my-service` |
+| `profileId` | 旧链接的目标配置 ID，用于解析预览；普通导入仍需明确选择是否覆盖 | `?profileId=my-service` |
 | `transparentBackgroundMethod` | 透明背景实现方式：`api`（原生）或 `local`（本地后处理） | `?transparentBackgroundMethod=local` |
 
 集成示例（New API 聊天系统，以下为上游在线体验地址，自行部署时替换为自己的地址）：
@@ -417,9 +425,9 @@ https://cooksleep.github.io/gpt_image_playground?apiUrl={address}&apiKey={key}&m
 
 | 字段 | 必填 | 说明 |
 |------|------|------|
-| `id` | 定向更新时填写 | 用于标识配置条目：若后续链接携带相同 ID（查询参数 `profileId`、`settings` 链接或预置配置 JSON 中的 `id`），将直接更新该条目而非新建。应用内普通分享链接会省略此字段。 |
+| `id` | 部署预置时填写 | 标识部署预置配置，供后续部署同步和旧链接定位。普通分享会省略此字段；手动导入默认新建，不会因为 ID 相同而直接覆盖本地配置。 |
 | `name` | 是 | 配置名称，方便用户识别。 |
-| `description` | 否 | 配置说明，支持 Markdown；填写后会以说明卡片显示在“当前配置”下方。文本可选中和复制，其中的链接可点击。 |
+| `description` | 否 | 配置说明，支持 Markdown；显示在配置详情中，可展开查看。文本可选中和复制，其中的链接可点击。 |
 | `provider` | 是 | 供应商类型。`"openai"` 为 OpenAI 兼容接口，`"sb2api-async"` 为 sub2api（异步），`"fal"` 为 fal.ai，其他值引用 `customProviders` 中具有相同 ID 的供应商定义。 |
 | `baseUrl` | 是 | API 基础地址（Base URL）。未以 `/` 结尾时遵循 OpenAI 规则自动补齐 `/v1` 前缀；以 `/` 结尾时直接基于该地址请求接口，不补 `/v1`；fal.ai 可留空。 |
 | `apiKey` | 否 | API Key。建议省略，让用户导入后自行填写。 |
@@ -483,12 +491,11 @@ https://cooksleep.github.io/gpt_image_playground?apiUrl={address}&apiKey={key}&m
 
 预置配置 JSON 可以通过以下三种方式填入部署环境变量（`VITE_DEFAULT_API_URL` 或 Docker 的 `DEFAULT_API_URL`）：
 
-**1. 导入链接（单配置导入，最简单）**
+**1. 旧版导入链接（兼容）**
 
-在项目的 [Vercel 上游在线体验](https://gpt-image-playground.cooksleep.dev) 或 [GitHub Pages 上游在线体验](https://cooksleep.github.io/gpt_image_playground) 中配置好某个条目后，点击“链接”按钮复制含 `?settings=` 参数的 URL（请勿勾选任何“New API 变量配置”选项），直接填入环境变量即可。
+已有的 `?settings=` 链接仍可填入环境变量。新版应用内分享使用 `#config=` 链接，供用户预览导入；配置部署环境变量时，请从分享弹窗导出 JSON，再使用下方的文件方式。
 
-
-> 💡 **提示**：页面中的“复制导入配置 URL”按钮导出的是**当前选中的单个配置**及其关联的自定义供应商。如需一次性预置包含多个服务商的列表，请使用下方的本地/仓库文件或远程 URL 方式。
+> 💡 **提示**：分享导出包含当前选中的单个配置及其关联的自定义供应商。如需一次性预置包含多个服务商的列表，请使用下方的本地/仓库文件或远程 URL 方式。
 
 ```dotenv
 VITE_DEFAULT_API_URL=https://你的域名?settings=%7B%22profiles%22%3A%5B...%5D%7D
@@ -533,7 +540,7 @@ VITE_DEFAULT_API_URL=https://example.com/gpt-image-config.json
 **创建方式：**
 
 1. **在线体验中生成**：打开 [Vercel 上游在线体验](https://gpt-image-playground.cooksleep.dev) 或 [GitHub Pages 上游在线体验](https://cooksleep.github.io/gpt_image_playground)，进入 **设置 → API 配置 → 供应商类型 → 创建自定义供应商 → AI 一键生成与导入**，粘贴第三方 API 文档让 AI 生成配置。
-2. **应用内导出**：生成完成后，在 **API 配置 → 当前配置** 右侧点击“链接按钮”复制含 `?settings=` 参数的分享 URL，可直接用作环境变量值。
+2. **应用内导出**：生成完成后，在 **API 配置 → 配置详情 → 分享** 中复制分享链接，或导出 JSON。部署预置请使用导出的 JSON 文件，并按下方格式填写稳定的服务商与配置 ID；分享链接用于接收方预览导入。
 
 也可以参考 [自定义供应商 LLM 提示词](docs/custom-provider-llm-prompt.md)，将提示词和第三方 API 文档直接发给任意 LLM，手动获取完整 JSON。
 
