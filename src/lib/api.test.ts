@@ -130,13 +130,12 @@ describe('callImageApi', () => {
       settings: DEFAULT_SETTINGS,
       params: DEFAULT_PARAMS,
       dismissedCodexCliPrompts: [],
-      agentConversations: [],
       favoriteCollections: [],
       defaultFavoriteCollectionId: null,
     })!
 
     await callImageApi({
-      settings: restored.state.settings,
+      settings: restored.settings,
       prompt: 'prompt',
       params: DEFAULT_PARAMS,
       inputImageDataUrls: [],
@@ -350,27 +349,6 @@ describe('callImageApi', () => {
     const body = JSON.parse(String((init as RequestInit).body))
     expect(body.size).toBeUndefined()
     expect(body.prompt).toBe('prompt')
-  })
-
-  it('does not append a size hint to Agent tool requests', async () => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
-      data: [{ b64_json: 'aW1hZ2U=' }],
-    }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    }))
-
-    await callImageApi({
-      settings: { ...DEFAULT_SETTINGS, apiKey: 'test-key', codexCli: true, allowPromptRewrite: true },
-      prompt: 'Generate at 1024x1024 resolution. prompt',
-      params: { ...DEFAULT_PARAMS, size: '1024x1024' },
-      inputImageDataUrls: [],
-      skipCodexCliSizePrompt: true,
-    })
-
-    const [, init] = fetchMock.mock.calls[0]
-    const body = JSON.parse(String((init as RequestInit).body))
-    expect(body.prompt).toBe('Generate at 1024x1024 resolution. prompt')
   })
 
   it('records actual params returned on Images API responses in Codex CLI mode', async () => {
@@ -1074,45 +1052,6 @@ describe('callImageApi', () => {
     }
     expect(result.images).toHaveLength(3)
     expect(result.actualParams).toMatchObject({ n: 3 })
-  })
-
-  it('keeps custom prompts unchanged when Codex CLI prompt transforms are disabled', async () => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
-      data: [{ b64_json: 'aW1hZ2U=' }],
-    }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    }))
-
-    await callImageApi({
-      settings: {
-        ...DEFAULT_SETTINGS,
-        codexCli: true,
-        allowPromptRewrite: true,
-        customProviders: [{
-          id: 'custom-sync',
-          name: 'Custom Sync',
-          submit: {
-            path: 'images/generations',
-            body: { prompt: '$prompt', size: '$params.size', quality: '$params.quality' },
-            result: { b64JsonPaths: ['data.*.b64_json'] },
-          },
-        }],
-        profiles: [{
-          ...DEFAULT_SETTINGS.profiles[0],
-          provider: 'custom-sync',
-          baseUrl: 'https://api.example.com/v1',
-          codexCli: true,
-        }],
-      },
-      prompt: 'prompt',
-      params: { ...DEFAULT_PARAMS, size: '1024x768', quality: 'high' },
-      inputImageDataUrls: [],
-      skipCodexCliSizePrompt: true,
-    })
-
-    const body = JSON.parse(String((fetchMock.mock.calls[0][1] as RequestInit).body))
-    expect(body).toEqual({ prompt: 'prompt' })
   })
 
   it('keeps successful Codex CLI sync custom results when one request fails', async () => {

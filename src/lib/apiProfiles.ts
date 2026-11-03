@@ -1,23 +1,5 @@
-import type {
-  ApiMode,
-  ApiProfile,
-  ApiProvider,
-  AppSettings,
-  PresetAgentConfig,
-  PresetConfig,
-  AgentApiConfigMode,
-  CustomProviderContentType,
-  CustomProviderDefinition,
-  CustomProviderFileMapping,
-  CustomProviderPollMapping,
-  CustomProviderRequestMethod,
-  CustomProviderResultMapping,
-  CustomProviderSubmitMapping,
-  CustomProviderTemplate,
-  ReferenceImageEditAction,
-  RetryMode,
-} from '../types'
-import { DEFAULT_AGENT_MAX_TOOL_ROUNDS, DEFAULT_STREAM_PARTIAL_IMAGES, DEFAULT_ZIP_DOWNLOAD_ROUTES, ZIP_DOWNLOAD_ROUTE_VALUES } from '../types'
+import type { ApiMode, ApiProfile, ApiProvider, AppSettings, PresetConfig, CustomProviderContentType, CustomProviderDefinition, CustomProviderFileMapping, CustomProviderPollMapping, CustomProviderRequestMethod, CustomProviderResultMapping, CustomProviderSubmitMapping, CustomProviderTemplate, ReferenceImageEditAction, RetryMode } from '../types'
+import { DEFAULT_STREAM_PARTIAL_IMAGES, DEFAULT_ZIP_DOWNLOAD_ROUTES, ZIP_DOWNLOAD_ROUTE_VALUES } from '../types'
 import { customProviderSupportsNativeTransparentBackground } from './customProviderCapabilities'
 import { shouldUseApiProxy } from './devProxy'
 import { normalizeReasoningEffort, normalizeStreamPartialImages, parseDefaultApiUrl } from './defaultApiUrl'
@@ -110,13 +92,6 @@ function getDefaultStreamImages(provider: ApiProvider, apiMode: ApiMode): boolea
 
 export { normalizeReasoningEffort, normalizeStreamPartialImages } from './defaultApiUrl'
 
-export function normalizeAgentMaxToolRounds(value: unknown, fallback: number | undefined = DEFAULT_AGENT_MAX_TOOL_ROUNDS): number {
-  const fallbackValue = fallback ?? DEFAULT_AGENT_MAX_TOOL_ROUNDS
-  const numeric = typeof value === 'number' ? value : Number(value)
-  if (!Number.isFinite(numeric)) return fallbackValue
-  return Math.min(50, Math.max(1, Math.trunc(numeric)))
-}
-
 export function hasDefaultPresetConfig(): boolean {
   return Boolean(RAW_DEFAULT_API_URL) || DEFAULT_OPENAI_API_PROXY
 }
@@ -154,14 +129,6 @@ function normalizeProviderOrder(value: unknown, customProviders: CustomProviderD
     .filter((id, idx, list) => knownIds.has(id) && list.indexOf(id) === idx)
 
   return [...ordered, ...providerIds.filter((id) => !ordered.includes(id))]
-}
-
-function normalizeAgentApiConfigMode(value: unknown): AgentApiConfigMode {
-  return value === 'native' || value === 'hybrid' ? value : 'off'
-}
-
-export function isAgentTextApiProfile(profile: ApiProfile): boolean {
-  return profile.provider === 'openai' && profile.apiMode === 'responses'
 }
 
 function isCustomProviderTemplate(value: unknown): value is CustomProviderTemplate {
@@ -710,14 +677,6 @@ export function normalizeSettings(input: Partial<AppSettings> | unknown): AppSet
     ? record.activeProfileId
     : profiles[0].id
   const active = profiles.find((p) => p.id === activeProfileId) ?? profiles[0]
-  const agentApiConfigMode = normalizeAgentApiConfigMode(record.agentApiConfigMode)
-  const firstAgentTextProfile = profiles.find(isAgentTextApiProfile)
-  const agentTextProfileId = typeof record.agentTextProfileId === 'string' && profiles.some((p) => p.id === record.agentTextProfileId && isAgentTextApiProfile(p))
-    ? record.agentTextProfileId
-    : (isAgentTextApiProfile(active) ? active.id : firstAgentTextProfile?.id ?? null)
-  const agentImageProfileId = typeof record.agentImageProfileId === 'string' && profiles.some((p) => p.id === record.agentImageProfileId)
-    ? record.agentImageProfileId
-    : active.id
 
   return {
     baseUrl: active.baseUrl,
@@ -746,30 +705,9 @@ export function normalizeSettings(input: Partial<AppSettings> | unknown): AppSet
     batchPromptConcurrency: normalizeBatchPromptConcurrency(record.batchPromptConcurrency),
     referenceImageEditAction: normalizeReferenceImageEditAction(record.referenceImageEditAction),
     zipDownloadRoutes: normalizeZipDownloadRoutes(record.zipDownloadRoutes),
-    agentScrollToBottomAfterSubmit: typeof record.agentScrollToBottomAfterSubmit === 'boolean' ? record.agentScrollToBottomAfterSubmit : true,
-    agentMaxToolRounds: normalizeAgentMaxToolRounds(record.agentMaxToolRounds),
-    agentWebSearch: typeof record.agentWebSearch === 'boolean' ? record.agentWebSearch : false,
-    agentMathFormattingPrompt: typeof record.agentMathFormattingPrompt === 'boolean' ? record.agentMathFormattingPrompt : true,
-    agentApiConfigMode,
-    agentTextProfileId,
-    agentImageProfileId,
     profiles,
     activeProfileId,
   }
-}
-
-export function getAgentTextApiProfile(settings: Partial<AppSettings> | unknown): ApiProfile | null {
-  const normalized = normalizeSettings(settings)
-  if (normalized.agentApiConfigMode === 'off') return getActiveApiProfile(normalized)
-  const profile = normalized.profiles.find((item) => item.id === normalized.agentTextProfileId)
-  return profile ? resolveApiProfileModel(profile) : null
-}
-
-export function getAgentImageApiProfile(settings: Partial<AppSettings> | unknown): ApiProfile | null {
-  const normalized = normalizeSettings(settings)
-  if (normalized.agentApiConfigMode !== 'hybrid') return getAgentTextApiProfile(normalized)
-  const profile = normalized.profiles.find((item) => item.id === normalized.agentImageProfileId)
-  return profile ? resolveApiProfileModel(profile) : null
 }
 
 export function getCustomProviderDefinition(settings: Partial<AppSettings> | unknown, provider: ApiProvider): CustomProviderDefinition | null {
@@ -791,30 +729,6 @@ export function isOpenAICompatibleProvider(settings: Partial<AppSettings> | unkn
 
 export interface ImportedProviderSettings extends PresetConfig {
   presetProfileFields?: Record<string, string[]>
-}
-
-export function normalizePresetAgent(value: unknown, profiles: ApiProfile[]): PresetAgentConfig | undefined {
-  if (value === undefined) return undefined
-  if (!isRecord(value)
-    || (value.apiConfigMode !== undefined && value.apiConfigMode !== 'off' && value.apiConfigMode !== 'native' && value.apiConfigMode !== 'hybrid')
-    || (value.textProfileId !== undefined && !profiles.some((profile) => profile.id === value.textProfileId && isAgentTextApiProfile(profile)))
-    || (value.imageProfileId !== undefined && !profiles.some((profile) => profile.id === value.imageProfileId))) {
-    console.warn('忽略无效的 Agent 预置配置：请检查模式及引用的配置 ID（文本配置必须使用 Responses API）')
-    return undefined
-  }
-  return {
-    ...(value.apiConfigMode !== undefined ? { apiConfigMode: value.apiConfigMode as AgentApiConfigMode } : {}),
-    ...(value.textProfileId !== undefined ? { textProfileId: value.textProfileId as string } : {}),
-    ...(value.imageProfileId !== undefined ? { imageProfileId: value.imageProfileId as string } : {}),
-  }
-}
-
-export function getPresetAgentSettings(agent: PresetAgentConfig | undefined): Partial<AppSettings> {
-  return {
-    ...(agent?.apiConfigMode !== undefined ? { agentApiConfigMode: agent.apiConfigMode } : {}),
-    ...(agent?.textProfileId !== undefined ? { agentTextProfileId: agent.textProfileId } : {}),
-    ...(agent?.imageProfileId !== undefined ? { agentImageProfileId: agent.imageProfileId } : {}),
-  }
 }
 
 function validateCustomProviderTaskMappings(providers: CustomProviderDefinition[]) {
@@ -861,12 +775,9 @@ export function importCustomProviderSettingsFromJson(
     const profileEntries = normalizeDeploymentProfileEntries(record.profiles, customProviderIds, nativeTransparentProviderIds, options.deploymentConfig)
     const profiles = profileEntries.map((entry) => entry.profile)
     if (!options.deploymentConfig) return { customProviders, profiles }
-
-    const agent = normalizePresetAgent(record.agent, profiles)
     return {
       customProviders,
       profiles,
-      ...(agent ? { agent } : {}),
       ...(profileEntries.length
         ? { presetProfileFields: Object.fromEntries(profileEntries.map((entry) => [entry.profile.id, Object.keys(entry.source)])) }
         : {}),
@@ -1280,15 +1191,9 @@ export function mergePresetImportedSettings(
     if (!sourceProfileIds.has(profile.id) && profiles.some((item) => item.id === profile.id)) presetProfiles.push(profile)
   }
 
-  const agent = normalizePresetAgent(importedRecord.agent, allSourceProfileEntries.map((entry) => entry.profile))
-  const previousAgentSettings = getPresetAgentSettings(options.previousPresetConfig?.agent)
-  const agentSettings = Object.fromEntries(Object.entries(getPresetAgentSettings(agent))
-    .filter(([key, value]) => options.lockPresetParams || value !== previousAgentSettings[key as keyof AppSettings]))
-
   return {
     settings: normalizeSettings({
       ...current,
-      ...agentSettings,
       customProviders,
       profiles,
       activeProfileId: replacingPristineDefault ? sourceDefaultProfileId ?? nextProfiles[0].id : current.activeProfileId,
@@ -1296,7 +1201,6 @@ export function mergePresetImportedSettings(
     presetConfig: {
       customProviders: presetProviders,
       profiles: presetProfiles,
-      ...(agent ? { agent } : {}),
     },
   }
 }
@@ -1328,11 +1232,4 @@ export const DEFAULT_SETTINGS: AppSettings = normalizeSettings({
   batchPromptConcurrency: DEFAULT_BATCH_PROMPT_CONCURRENCY,
   referenceImageEditAction: 'ask',
   zipDownloadRoutes: DEFAULT_ZIP_DOWNLOAD_ROUTES,
-  agentScrollToBottomAfterSubmit: true,
-  agentMaxToolRounds: DEFAULT_AGENT_MAX_TOOL_ROUNDS,
-  agentWebSearch: false,
-  agentMathFormattingPrompt: true,
-  agentApiConfigMode: 'off',
-  agentTextProfileId: null,
-  agentImageProfileId: null,
 })

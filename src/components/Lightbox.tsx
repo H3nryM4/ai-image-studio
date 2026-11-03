@@ -268,7 +268,7 @@ export default function Lightbox() {
 
   if (!lightboxImageId || !src) return null
 
-  // 打开预览的入口（输入栏、任务详情、Agent 消息）会传入对应的提示词，图片在列表中的位置即其序号
+  // 打开预览的入口（输入栏、任务详情）会传入对应的提示词，图片在列表中的位置即其序号
   const comments = lightboxCommentPrompt != null && currentIndex >= 0 ? getImageComments(lightboxCommentPrompt, currentIndex) : []
 
   return (

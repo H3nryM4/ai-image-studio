@@ -103,7 +103,6 @@ export default function InputParamsPanel({
   displaySize,
   qualityOptions,
   selectClass,
-  transparentOutputAvailable,
   showTransparentOutputControl,
   transparentOutputEnabled,
   transparentOutputHint,
@@ -115,17 +114,13 @@ export default function InputParamsPanel({
   commitOutputCompression,
   moderationHint,
   moderationDisabled,
-  agentAutoImageCount,
   outputImageLimit,
   nInput,
   setNInputFocused,
   commitN,
   handleNInputChange,
   handleNLimitIncreaseAttempt,
-  showAgentNHint,
   hideNLimitHint,
-  startAgentNHintTouch,
-  clearAgentNHintTouchTimer,
   nLimitHint,
   nLimitHintText,
   streamConcurrentByN,
@@ -153,7 +148,6 @@ export default function InputParamsPanel({
   displaySize: string
   qualityOptions: Array<{ label: string; value: string }>
   selectClass: string
-  transparentOutputAvailable: boolean
   showTransparentOutputControl: boolean
   transparentOutputEnabled: boolean
   transparentOutputHint: HintTooltipState
@@ -165,17 +159,13 @@ export default function InputParamsPanel({
   commitOutputCompression: () => void
   moderationHint: HintTooltipState
   moderationDisabled: boolean
-  agentAutoImageCount: boolean
   outputImageLimit: number
   nInput: string
   setNInputFocused: (focused: boolean) => void
   commitN: () => void
   handleNInputChange: (value: string) => void
   handleNLimitIncreaseAttempt: (preventDefault: () => void) => void
-  showAgentNHint: () => void
   hideNLimitHint: () => void
-  startAgentNHintTouch: () => void
-  clearAgentNHintTouchTimer: () => void
   nLimitHint: HintTooltipState
   nLimitHintText: string
   streamConcurrentByN: boolean
@@ -270,17 +260,16 @@ export default function InputParamsPanel({
         />
       </div>
       <label
-        className={`relative flex items-center max-sm:flex-auto sm:shrink-0 ${agentAutoImageCount ? CHIP_DISABLED_CLASS : `${CHIP_CLASS} cursor-text`}`}
-        onMouseEnter={() => { showAgentNHint(); streamConcurrentHint.show() }}
+        className={`relative flex items-center max-sm:flex-auto sm:shrink-0 ${CHIP_CLASS} cursor-text`}
+        onMouseEnter={() => { streamConcurrentHint.show() }}
         onMouseLeave={() => { hideNLimitHint(); streamConcurrentHint.hide() }}
-        onTouchStart={() => { startAgentNHintTouch(); streamConcurrentHint.startTouch() }}
-        onTouchEnd={() => { clearAgentNHintTouchTimer(); streamConcurrentHint.clearTimer() }}
+        onTouchStart={() => { streamConcurrentHint.startTouch() }}
+        onTouchEnd={() => { streamConcurrentHint.clearTimer() }}
         onTouchCancel={() => {
-          clearAgentNHintTouchTimer()
           hideNLimitHint()
           streamConcurrentHint.hide()
         }}
-        onClick={() => { showAgentNHint(); streamConcurrentHint.show() }}
+        onClick={() => { streamConcurrentHint.show() }}
       >
         {prefix('数量')}
         <input
@@ -301,10 +290,9 @@ export default function InputParamsPanel({
               handleNLimitIncreaseAttempt(() => e.preventDefault())
             }
           }}
-          disabled={agentAutoImageCount}
-          type={agentAutoImageCount ? 'text' : 'number'}
-          min={agentAutoImageCount ? undefined : 1}
-          max={agentAutoImageCount ? undefined : outputImageLimit}
+          type={'number'}
+          min={1}
+          max={outputImageLimit}
           style={{ width: `${Math.max(1, nInput.length)}ch` }}
           className="bg-transparent text-xs focus:outline-none disabled:cursor-not-allowed [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
         />
@@ -348,7 +336,6 @@ export default function InputParamsPanel({
                   <Select
                     value={transparentOutputEnabled ? 'on' : 'off'}
                     onChange={(val) => {
-                      if (!transparentOutputAvailable) return
                       setParams({
                         transparent_output: val === 'on',
                         ...(params.output_format === 'png' ? { output_compression: null } : {}),

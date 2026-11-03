@@ -59,13 +59,6 @@
 <br>
 
 <div align="center">
-  <b>桌面端 Agent 模式</b><br>
-  <img src="docs/images/example_pc_4.jpg" alt="桌面端 Agent 模式" />
-</div>
-
-<br>
-
-<div align="center">
   <b>移动端主界面</b><br>
   <img src="docs/images/example_mb_1.jpg" alt="移动端主界面" width="420" />
 </div>
@@ -94,13 +87,6 @@
 
   > 本地后处理流程适用于图标、贴纸、单主体素材等场景；若主体边缘存在复杂发丝、半透明材质、强反光或与背景色接近的颜色，可能出现边缘残留或误抠。若使用 API 原生模式时接口返回“不支持透明背景”类错误，应用会提示切换为本地后处理。
 
-### 🤖 Agent 多轮对话模式
-- **多轮对话与上下文记忆**：基于 Responses API 的对话式生成，Agent 会理解上下文并按需调用图像工具；支持 `@` 引用参考图或前面轮次生成的图片，并自动识别上下文中的图片。
-- **并发批量生成**：内置 `generate_image_batch` 工具，让 Agent 在一次轮次中并发生成多张关联图像，并通过 `continue_generation` 自动追加新一轮以处理依赖关系。
-- **分支与重新生成**：编辑某轮消息重新发送或重新生成某轮消息会产生可切换的分支，引用解析严格限定在当前分支路径内，避免误用其他分支的图片。
-- **画廊同步与隔离删除**：Agent 生成的图片会同步到画廊；删除对话默认保留画廊记录，删除画廊任务时也会自动清理对话中残留的图片引用。
-- **可选 Web 搜索**：可开启 `web_search` 工具，Agent 会在需要时搜索网络信息并附带引用链接。
-
 ### ⚙️ 精细化参数追踪
 - **智能尺寸控制**：提供 1K/2K/4K 快速预设，自定义宽高时会自动规整至模型安全范围（16 的倍数、总像素校验等）。
 - **实际参数对比**：自动提取 API 响应中真实生效的尺寸、质量、耗时以及**模型改写后的提示词**，与你的请求参数高亮对比。支持定制化的参数列表横向平滑滚动体验。
@@ -117,7 +103,6 @@
 - **多配置管理**：支持创建并保存多个 API 配置（包含供应商、API Key、模型等），按需快速切换；支持一键复制当前配置到列表底部，并通过拖拽对配置列表与供应商列表进行自定义排序。
 - **多模型切换**：配置的模型 ID 可用逗号分隔填写多个模型（如 `gpt-image-2.5-sunburst, gpt-image-2`），在首页参数栏的“模型”中切换，选择按配置分别记住；预置配置、URL 传参与导入导出均支持这种写法。
 - **多供应商接入**：内置 OpenAI 兼容接口（含 `Images API` 和 `Responses API`）、sub2api（异步）、fal.ai（支持队列），并支持通过 JSON 导入自定义 HTTP 供应商配置（兼容同步/异步任务）。
-- **Agent 模式独立 API 配置**：支持为 Agent 模式使用原生（Response API）或混合（Response API + Image API）的独立 API 配置，解决部分供应商/模型不支持 `image_generation` 工具的问题。
 - **API 代理**：OpenAI 兼容接口与 fal.ai 均可配置自定义代理。其中 OpenAI 兼容接口可开启同源 `/api-proxy/` 代理，交由 Docker 或本地开发环境转发至真实 API，绕开浏览器 CORS 限制。
 - **Codex CLI 兼容模式**：对上游为 Codex CLI 的 API，开启后应用 Codex CLI 实际支持的参数，并将多图生成拆分为并发单图。
 - **提示词防改写**：Responses API 会始终在请求文本前加入强制指令防止提示词被改写；开启 Codex CLI 模式后，Images API 也会获得同等保护。
@@ -427,7 +412,6 @@ https://cooksleep.github.io/gpt_image_playground?apiUrl={address}&apiKey={key}&m
 
 - **`customProviders`**（可选数组）：自定义供应商定义。只使用内置供应商（OpenAI 兼容、sub2api（异步）或 fal.ai）时可省略。
 - **`profiles`**（数组）：预置的 API 配置列表。每项对应用户配置页中的一个配置条目。
-- **`agent`**（可选对象）：预置 Agent 的独立 API 模式及文本、图像配置选择，示例见下方。
 
 ### 配置列表字段说明（`profiles`）
 
@@ -494,49 +478,6 @@ https://cooksleep.github.io/gpt_image_playground?apiUrl={address}&apiKey={key}&m
   ]
 }
 ```
-
-### 示例：预置 Agent 配置
-
-Agent 可以选择是否使用独立的 API 配置：
-
-- **关闭（`off`）**：沿用当前 API 配置。
-- **原生（`native`）**：文本模型通过 Responses API 调用 `image_generation` 工具生成图片。
-- **混合（`hybrid`）**：文本模型调用自定义工具，再由图像模型生成图片，适用于文本模型不支持原生图像工具的情况。
-
-在预置 JSON 中添加 `agent`，即可指定默认模式，以及文本和图像模型使用的配置：
-
-```json
-{
-  "profiles": [
-    {
-      "id": "default-openai",
-      "name": "图像配置",
-      "provider": "openai",
-      "baseUrl": "https://api.example.com/v1",
-      "model": "image-model",
-      "apiMode": "images",
-      "isDefault": true
-    },
-    {
-      "id": "default-openai-agent",
-      "name": "文本配置",
-      "provider": "openai",
-      "baseUrl": "https://api.example.com/v1",
-      "model": "text-model",
-      "apiMode": "responses"
-    }
-  ],
-  "agent": {
-    "apiConfigMode": "hybrid",
-    "textProfileId": "default-openai-agent",
-    "imageProfileId": "default-openai"
-  }
-}
-```
-
-`textProfileId` 和 `imageProfileId` 引用上方 `profiles` 中的 ID。文本配置须使用 OpenAI 兼容的 Responses API；图像配置可使用任意支持的供应商。`agent` 及其三个字段都可省略。部署更新与锁定遵循上文的预置配置规则。
-
-完整示例见 [`gpt-image-config.agent.example.json`](gpt-image-config.agent.example.json)。
 
 ### 如何将预置配置提供给环境变量
 

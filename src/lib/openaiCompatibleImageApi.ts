@@ -482,7 +482,7 @@ async function callImagesApiConcurrent(opts: CallApiOptions, profile: ApiProfile
 
 async function callImagesApiSingle(opts: CallApiOptions, profile: ApiProfile): Promise<CallApiResult> {
   const { prompt: originalPrompt, params, inputImageDataUrls } = opts
-  const sizePrompt = profile.codexCli && !opts.skipCodexCliSizePrompt
+  const sizePrompt = profile.codexCli
     ? prependCodexCliSizePrompt(originalPrompt, params.size)
     : originalPrompt
   const prompt = profile.codexCli && !opts.settings.allowPromptRewrite
@@ -683,7 +683,7 @@ function resolveTemplateValue(value: unknown, context: Record<string, unknown>):
 }
 
 function createCustomProviderContext(opts: CallApiOptions, profile: ApiProfile) {
-  const sizePrompt = profile.codexCli && !opts.skipCodexCliSizePrompt
+  const sizePrompt = profile.codexCli
     ? prependCodexCliSizePrompt(opts.prompt, opts.params.size)
     : opts.prompt
   const prompt = profile.codexCli && !opts.settings.allowPromptRewrite
@@ -1008,7 +1008,7 @@ async function callResponsesImageApi(opts: CallApiOptions, profile: ApiProfile):
 
 async function callResponsesImageApiSingle(opts: CallApiOptions, profile: ApiProfile): Promise<CallApiResult> {
   const { prompt, params, inputImageDataUrls } = opts
-  const requestPrompt = profile.codexCli && !opts.skipCodexCliSizePrompt
+  const requestPrompt = profile.codexCli
     ? prependCodexCliSizePrompt(prompt, params.size)
     : prompt
   const mime = MIME_MAP[params.output_format] || 'image/png'

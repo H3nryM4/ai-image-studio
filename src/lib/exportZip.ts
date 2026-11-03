@@ -1,6 +1,6 @@
 import { strFromU8, strToU8, type AsyncUnzipOptions, unzip, zip } from 'fflate'
 
-import type { AgentConversation, AppSettings, ExportData, FavoriteCollection, StoredImage, StoredImageThumbnail, TaskRecord } from '../types'
+import type { AppSettings, ExportData, FavoriteCollection, StoredImage, StoredImageThumbnail, TaskRecord } from '../types'
 import { bytesToDataUrl, dataUrlToBytes } from './dataUrl'
 import { getNumberedFileNameBase, sanitizeFileNamePart } from './exportFileName'
 import { getDataUrlDecodedByteSize } from './imageApiShared'
@@ -27,7 +27,6 @@ export interface BuildExportZipParams {
   thumbnailsByImageId: Map<string, StoredImageThumbnail>
   favoriteCollections: FavoriteCollection[]
   defaultFavoriteCollectionId: string | null
-  agentConversations: AgentConversation[]
   imageTasks?: TaskRecord[]
   includeManifestData?: boolean
   backupPart?: ExportData['backupPart']
@@ -46,7 +45,6 @@ export interface ExportImageSize {
 export interface ExportZipPlanPart {
   imageIds: string[]
   tasks: TaskRecord[]
-  agentConversations: AgentConversation[]
   includeBaseData: boolean
 }
 
@@ -99,7 +97,7 @@ export async function buildExportZip(params: BuildExportZipParams) {
   }
 
   const manifest: ExportData = {
-    version: 3,
+    version: 4,
     exportedAt: exportedAtDate.toISOString(),
   }
 
@@ -109,7 +107,6 @@ export async function buildExportZip(params: BuildExportZipParams) {
   }
   if (params.options.exportTasks) {
     if (params.includeManifestData !== false || params.tasks.length) manifest.tasks = params.tasks
-    if (params.includeManifestData !== false || params.agentConversations.length) manifest.agentConversations = params.agentConversations
     if (params.includeManifestData !== false) {
       manifest.favoriteCollections = params.favoriteCollections
       manifest.defaultFavoriteCollectionId = params.defaultFavoriteCollectionId
@@ -144,30 +141,26 @@ export function getExportZipPlan(
   const partBytes = Math.min(options.partBytes ?? DEFAULT_EXPORT_PART_BYTES, maxBytes - safetyBytes)
   const manifestBytes = getBaseManifestEstimatedBytes(params)
   const plannedTasks = params.options.exportTasks ? params.tasks : []
-  const plannedConversations = params.options.exportTasks ? params.agentConversations : []
   const taskBytes = plannedTasks.map(getJsonEstimatedBytes)
-  const conversationBytes = plannedConversations.map(getJsonEstimatedBytes)
   const plannedImages = params.options.exportTasks ? images : []
   const estimatedBytes = manifestBytes
     + taskBytes.reduce((total, bytes) => total + bytes, 0)
-    + conversationBytes.reduce((total, bytes) => total + bytes, 0)
     + plannedImages.reduce((total, image) => total + image.bytes, 0)
   if (estimatedBytes < partBytes) {
     return [{
       imageIds: plannedImages.map((image) => image.id),
       tasks: plannedTasks,
-      agentConversations: plannedConversations,
       includeBaseData: true,
     }]
   }
 
-  const parts: ExportZipPlanPart[] = [{ imageIds: [], tasks: [], agentConversations: [], includeBaseData: true }]
+  const parts: ExportZipPlanPart[] = [{ imageIds: [], tasks: [], includeBaseData: true }]
   const sizes = [manifestBytes]
   const addItem = (bytes: number, errorMessage: string, append: (part: ExportZipPlanPart) => void) => {
     let index = parts.length - 1
-    const hasItems = parts[index].imageIds.length > 0 || parts[index].tasks.length > 0 || parts[index].agentConversations.length > 0
+    const hasItems = parts[index].imageIds.length > 0 || parts[index].tasks.length > 0
     if (hasItems && sizes[index] + bytes >= partBytes) {
-      parts.push({ imageIds: [], tasks: [], agentConversations: [], includeBaseData: false })
+      parts.push({ imageIds: [], tasks: [], includeBaseData: false })
       sizes.push(ZIP_BASE_OVERHEAD_BYTES)
       index++
     }
@@ -177,10 +170,7 @@ export function getExportZipPlan(
   }
 
   for (let index = 0; index < plannedTasks.length; index++) {
-    addItem(taskBytes[index], '单条任务或 Agent 对话超过 2 GB，无法生成备份。', (part) => part.tasks.push(plannedTasks[index]))
-  }
-  for (let index = 0; index < plannedConversations.length; index++) {
-    addItem(conversationBytes[index], '单条任务或 Agent 对话超过 2 GB，无法生成备份。', (part) => part.agentConversations.push(plannedConversations[index]))
+    addItem(taskBytes[index], '单条任务超过 2 GB，无法生成备份。', (part) => part.tasks.push(plannedTasks[index]))
   }
   for (const image of plannedImages) {
     addItem(image.bytes, `图片 ${image.id} 过大，无法放入小于 2 GB 的备份分片。`, (part) => part.imageIds.push(image.id))
@@ -208,7 +198,7 @@ export async function readExportZipManifest(bytes: Uint8Array, validateFiles = t
   } })
   const manifestBytes = files['manifest.json']
   if (!manifestBytes) throw new Error('ZIP 中缺少 manifest.json')
-  const manifest = JSON.parse(strFromU8(manifestBytes)) as ExportData
+  const manifest = parseExportManifest(manifestBytes)
   if (validateFiles) assertExportZipFiles(manifest, (path) => entryNames.has(path))
   return manifest
 }
@@ -217,7 +207,7 @@ export async function readExportZip(bytes: Uint8Array): Promise<ExportZipContent
   const files = await unzipFiles(bytes)
   const manifestBytes = files['manifest.json']
   if (!manifestBytes) throw new Error('ZIP 中缺少 manifest.json')
-  const manifest = JSON.parse(strFromU8(manifestBytes)) as ExportData
+  const manifest = parseExportManifest(manifestBytes)
   assertExportZipFiles(manifest, (path) => files[path] != null)
 
   return {
@@ -249,14 +239,13 @@ function assertExportZipFiles(manifest: ExportData, hasFile: (path: string) => b
 
 function getBaseManifestEstimatedBytes(params: Omit<BuildExportZipParams, 'images' | 'thumbnailsByImageId'>) {
   const manifest = {
-    version: 3,
+    version: 4,
     exportedAt: new Date(params.exportedAt).toISOString(),
     ...(params.options.exportConfig ? { settings: getExportSettings(params.settings) } : {}),
     ...(params.options.exportTasks ? {
       tasks: [],
       favoriteCollections: params.favoriteCollections,
       defaultFavoriteCollectionId: params.defaultFavoriteCollectionId,
-      agentConversations: [],
     } : {}),
   }
   return ZIP_BASE_OVERHEAD_BYTES + strToU8(JSON.stringify(manifest)).byteLength
@@ -330,4 +319,12 @@ function getUniqueImagePath(fileNameBase: string, ext: string, usedPaths: Set<st
   }
   usedPaths.add(path)
   return path
+}
+
+function parseExportManifest(bytes: Uint8Array): ExportData {
+  const manifest = JSON.parse(strFromU8(bytes))
+  if (!manifest || typeof manifest !== 'object' || Array.isArray(manifest) || manifest.version !== 4) {
+    throw new Error('不支持此备份版本，请使用新版应用导出的备份。')
+  }
+  return manifest
 }
