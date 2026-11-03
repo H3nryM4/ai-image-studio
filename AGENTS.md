@@ -7,6 +7,7 @@
 - React 19 + Vite + TypeScript 前端应用，使用 Zustand 状态管理、Tailwind CSS 样式。
 - 源码在 `src/`，构建产物由 Vite 生成，不要手动编辑 `dist/`。
 - 包管理器为 npm（有 `package-lock.json`），不要使用 yarn 或 pnpm。
+- 这是 CookSleep/gpt_image_playground 的 fork，基线停在 v0.7.17。改代码前先读 `docs/fork.md`，不要合并上游 main。没写明的功能、样式和上游网页改动不要自行处理。
 
 ## 常用命令
 
