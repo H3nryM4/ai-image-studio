@@ -27,6 +27,19 @@ describe('callImageApi', () => {
     vi.useRealTimers()
   })
 
+  it.each(['fal', 'sb2api-async', 'missing-provider'])('rejects unavailable provider %s before sending a request', async (provider) => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+    const profile = createDefaultOpenAIProfile({ provider, baseUrl: 'https://old.example.com/', apiKey: 'old-key' })
+
+    await expect(callImageApi({
+      settings: { ...DEFAULT_SETTINGS, profiles: [profile], activeProfileId: profile.id },
+      prompt: 'prompt',
+      params: { ...DEFAULT_PARAMS },
+      inputImageDataUrls: [],
+    })).rejects.toThrow('接入方式已不可用，请重新选择')
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
   it.each([false, true])(
     'adds the prompt rewrite guard on Responses API when Codex CLI mode is %s',
     async (codexCli) => {
@@ -1467,58 +1480,6 @@ describe('callImageApi', () => {
       images: ['data:image/png;base64,aW1hZ2U='],
     })
     expect(fetchMock).toHaveBeenCalledTimes(3)
-  })
-
-  it('uses the built-in sub2api async endpoints and result mapping', async () => {
-    const onCustomTaskEnqueued = vi.fn()
-    const fetchMock = vi.spyOn(globalThis, 'fetch')
-      .mockResolvedValueOnce(new Response(JSON.stringify({
-        task_id: 'imgtask-1',
-        status: 'processing',
-      }), {
-        status: 202,
-        headers: { 'Content-Type': 'application/json' },
-      }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({
-        task_id: 'imgtask-1',
-        status: 'completed',
-        result: {
-          data: [{ url: 'data:image/png;base64,aW1hZ2U=' }],
-        },
-      }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      }))
-
-    const result = await callImageApi({
-      settings: {
-        ...DEFAULT_SETTINGS,
-        baseUrl: 'https://sub2api.example.com/v1',
-        apiKey: 'test-key',
-        profiles: [{
-          ...DEFAULT_SETTINGS.profiles[0],
-          id: 'sub2api-profile',
-          provider: 'sb2api-async',
-          baseUrl: 'https://sub2api.example.com/v1',
-          apiKey: 'test-key',
-        }],
-        activeProfileId: 'sub2api-profile',
-      },
-      prompt: 'prompt',
-      params: { ...DEFAULT_PARAMS },
-      inputImageDataUrls: [],
-      onCustomTaskEnqueued,
-    })
-
-    expect(fetchMock.mock.calls[0][0]).toBe('https://sub2api.example.com/v1/images/generations/async')
-    expect(JSON.parse(String((fetchMock.mock.calls[0][1] as RequestInit).body))).toMatchObject({
-      model: 'gpt-image-2.5-sunburst',
-      prompt: 'prompt',
-      n: 1,
-    })
-    expect(fetchMock.mock.calls[1][0]).toBe('https://sub2api.example.com/v1/images/tasks/imgtask-1')
-    expect(onCustomTaskEnqueued).toHaveBeenCalledWith({ taskId: 'imgtask-1' })
-    expect(result).toEqual({ images: ['data:image/png;base64,aW1hZ2U='] })
   })
 
   it('does not apply submit timeout to custom async polling after receiving a task id', async () => {

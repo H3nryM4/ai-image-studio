@@ -4,7 +4,7 @@ import { normalizeBaseUrl } from '../lib/api'
 import { hasActiveDataOperations } from '../lib/dataOperations'
 import { isApiProxyAvailable, isApiProxyLocked, readClientDevProxyConfig } from '../lib/devProxy'
 import { useStore, exportData, importData, clearData, type SettingsTab } from '../store'
-import { createDefaultOpenAIProfile, DEFAULT_FAL_BASE_URL, DEFAULT_FAL_MODEL, DEFAULT_IMAGES_MODEL, DEFAULT_RESPONSES_MODEL, DEFAULT_SETTINGS, getApiProviderLabel, getActiveApiProfile, getCustomProviderDefinition, importCustomProviderSettingsFromJson, getDefaultApiProfileId, isOpenAICompatibleProvider, normalizeCustomProviderDefinition, normalizeSettings, normalizeStreamPartialImages, switchApiProfileProvider } from '../lib/apiProfiles'
+import { createDefaultOpenAIProfile, DEFAULT_IMAGES_MODEL, DEFAULT_RESPONSES_MODEL, DEFAULT_SETTINGS, getApiProviderLabel, getActiveApiProfile, getCustomProviderDefinition, importCustomProviderSettingsFromJson, getDefaultApiProfileId, isOpenAICompatibleProvider, normalizeCustomProviderDefinition, normalizeSettings, normalizeStreamPartialImages, switchApiProfileProvider } from '../lib/apiProfiles'
 import {
   getDefaultPresetBaseUrl,
   getDefaultPresetProfileId,
@@ -42,6 +42,7 @@ function newId(prefix: string) {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`
 }
 
+const PROFILE_MENU_ITEM_CLASS_NAME = 'flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs transition-colors'
 const ADD_CUSTOM_PROVIDER_VALUE = '__add_custom_provider__'
 const COPY_IMPORT_URL_OPTIONS_STORAGE_KEY = 'ai-image-studio.copy-import-url-options'
 
@@ -113,8 +114,10 @@ export default function SettingsModal({ onImportProfile }: { onImportProfile: (s
   const hasRunningOperations = useStore((s) => hasActiveDataOperations(s.tasks))
   const importInputRef = useRef<HTMLInputElement>(null)
   const profileMenuRef = useRef<HTMLDivElement>(null)
-  const profileActionsRef = useRef<HTMLDivElement>(null)
+  const profileAddMenuRef = useRef<HTMLDivElement>(null)
   const profileMenuTriggerRef = useRef<HTMLButtonElement>(null)
+  const profileNameInputRef = useRef<HTMLInputElement>(null)
+  const focusProfileNameRef = useRef(false)
   const dataTransferToastAtRef = useRef(0)
 
   const profileShareScrollBoundaryRef = useRef<HTMLDivElement>(null)
@@ -125,8 +128,8 @@ export default function SettingsModal({ onImportProfile }: { onImportProfile: (s
 
   const [draft, setDraft] = useState<AppSettings>(normalizeSettings(settings))
   const [timeoutInput, setTimeoutInput] = useState(String(getActiveApiProfile(settings).timeout))
-  const [showProfileMenu, setShowProfileMenu] = useState(false)
-  const [showProfileActions, setShowProfileActions] = useState(false)
+  const [profileMenu, setProfileMenu] = useState<'select' | 'add' | null>(null)
+  const showProfileMenu = profileMenu === 'select'
   const [profileMenuMaxHeight, setProfileMenuMaxHeight] = useState(DEFAULT_DROPDOWN_MAX_HEIGHT)
   const [showCustomProviderImport, setShowCustomProviderImport] = useState(false)
   const [showZipDownloadRouteManager, setShowZipDownloadRouteManager] = useState(false)
@@ -169,24 +172,28 @@ export default function SettingsModal({ onImportProfile }: { onImportProfile: (s
   const visibleProfiles = presetConfigOnly
     ? draft.profiles.filter((profile) => presetProfileIds.has(profile.id))
     : draft.profiles
-  const profileMenuDisabled = presetConfigOnly && visibleProfiles.length <= 1
+  const profileMenuDisabled = visibleProfiles.length === 0
   const defaultProfileId = getDefaultPresetProfileId() ?? getDefaultApiProfileId(draft)
   const activeProfile = draft.profiles.find((profile) => profile.id === draft.activeProfileId) ?? draft.profiles[0] ?? getActiveApiProfile(draft)
   const activePresetDescription = getPresetProfileDescription(activeProfile.id)
   const activeProfileLocked = isPresetProfileLocked(activeProfile.id)
-  const canDeleteActiveProfile = !presetConfigOnly && draft.profiles.length > 1 && (presetProfileIds.has(activeProfile.id) ? !presetDeletionPrevented : activeProfile.id !== defaultProfileId)
   const activeProviderIsOpenAICompatible = isOpenAICompatibleProvider(draft, activeProfile.provider)
   const activeCustomProvider = getCustomProviderDefinition(draft, activeProfile.provider)
   const activeProfileApiProxyEligible = isProfileApiProxyEligible(draft, activeProfile)
   const apiProxyChecked = activeProfileApiProxyEligible && (apiProxyLocked || activeProfile.apiProxy)
   const apiProxyEnabled = apiProxyAvailable && activeProfileApiProxyEligible && apiProxyChecked
-  const defaultProviderOrder = ['openai', 'sb2api-async', 'fal', ...draft.customProviders.map(p => p.id)]
+  const defaultProviderOrder = ['openai', ...draft.customProviders.map(p => p.id)]
   const providerOrder = draft.providerOrder || defaultProviderOrder
+
+  useEffect(() => {
+    if (!focusProfileNameRef.current) return
+    focusProfileNameRef.current = false
+    profileNameInputRef.current?.focus()
+    profileNameInputRef.current?.select()
+  }, [activeProfile.id])
 
   const unorderedProviderOptions = [
     { label: 'OpenAI 兼容接口', value: 'openai', draggable: true },
-    { label: 'sub2api（异步）', value: 'sb2api-async', draggable: true },
-    { label: 'fal.ai', value: 'fal', draggable: true },
     ...draft.customProviders.map((provider) => {
       const actions = [
         ...(!presetConfigOnly && !isPresetProviderLocked(provider.id) ? [{ label: '编辑', onClick: () => openEditCustomProvider(provider) }] : []),
@@ -234,8 +241,7 @@ export default function SettingsModal({ onImportProfile }: { onImportProfile: (s
   useEffect(() => {
     if (!showSettings) {
       wasSettingsOpenRef.current = false
-      setShowProfileMenu(false)
-      setShowProfileActions(false)
+      setProfileMenu(null)
       setCopyImportUrlProfile(null)
       setShowCustomProviderImport(false)
       setShowZipDownloadRouteManager(false)
@@ -285,11 +291,11 @@ export default function SettingsModal({ onImportProfile }: { onImportProfile: (s
   }, [])
 
   useEffect(() => {
-    if (!showProfileMenu && !showProfileActions) return
+    if (!profileMenu) return
 
     const handlePointerDown = (event: PointerEvent) => {
-      if (!profileMenuRef.current?.contains(event.target as Node)) setShowProfileMenu(false)
-      if (!profileActionsRef.current?.contains(event.target as Node)) setShowProfileActions(false)
+      const ref = profileMenu === 'add' ? profileAddMenuRef : profileMenuRef
+      if (!ref.current?.contains(event.target as Node)) setProfileMenu(null)
     }
 
     updateProfileMenuMaxHeight()
@@ -301,7 +307,7 @@ export default function SettingsModal({ onImportProfile }: { onImportProfile: (s
       window.removeEventListener('resize', updateProfileMenuMaxHeight)
       window.removeEventListener('scroll', updateProfileMenuMaxHeight, true)
     }
-  }, [showProfileMenu, showProfileActions, updateProfileMenuMaxHeight])
+  }, [profileMenu, updateProfileMenuMaxHeight])
 
   useEffect(() => {
     if (!profileTouchDragPreview) return
@@ -327,14 +333,12 @@ export default function SettingsModal({ onImportProfile }: { onImportProfile: (s
   const commitSettings = (nextDraft: AppSettings) => {
     const normalizedProfiles = nextDraft.profiles.map((profile) => {
       const nextApiProxy = isProfileApiProxyEligible(nextDraft, profile) && apiProxyAvailable ? (apiProxyLocked || profile.apiProxy) : false
-      const shouldKeepEmptyBaseUrl = profile.provider !== 'fal' && nextApiProxy && !profile.baseUrl.trim()
+      const shouldKeepEmptyBaseUrl = nextApiProxy && !profile.baseUrl.trim()
       const emptyBaseUrlFallback = profile.id === defaultProfileId
         ? getDefaultPresetBaseUrl()
         : DEFAULT_SETTINGS.baseUrl
-      const normalizedBaseUrl = profile.provider === 'fal'
-        ? profile.baseUrl.trim().replace(/\/+$/, '') || (profile.id === defaultProfileId ? '' : DEFAULT_FAL_BASE_URL)
-        : shouldKeepEmptyBaseUrl ? '' : normalizeBaseUrl(profile.baseUrl.trim() || emptyBaseUrlFallback)
-      const defaultModel = profile.provider === 'fal' ? DEFAULT_FAL_MODEL : getDefaultModelForMode(profile.apiMode)
+      const normalizedBaseUrl = shouldKeepEmptyBaseUrl ? '' : normalizeBaseUrl(profile.baseUrl.trim() || emptyBaseUrlFallback)
+      const defaultModel = getDefaultModelForMode(profile.apiMode)
       return {
         ...profile,
         name: profile.name.trim() || (profile.id === defaultProfileId ? '默认' : '新配置'),
@@ -444,8 +448,7 @@ export default function SettingsModal({ onImportProfile }: { onImportProfile: (s
   }
 
   const confirmCopyProfileImportUrl = (profile: ApiProfile) => {
-    setShowProfileMenu(false)
-    setShowProfileActions(false)
+    setProfileMenu(null)
     setCopyImportUrlProfile(profile)
     setCopyImportUrlOptions(readCopyImportUrlOptions())
   }
@@ -565,8 +568,12 @@ export default function SettingsModal({ onImportProfile }: { onImportProfile: (s
   }
 
   useCloseOnEscape(showSettings && !dataTransferMode, () => {
-    if (showProfileActions) return setShowProfileActions(false)
-    if (showProfileMenu) return setShowProfileMenu(false)
+    if (profileMenu) {
+      const trigger = profileMenu === 'add' ? profileAddMenuRef.current?.querySelector('button') : profileMenuTriggerRef.current
+      setProfileMenu(null)
+      trigger?.focus()
+      return
+    }
     handleClose()
   })
   usePreventBackgroundScroll(showSettings, copyImportUrlProfile ? profileShareScrollBoundaryRef : showZipDownloadRouteManager ? zipDownloadRouteScrollBoundaryRef : showCustomProviderImport ? customProviderScrollBoundaryRef : settingsScrollBoundaryRef)
@@ -601,7 +608,7 @@ export default function SettingsModal({ onImportProfile }: { onImportProfile: (s
           const nextDraft = normalizeSettings(useStore.getState().settings)
           setDraft(nextDraft)
           setTimeoutInput(String(getActiveApiProfile(nextDraft).timeout))
-          setShowProfileMenu(false)
+          setProfileMenu(null)
         }
       } finally {
         setIsImportingData(false)
@@ -615,7 +622,7 @@ export default function SettingsModal({ onImportProfile }: { onImportProfile: (s
     const nextDraft = normalizeSettings(useStore.getState().settings)
     setDraft(nextDraft)
     setTimeoutInput(String(getActiveApiProfile(nextDraft).timeout))
-    setShowProfileMenu(false)
+    setProfileMenu(null)
   }
 
   const createNewProfile = () => {
@@ -628,26 +635,30 @@ export default function SettingsModal({ onImportProfile }: { onImportProfile: (s
         activeProfileId: profile.id
     })
     commitSettings(nextDraft)
-    setShowProfileMenu(false)
+    setProfileMenu(null)
   }
 
-  const duplicateActiveProfile = () => {
+  const duplicateProfile = (source: ApiProfile) => {
     if (presetConfigOnly) return
     setReusedTaskApiProfile(null)
-    setShowProfileActions(false)
+    const baseName = source.name.replace(/（副本(?: \d+)?）$/, '')
+    let idx = 1
+    while (draft.profiles.some((profile) => profile.name === `${baseName}（副本${idx === 1 ? '' : ` ${idx}`}）`)) idx++
     const profile: ApiProfile = {
-      ...activeProfile,
-      id: newId(activeProfile.provider === 'openai' ? 'openai' : 'profile'),
+      ...source,
+      id: newId(source.provider === 'openai' ? 'openai' : 'profile'),
       isDefault: undefined,
-      name: `${activeProfile.name}（复制）`,
+      name: `${baseName}（副本${idx === 1 ? '' : ` ${idx}`}）`,
     }
     const nextDraft = normalizeSettings({
       ...draft,
       profiles: [...draft.profiles, profile],
       activeProfileId: profile.id,
     })
+    focusProfileNameRef.current = true
     commitSettings(nextDraft)
-    setShowProfileMenu(false)
+    setProfileMenu(null)
+    showToast(`已创建副本「${profile.name}」`, 'success')
   }
 
   const switchProfile = (id: string) => {
@@ -655,7 +666,7 @@ export default function SettingsModal({ onImportProfile }: { onImportProfile: (s
     setReusedTaskApiProfile(null)
     const nextDraft = normalizeSettings({ ...draft, activeProfileId: id })
     commitSettings(nextDraft)
-    setShowProfileMenu(false)
+    setProfileMenu(null)
   }
 
   const handleProfileDragStart = (e: React.DragEvent, id: string) => {
@@ -812,10 +823,10 @@ export default function SettingsModal({ onImportProfile }: { onImportProfile: (s
   }
 
   const handleProviderReorder = (sourceValue: string | number, targetValue: string | number, position: 'before' | 'after' | null) => {
-    const currentOrder = draft.providerOrder || ['openai', 'sb2api-async', 'fal', ...draft.customProviders.map(p => p.id)]
+    const currentOrder = draft.providerOrder || ['openai', ...draft.customProviders.map(p => p.id)]
     const sourceIndex = currentOrder.indexOf(String(sourceValue))
     const targetIndex = currentOrder.indexOf(String(targetValue))
-    if (sourceIndex < 0 || targetIndex < 0) return
+    if (sourceIndex < 0 || targetIndex < 0 || sourceIndex === targetIndex) return
 
     const newOrder = [...currentOrder]
     const [removed] = newOrder.splice(sourceIndex, 1)
@@ -1091,21 +1102,29 @@ export default function SettingsModal({ onImportProfile }: { onImportProfile: (s
             {activeTab === 'api' && (
               <div className="space-y-4">
                 <section className="rounded-2xl bg-gray-50 p-4 dark:bg-white/[0.03]">
-                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <div className="mb-3 flex items-center justify-between gap-3">
                     <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-200">配置管理 <span className="ml-1 text-xs font-normal text-gray-400">{visibleProfiles.length}</span></h4>
-                    <div className="flex items-center gap-1">
-                      {!presetConfigOnly && <button type="button" onClick={createNewProfile} className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-500/10"><PlusIcon className="h-3.5 w-3.5" />新建</button>}
-                      <button type="button" onClick={() => { handleClose(); onImportProfile() }} className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-white/[0.06]"><ImportIcon className="h-3.5 w-3.5" />导入</button>
+                    <div ref={profileAddMenuRef} className="relative shrink-0">
+                      <button type="button" aria-expanded={profileMenu === 'add'} aria-controls="profile-add-menu" onClick={() => setProfileMenu(profileMenu === 'add' ? null : 'add')} className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-500/10">
+                        <PlusIcon className="h-3.5 w-3.5" />添加配置<ChevronDownIcon className={`h-3 w-3 transition-transform ${profileMenu === 'add' ? 'rotate-180' : ''}`} />
+                      </button>
+                      {profileMenu === 'add' && <div id="profile-add-menu" role="group" aria-label="添加配置选项" className="absolute right-0 top-full z-50 mt-1 w-40 rounded-xl bg-white p-1 shadow-xl ring-1 ring-black/5 dark:bg-gray-800 dark:ring-white/10">
+                        {!presetConfigOnly && <button type="button" onClick={createNewProfile} className={`${PROFILE_MENU_ITEM_CLASS_NAME} text-gray-600 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-white/[0.06]`}><PlusIcon className="h-3.5 w-3.5" />新建配置</button>}
+                        <button type="button" onClick={() => { handleClose(); onImportProfile() }} className={`${PROFILE_MENU_ITEM_CLASS_NAME} text-gray-600 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-white/[0.06]`}><ImportIcon className="h-3.5 w-3.5" />导入配置</button>
+                      </div>}
                     </div>
                   </div>
                   <div ref={profileMenuRef} className="relative">
                     <button
                       ref={profileMenuTriggerRef}
                       type="button"
+                      aria-label="选择配置"
+                      aria-expanded={showProfileMenu}
+                      aria-controls="profile-list-menu"
                       onClick={() => {
                         if (profileMenuDisabled) return
                         if (!showProfileMenu) updateProfileMenuMaxHeight()
-                        setShowProfileMenu(!showProfileMenu)
+                        setProfileMenu(showProfileMenu ? null : 'select')
                       }}
                       disabled={profileMenuDisabled}
                       className={`flex w-full min-w-0 items-center justify-between gap-2 rounded-xl border border-transparent bg-black/[0.04] px-3 py-2 text-sm text-gray-700 outline-none transition dark:bg-white/[0.06] dark:text-gray-200 ${profileMenuDisabled ? 'cursor-not-allowed opacity-70' : 'hover:bg-gray-50 dark:hover:bg-white/[0.1]'}`}
@@ -1113,7 +1132,7 @@ export default function SettingsModal({ onImportProfile }: { onImportProfile: (s
                     >
                       <span className="flex min-w-0 items-center gap-2">
                         <span className="min-w-0 truncate">{activeProfile.name}</span>
-                        <span className="shrink-0 rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-600 dark:bg-blue-500/10 dark:text-blue-400">
+                        <span className="hidden shrink-0 rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-600 dark:bg-blue-500/10 dark:text-blue-400 sm:inline">
                           {getApiProviderLabel(draft, activeProfile.provider)}
                         </span>
                       </span>
@@ -1123,11 +1142,15 @@ export default function SettingsModal({ onImportProfile }: { onImportProfile: (s
                     {showProfileMenu && !profileMenuDisabled && (
                       <>
                         <div
+                          id="profile-list-menu"
+                          role="group"
+                          aria-label="配置列表"
                           className="absolute right-0 top-full z-50 mt-1.5 w-full overflow-hidden overflow-y-auto rounded-xl border border-transparent bg-white/95 shadow-[0_8px_30px_rgb(0,0,0,0.12)] ring-1 ring-black/5 backdrop-blur-xl animate-dropdown-down dark:bg-gray-800/95 dark:shadow-[0_8px_30px_rgb(0,0,0,0.4)] dark:ring-white/[0.06] custom-scrollbar"
                           style={{ maxHeight: profileMenuMaxHeight }}
                         >
                           <div>
                             {visibleProfiles.map((profile) => {
+                              const canDelete = !presetConfigOnly && draft.profiles.length > 1 && (presetProfileIds.has(profile.id) ? !presetDeletionPrevented : profile.id !== defaultProfileId)
                               return (
                                 <div
                                   key={profile.id}
@@ -1143,8 +1166,8 @@ export default function SettingsModal({ onImportProfile }: { onImportProfile: (s
                                   onTouchEnd={handleProfileTouchEnd}
                                   onTouchCancel={handleProfileDragEnd}
                                   onClick={(e) => {
-                                    // 点击拖拽柄时不切换配置。
-                                    if ((e.target as HTMLElement).closest('[data-drag-handle]')) return
+                                    // 配置操作和拖拽不应触发配置切换。
+                                    if ((e.target as HTMLElement).closest('button, [data-drag-handle]')) return
                                     e.preventDefault()
                                     switchProfile(profile.id)
                                   }}
@@ -1167,12 +1190,19 @@ export default function SettingsModal({ onImportProfile }: { onImportProfile: (s
                                       <DragHandleIcon className="h-3.5 w-3.5" />
                                     </div>
                                   )}
-                                  <span className="min-w-0 truncate">{profile.name}</span>
-                                  <span className={`rounded px-1.5 py-0.5 text-[10px] shrink-0 ${profile.id === activeProfile.id ? 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300' : 'bg-gray-100 text-gray-500 dark:bg-white/[0.08] dark:text-gray-400'}`}>
-                                    {getApiProviderLabel(draft, profile.provider)}
-                                  </span>
+                                  <div className="min-w-0">
+                                    <span className="block truncate">{profile.name}</span>
+                                    <span className="mt-0.5 block truncate text-[10px] font-normal text-gray-400 dark:text-gray-500">{getApiProviderLabel(draft, profile.provider)}</span>
+                                  </div>
                                 </div>
-
+                                <div data-profile-actions className="flex shrink-0 items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
+                                  {!presetConfigOnly && <button type="button" aria-label={`复制配置「${profile.name}」`} title="创建副本" draggable={false} onClick={() => duplicateProfile(profile)} className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-white/[0.08] dark:hover:text-gray-200"><CopyIcon className="h-3.5 w-3.5" /></button>}
+                                  <button type="button" aria-label={`分享配置「${profile.name}」`} title="分享配置" draggable={false} onClick={() => confirmCopyProfileImportUrl(profile)} className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-white/[0.08] dark:hover:text-gray-200"><LinkIcon className="h-3.5 w-3.5" /></button>
+                                  {!presetConfigOnly && <button type="button" aria-label={`删除配置「${profile.name}」`} title={canDelete ? '删除配置' : '默认或受保护的配置不可删除，且需至少保留一项配置'} disabled={!canDelete} draggable={false} onClick={() => {
+                                    setProfileMenu(null)
+                                    setConfirmDialog({ title: '删除配置', message: `确定要删除配置「${profile.name}」吗？`, action: () => deleteProfile(profile.id) })
+                                  }} className="ml-1 flex h-8 w-8 items-center justify-center rounded-lg text-red-400 hover:bg-red-50 hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-30 dark:hover:bg-red-500/10"><TrashIcon className="h-3.5 w-3.5" /></button>}
+                                </div>
                               </div>
                               )
                             })}
@@ -1184,32 +1214,12 @@ export default function SettingsModal({ onImportProfile }: { onImportProfile: (s
                 </section>
 
                 <section className="rounded-2xl border border-gray-100 p-4 dark:border-white/[0.08]">
-                  <div className="mb-5 flex items-center justify-between gap-3">
-                    <h4 className="text-sm font-semibold text-gray-800 dark:text-gray-100">配置详情{activeProfileLocked && <span className="ml-2 text-xs font-normal text-gray-400">部署锁定</span>}</h4>
-                    <div className="flex items-center gap-1">
-                      <button type="button" onClick={() => confirmCopyProfileImportUrl(activeProfile)} className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-white/[0.06]"><LinkIcon className="h-3.5 w-3.5" />分享</button>
-                      {!presetConfigOnly && <div ref={profileActionsRef} className="relative">
-                        <button type="button" aria-label="更多配置操作" aria-expanded={showProfileActions} onClick={() => setShowProfileActions(!showProfileActions)} className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-white/[0.06]">
-                          <svg aria-hidden="true" className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
-                            <circle cx="6" cy="12" r="1.75" />
-                            <circle cx="12" cy="12" r="1.75" />
-                            <circle cx="18" cy="12" r="1.75" />
-                          </svg>
-                        </button>
-                        {showProfileActions && <div className="absolute right-0 top-full z-50 mt-1 w-40 rounded-xl bg-white p-1 shadow-xl ring-1 ring-black/5 dark:bg-gray-800 dark:ring-white/10">
-                          <button type="button" onClick={duplicateActiveProfile} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-gray-600 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-white/[0.06]"><CopyIcon className="h-3.5 w-3.5" />复制副本</button>
-                          <button type="button" disabled={!canDeleteActiveProfile} onClick={() => {
-                            setShowProfileActions(false)
-                            setConfirmDialog({ title: '删除配置', message: `确定要删除配置「${activeProfile.name}」吗？`, action: () => deleteProfile(activeProfile.id) })
-                          }} title={canDeleteActiveProfile ? undefined : '默认或受保护的配置不可删除，且需至少保留一项配置'} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-red-500 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-red-500/10"><TrashIcon className="h-3.5 w-3.5" />删除配置</button>
-                        </div>}
-                      </div>}
-                    </div>
-                  </div>
+                  <h4 className="mb-5 text-sm font-semibold text-gray-800 dark:text-gray-100">配置详情{activeProfileLocked && <span className="ml-2 text-xs font-normal text-gray-400">部署锁定</span>}</h4>
                   {activePresetDescription && <details className="mb-4 rounded-xl bg-gray-50 p-3 text-xs text-gray-500 dark:bg-white/[0.04] dark:text-gray-400"><summary className="cursor-pointer">配置说明</summary><MarkdownRenderer content={activePresetDescription} className="mt-3 text-sm leading-6" /></details>}
                   <ApiProfileEditor
                     key={activeProfile.id}
                     profile={activeProfile}
+                    nameInputRef={profileNameInputRef}
                     customProvider={activeCustomProvider}
                     locked={activeProfileLocked}
                     presetOnly={presetConfigOnly}

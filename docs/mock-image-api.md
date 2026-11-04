@@ -20,10 +20,9 @@ $env:MOCK_IMAGE_API_PORT="8788"; npm run mock:api
 
 在应用设置里创建普通 OpenAI 兼容配置：
 
-- 服务商类型：OpenAI 兼容
+- 接入方式：OpenAI Images API
 - API 地址：按下方模式填写，例如 `http://127.0.0.1:8787/url-cors-block`
 - API Key：任意非空字符串，例如 `mock`
-- API 模式：`Images API`
 - 模型：任意值，例如 `mock`
 
 模拟服务会读取请求体里的 `n`，最多返回 10 条结果。把应用里的图片数量调到 2 或更多后，`url-cors-block` 这类模式会一次返回多个图片 URL，可用于测试“原始图片链接”弹窗。
@@ -88,7 +87,7 @@ $env:MOCK_IMAGE_API_PORT="8788"; npm run mock:api
 
 导入后创建 API 配置：
 
-- 服务商类型：`本地故障模拟`
+- 接入方式：`本地故障模拟`
 - API 地址：`http://127.0.0.1:8787`
 - API Key：任意非空字符串，例如 `mock`
 - 模型：可填 `mock:url-cors-block`、`mock:url-ok`、`mock:no-recognizable` 或 `mock:http-error`
@@ -141,7 +140,7 @@ $env:MOCK_IMAGE_API_PORT="8788"; npm run mock:api
 
 导入后创建 API 配置：
 
-- 服务商类型：`本地异步故障模拟`
+- 接入方式：`本地异步故障模拟`
 - API 地址：`http://127.0.0.1:8787`
 - API Key：任意非空字符串，例如 `mock`
 - 模型：可填 `mock:url-cors-block`、`mock:url-ok`、`mock:b64`、`mock:async-failure`、`mock:async-no-task-id` 或 `mock:async-empty`

@@ -12,7 +12,7 @@
 
 **基于 OpenAI gpt-image-2.5 API 的图片生成与编辑工具**
 
-提供简洁精美的 Web UI，支持 OpenAI / OpenAI 兼容接口、sub2api（异步）、fal.ai 与可导入的自定义 HTTP 供应商。<br>
+提供简洁精美的 Web UI，支持 OpenAI / OpenAI 兼容接口与可导入的自定义 HTTP 供应商。<br>
 支持文本生图、参考图、画板标注与遮罩编辑，数据纯本地化存储，带来流畅的历史记录与参数管理体验。
 
 <br>
@@ -83,7 +83,7 @@
 - **批量与迭代**：支持单次多图生成；一键将满意结果转为参考图，无缝开启下一轮修改。
 - **多提示词批量提交**：在“设置 - 习惯配置”中开启后，可一次粘贴多条提示词批量生成。提示词之间空两行分隔（评论等单个空行仍属于同一条提示词），参考图和参数对每条提示词都生效；支持排队或并发执行，并发数默认限制为 10，进行中可查看进度并随时停止。
 - **流式生成预览**：`Images API` 与 `Responses API` 模式均支持流式接收中间步骤图像，缓解连接超时问题。
-- **透明背景（API 原生 / 本地后处理双模式）**：画廊模式下选择 PNG 或 WebP 格式后可开启透明背景功能，每个 API 配置可独立选择实现方式（设置入口在 API 配置页）。API 原生模式会直接请求模型返回透明通道（需当前接口和模型支持；fal.ai 暂无对应参数），本地后处理模式则会要求模型使用纯绿色或纯洋红色背景，并在结果返回后于浏览器中去除背景色，按所选 PNG 或 WebP 格式保存透明结果。
+- **透明背景（API 原生 / 本地后处理双模式）**：画廊模式下选择 PNG 或 WebP 格式后可开启透明背景功能，每个 API 配置可独立选择实现方式（设置入口在 API 配置页）。API 原生模式会直接请求模型返回透明通道（需当前接口和模型支持），本地后处理模式则会要求模型使用纯绿色或纯洋红色背景，并在结果返回后于浏览器中去除背景色，按所选 PNG 或 WebP 格式保存透明结果。
 
   > 本地后处理流程适用于图标、贴纸、单主体素材等场景；若主体边缘存在复杂发丝、半透明材质、强反光或与背景色接近的颜色，可能出现边缘残留或误抠。若使用 API 原生模式时接口返回“不支持透明背景”类错误，应用会提示切换为本地后处理。
 
@@ -102,8 +102,8 @@
 ### 🔌 多配置与供应商增强
 - **多配置管理**：支持创建并保存多个 API 配置（包含供应商、API Key、模型等），按需快速切换；支持一键复制当前配置到列表底部，并通过拖拽对配置列表与供应商列表进行自定义排序。
 - **多模型切换**：配置的模型 ID 可用逗号分隔填写多个模型（如 `gpt-image-2.5-sunburst, gpt-image-2`），在首页参数栏的“模型”中切换，选择按配置分别记住；预置配置、URL 传参与导入导出均支持这种写法。
-- **多供应商接入**：内置 OpenAI 兼容接口（含 `Images API` 和 `Responses API`）、sub2api（异步）、fal.ai（支持队列），并支持通过 JSON 导入自定义 HTTP 供应商配置（兼容同步/异步任务）。
-- **API 代理**：OpenAI 兼容接口与 fal.ai 均可配置自定义代理。其中 OpenAI 兼容接口可开启同源 `/api-proxy/` 代理，交由 Docker 或本地开发环境转发至真实 API，绕开浏览器 CORS 限制。
+- **多供应商接入**：内置 OpenAI 兼容接口（含 `Images API` 和 `Responses API`），并支持通过 JSON 导入自定义 HTTP 供应商配置（兼容同步/异步任务）。
+- **API 代理**：OpenAI 兼容接口可开启同源 `/api-proxy/` 代理，交由 Docker 或本地开发环境转发至真实 API，绕开浏览器 CORS 限制。
 - **Codex CLI 兼容模式**：对上游为 Codex CLI 的 API，开启后应用 Codex CLI 实际支持的参数，并将多图生成拆分为并发单图。
 - **提示词防改写**：Responses API 会始终在请求文本前加入强制指令防止提示词被改写；开启 Codex CLI 模式后，Images API 也会获得同等保护。
 - **智能诊断提示**：当检测到接口异常改写行为或缺少常规参数时，自动提示开启相应的兼容模式。
@@ -126,7 +126,7 @@
 |------|------|------|
 | **直接填写 API 地址** | 自动创建一个 OpenAI 兼容的默认预置配置（ID 为 `default-openai`）并注入 API URL，其余参数（模型、超时等）使用应用默认值，用户只需补充 API Key。末尾带 `/` 时直接拼接接口，不补 `/v1` 前缀。适合只提供一个配置的部署。后续如需通过 JSON 或链接更新此配置，指定 `id` 为 `default-openai` 即可。 | `https://api.openai.com/v1` |
 | **API 地址 + 查询参数** | 在地址后追加参数，可同时预填 Key、模型等字段。 | `https://api.openai.com/v1?model=gpt-image-2.5-sunburst&apiMode=images` |
-| **JSON 配置文件 / 导入链接** | 通过仓库内或本地的 JSON 文件路径（如 `./config.json`）、远程 URL 或含 `?settings=` 参数的导入链接提供完整预置配置，支持预置多个配置（OpenAI 兼容、sub2api（异步）、fal.ai 或自定义供应商）。 | 详见 [预置配置 JSON 格式](#preset-config-json) |
+| **JSON 配置文件 / 导入链接** | 通过仓库内或本地的 JSON 文件路径（如 `./config.json`）、远程 URL 或含 `?settings=` 参数的导入链接提供完整预置配置，支持预置多个配置（OpenAI Images API / Responses API 或自定义 HTTP 接口）。 | 详见 [预置配置 JSON 格式](#preset-config-json) |
 
 **环境变量一览**
 
@@ -378,11 +378,11 @@ npm run build
 <a id="url-quick-fill"></a>
 ## 🛠️ 配置分享与导入
 
-在 **设置 → API 配置 → 配置详情 → 分享** 中复制完整配置链接，或复制配置 JSON、导出 JSON 文件。分享默认不包含 API Key，接收方可在导入预览中填写。
+在 **设置 → API 配置 → 配置管理 → 配置下拉列表 → 对应配置的分享按钮** 中复制完整配置链接，或复制配置 JSON、导出 JSON 文件。分享默认不包含 API Key，接收方可在导入预览中填写。
 
 打开分享链接会先显示配置预览，确认后才保存和切换。默认添加为新配置；连接相同的配置可以选择复用，也可以明确选择覆盖某个已有配置。自定义服务商定义随配置一起导入，同 ID 的不同服务商会另存，不会自动覆盖本地定义。
 
-在 **配置管理 → 导入** 中可以粘贴分享链接、配置 JSON，或选择 JSON 文件。新分享链接使用 `#config=` 承载配置；旧版 `?settings=` 和下面的查询参数链接仍可导入，也会先显示预览。仅展示预置配置的部署只允许更新匹配预置配置中允许修改的字段。
+在 **配置管理 → 添加配置 → 导入配置** 中可以粘贴分享链接、配置 JSON，或选择 JSON 文件。新分享链接使用 `#config=` 承载配置；旧版 `?settings=` 和下面的查询参数链接仍可导入，也会先显示预览。仅展示预置配置的部署只允许更新匹配预置配置中允许修改的字段。
 
 ### 兼容查询参数与 New API 集成
 
@@ -418,7 +418,7 @@ https://cooksleep.github.io/gpt_image_playground?apiUrl={address}&apiKey={key}&m
 
 使用 JSON 文件或分享链接提供预置配置时，JSON 对象支持以下顶层字段：
 
-- **`customProviders`**（可选数组）：自定义供应商定义。只使用内置供应商（OpenAI 兼容、sub2api（异步）或 fal.ai）时可省略。
+- **`customProviders`**（可选数组）：自定义供应商定义。只使用 OpenAI 兼容接口时可省略。
 - **`profiles`**（数组）：预置的 API 配置列表。每项对应用户配置页中的一个配置条目。
 
 ### 配置列表字段说明（`profiles`）
@@ -428,8 +428,8 @@ https://cooksleep.github.io/gpt_image_playground?apiUrl={address}&apiKey={key}&m
 | `id` | 部署预置时填写 | 标识部署预置配置，供后续部署同步和旧链接定位。普通分享会省略此字段；手动导入默认新建，不会因为 ID 相同而直接覆盖本地配置。 |
 | `name` | 是 | 配置名称，方便用户识别。 |
 | `description` | 否 | 配置说明，支持 Markdown；显示在配置详情中，可展开查看。文本可选中和复制，其中的链接可点击。 |
-| `provider` | 是 | 供应商类型。`"openai"` 为 OpenAI 兼容接口，`"sb2api-async"` 为 sub2api（异步），`"fal"` 为 fal.ai，其他值引用 `customProviders` 中具有相同 ID 的供应商定义。 |
-| `baseUrl` | 是 | API 基础地址（Base URL）。未以 `/` 结尾时遵循 OpenAI 规则自动补齐 `/v1` 前缀；以 `/` 结尾时直接基于该地址请求接口，不补 `/v1`；fal.ai 可留空。 |
+| `provider` | 是 | 供应商类型。`"openai"` 为 OpenAI 兼容接口，其他值引用 `customProviders` 中具有相同 ID 的供应商定义。 |
+| `baseUrl` | 是 | API 基础地址（Base URL）。未以 `/` 结尾时遵循 OpenAI 规则自动补齐 `/v1` 前缀；以 `/` 结尾时直接基于该地址请求接口，不补 `/v1`。 |
 | `apiKey` | 否 | API Key。建议省略，让用户导入后自行填写。 |
 | `model` | 是 | 模型 ID。多个模型以逗号分隔，默认使用第一个，用户可在首页切换。 |
 | `imageGenerationModel` | 否 | Responses API 的 `image_generation` 工具模型，默认 `gpt-image-2.5-sunburst`；也可使用 `gpt-image-2.5-flare`。留空时不发送工具模型 ID，保持 API 默认值。 |
@@ -437,7 +437,7 @@ https://cooksleep.github.io/gpt_image_playground?apiUrl={address}&apiKey={key}&m
 | `isDefault` | 否 | 有多个配置时，为默认项设置 `true`（只能有一个）；只有一个配置时不填。默认项决定首次使用时自动选中的配置；允许拖动排序和删除（受保护策略控制）。 |
 | `timeout` | 否 | 请求超时秒数，默认 600。 |
 | `apiProxy` | 否 | 是否走部署端 API 代理，默认 `false`。 |
-| `transparentBackgroundMethod` | 否 | 透明背景实现方式：`"api"`（API 原生）或 `"local"`（本地后处理）。OpenAI 兼容配置默认 `"api"`，fal.ai 默认 `"local"`，自定义服务商若生成和编辑请求都映射了 `$params.background` 模板变量则默认 `"api"`，否则默认 `"local"`。 |
+| `transparentBackgroundMethod` | 否 | 透明背景实现方式：`"api"`（API 原生）或 `"local"`（本地后处理）。OpenAI 兼容配置默认 `"api"`，自定义服务商若生成和编辑请求都映射了 `$params.background` 模板变量则默认 `"api"`，否则默认 `"local"`。 |
 
 ### 示例：仅 OpenAI 兼容
 
@@ -456,32 +456,28 @@ https://cooksleep.github.io/gpt_image_playground?apiUrl={address}&apiKey={key}&m
 }
 ```
 
-### 示例：OpenAI 兼容 + sub2api + fal.ai 多配置
+### 示例：Images API 与 Responses API 多配置
 
 ```json
 {
   "profiles": [
     {
-      "id": "openai-main",
-      "name": "OpenAI",
+      "id": "images-main",
+      "name": "图片直连",
       "provider": "openai",
+      "apiMode": "images",
       "baseUrl": "https://api.openai.com/v1",
       "model": "gpt-image-2.5-sunburst",
       "isDefault": true
     },
     {
-      "id": "sub2api-profile",
-      "name": "sub2api 异步",
-      "provider": "sb2api-async",
+      "id": "responses-main",
+      "name": "通过文本模型生图",
+      "provider": "openai",
+      "apiMode": "responses",
       "baseUrl": "https://api.example.com/v1",
-      "model": "gpt-image-2.5-sunburst"
-    },
-    {
-      "id": "fal-profile",
-      "name": "fal.ai",
-      "provider": "fal",
-      "baseUrl": "",
-      "model": "openai/gpt-image-2"
+      "model": "gpt-6.1-sol",
+      "imageGenerationModel": "gpt-image-2.5-sunburst"
     }
   ]
 }
@@ -540,7 +536,7 @@ VITE_DEFAULT_API_URL=https://example.com/gpt-image-config.json
 **创建方式：**
 
 1. **在线体验中生成**：打开 [Vercel 上游在线体验](https://gpt-image-playground.cooksleep.dev) 或 [GitHub Pages 上游在线体验](https://cooksleep.github.io/gpt_image_playground)，进入 **设置 → API 配置 → 供应商类型 → 创建自定义供应商 → AI 一键生成与导入**，粘贴第三方 API 文档让 AI 生成配置。
-2. **应用内导出**：生成完成后，在 **API 配置 → 配置详情 → 分享** 中复制分享链接，或导出 JSON。部署预置请使用导出的 JSON 文件，并按下方格式填写稳定的服务商与配置 ID；分享链接用于接收方预览导入。
+2. **应用内导出**：生成完成后，在 **API 配置 → 配置管理 → 配置下拉列表 → 对应配置的分享按钮** 中复制分享链接，或导出 JSON。部署预置请使用导出的 JSON 文件，并按下方格式填写稳定的服务商与配置 ID；分享链接用于接收方预览导入。
 
 也可以参考 [自定义供应商 LLM 提示词](docs/custom-provider-llm-prompt.md)，将提示词和第三方 API 文档直接发给任意 LLM，手动获取完整 JSON。
 

@@ -8,13 +8,13 @@ afterEach(() => {
 describe('preset config policy', () => {
   it('exposes every current preset profile in preset-only mode', async () => {
     vi.stubEnv('VITE_SHOW_PRESET_CONFIG_ONLY', 'true')
-    const { createDefaultFalProfile, createDefaultOpenAIProfile } = await import('./apiProfiles')
+    const { createDefaultOpenAIProfile } = await import('./apiProfiles')
     const policy = await import('./presetConfig')
     policy.setPresetConfig({
       customProviders: [],
       profiles: [
         createDefaultOpenAIProfile({ id: 'preset-a', isDefault: true }),
-        createDefaultFalProfile({ id: 'preset-b' }),
+        createDefaultOpenAIProfile({ id: 'preset-b' }),
       ],
     })
 
@@ -46,7 +46,7 @@ describe('preset config policy', () => {
 
   it('locks preset parameters and providers except API keys without preventing profile deletion', async () => {
     vi.stubEnv('VITE_LOCK_PRESET_CONFIG_PARAMS', 'true')
-    const { createDefaultFalProfile, createDefaultOpenAIProfile, normalizeSettings } = await import('./apiProfiles')
+    const { createDefaultOpenAIProfile, normalizeSettings } = await import('./apiProfiles')
     const policy = await import('./presetConfig')
     const source = createDefaultOpenAIProfile({
       id: 'preset-a',
@@ -56,7 +56,7 @@ describe('preset config policy', () => {
       apiKey: 'deployed-key',
       model: 'preset-model',
     })
-    const user = createDefaultFalProfile({ id: 'user-profile', model: 'user-model' })
+    const user = createDefaultOpenAIProfile({ id: 'user-profile', model: 'user-model' })
     const provider = { id: 'preset-provider', name: 'Preset Provider', submit: { path: 'generate' } }
     const removed = createDefaultOpenAIProfile({ id: 'preset-removed', provider: provider.id })
     policy.setPresetConfig({ customProviders: [provider], profiles: [source, removed] })
@@ -84,10 +84,10 @@ describe('preset config policy', () => {
   })
 
   it('allows removed presets to stay deleted by default', async () => {
-    const { createDefaultFalProfile, createDefaultOpenAIProfile, normalizeSettings } = await import('./apiProfiles')
+    const { createDefaultOpenAIProfile, normalizeSettings } = await import('./apiProfiles')
     const policy = await import('./presetConfig')
     const presetA = createDefaultOpenAIProfile({ id: 'preset-a', isDefault: true })
-    const presetB = createDefaultFalProfile({ id: 'preset-b' })
+    const presetB = createDefaultOpenAIProfile({ id: 'preset-b' })
     const user = createDefaultOpenAIProfile({ id: 'user-profile' })
     policy.setPresetConfig({ customProviders: [], profiles: [presetA, presetB] })
 
@@ -102,10 +102,10 @@ describe('preset config policy', () => {
   })
 
   it('preserves the user order when the default preset is not first', async () => {
-    const { createDefaultFalProfile, createDefaultOpenAIProfile, normalizeSettings } = await import('./apiProfiles')
+    const { createDefaultOpenAIProfile, normalizeSettings } = await import('./apiProfiles')
     const policy = await import('./presetConfig')
     const presetA = createDefaultOpenAIProfile({ id: 'preset-a', isDefault: true })
-    const presetB = createDefaultFalProfile({ id: 'preset-b' })
+    const presetB = createDefaultOpenAIProfile({ id: 'preset-b' })
     const user = createDefaultOpenAIProfile({ id: 'user-profile' })
     policy.setPresetConfig({ customProviders: [], profiles: [presetA, presetB] })
 
@@ -120,11 +120,11 @@ describe('preset config policy', () => {
 
   it('restores removed presets when deletion is prevented', async () => {
     vi.stubEnv('VITE_PREVENT_PRESET_CONFIG_DELETION', 'true')
-    const { createDefaultFalProfile, createDefaultOpenAIProfile, normalizeSettings } = await import('./apiProfiles')
+    const { createDefaultOpenAIProfile, normalizeSettings } = await import('./apiProfiles')
     const policy = await import('./presetConfig')
     const provider = { id: 'preset-provider', name: 'Preset Provider', submit: { path: 'generate' } }
     const presetA = createDefaultOpenAIProfile({ id: 'preset-a', isDefault: true })
-    const presetB = createDefaultFalProfile({ id: 'preset-b' })
+    const presetB = createDefaultOpenAIProfile({ id: 'preset-b' })
     const user = createDefaultOpenAIProfile({ id: 'user-profile' })
     policy.setPresetConfig({ customProviders: [provider], profiles: [presetA, presetB] })
 
@@ -177,10 +177,10 @@ describe('preset config policy', () => {
 
   it('locks preset parameters without restoring their deployment order', async () => {
     vi.stubEnv('VITE_LOCK_PRESET_CONFIG_PARAMS', 'true')
-    const { createDefaultFalProfile, createDefaultOpenAIProfile, normalizeSettings } = await import('./apiProfiles')
+    const { createDefaultOpenAIProfile, normalizeSettings } = await import('./apiProfiles')
     const policy = await import('./presetConfig')
     const presetA = createDefaultOpenAIProfile({ id: 'preset-a', isDefault: true, model: 'preset-a-model' })
-    const presetB = createDefaultFalProfile({ id: 'preset-b', model: 'preset-b-model' })
+    const presetB = createDefaultOpenAIProfile({ id: 'preset-b', model: 'preset-b-model' })
     const user = createDefaultOpenAIProfile({ id: 'user-profile' })
     policy.setPresetConfig({ customProviders: [], profiles: [presetA, presetB] })
 
@@ -223,11 +223,11 @@ describe('preset config policy', () => {
 
   it('allows a dismissed provider to stay deleted after its only preset profile is deleted', async () => {
     vi.stubEnv('VITE_LOCK_PRESET_CONFIG_PARAMS', 'true')
-    const { createDefaultFalProfile, createDefaultOpenAIProfile } = await import('./apiProfiles')
+    const { createDefaultOpenAIProfile } = await import('./apiProfiles')
     const policy = await import('./presetConfig')
     const provider = { id: 'preset-provider', name: 'Preset Provider', submit: { path: 'generate' } }
     const source = createDefaultOpenAIProfile({ id: 'preset-profile', provider: provider.id })
-    const user = createDefaultFalProfile({ id: 'user-profile' })
+    const user = createDefaultOpenAIProfile({ id: 'user-profile' })
     policy.setPresetConfig({ customProviders: [provider], profiles: [source] })
 
     expect(policy.isPresetProviderDeletionPrevented(provider.id, [])).toBe(false)
@@ -263,8 +263,8 @@ describe('preset config policy', () => {
     expect(policy.isPresetProviderDeletionPrevented(provider.id, [profiles[1]])).toBe(true)
   })
 
-  it('uses the default OpenAI-compatible preset URL but not the fal.ai URL as the empty-field fallback', async () => {
-    const { createDefaultFalProfile, createDefaultOpenAIProfile } = await import('./apiProfiles')
+  it('uses the default preset URL and leaves the fallback empty when no preset exists', async () => {
+    const { createDefaultOpenAIProfile } = await import('./apiProfiles')
     const policy = await import('./presetConfig')
     policy.setPresetConfig({
       customProviders: [],
@@ -274,7 +274,7 @@ describe('preset config policy', () => {
 
     policy.setPresetConfig({
       customProviders: [],
-      profiles: [createDefaultFalProfile({ id: 'fal-preset', baseUrl: 'https://fal-proxy.example.com' })],
+      profiles: [],
     })
     expect(policy.getDefaultPresetBaseUrl()).toBe('')
   })

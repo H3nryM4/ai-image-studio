@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_PARAMS } from '../types'
 import type { TaskParams, TaskRecord } from '../types'
-import { addImageSizeParam, createTaskDonePatch, createTaskErrorPatch, deriveGalleryActualParams, firstActualParams, mapActualParamsByImage, mapRevisedPromptsByImage, markInterruptedOpenAIRunningTasks } from './taskState'
+import { addImageSizeParam, createTaskDonePatch, createTaskErrorPatch, deriveGalleryActualParams, firstActualParams, mapActualParamsByImage, mapRevisedPromptsByImage, markInterruptedRunningTasks } from './taskState'
 
 function task(overrides: Partial<TaskRecord> = {}): TaskRecord {
   return {
@@ -41,19 +41,18 @@ describe('task lifecycle patches', () => {
     const source = task({ createdAt: 1_000, startedAt: 7_000 })
     expect(createTaskDonePatch(source, 10_000).elapsed).toBe(3_000)
     expect(createTaskErrorPatch(source, '失败', 10_000).elapsed).toBe(3_000)
-    expect(markInterruptedOpenAIRunningTasks([{ ...source, status: 'running' }], 10_000).tasks[0].elapsed).toBe(3_000)
+    expect(markInterruptedRunningTasks([{ ...source, status: 'running' }], 10_000).tasks[0].elapsed).toBe(3_000)
   })
 
   it('marks legacy and OpenAI running tasks as interrupted', () => {
     const now = 10_000
     const legacyRunning = task({ id: 'legacy-running', status: 'running', createdAt: 1_000, finishedAt: null, elapsed: null })
     const openAIRunning = task({ id: 'openai-running', apiProvider: 'openai', status: 'running', createdAt: 2_000, finishedAt: null, elapsed: null })
-    const falRunning = task({ id: 'fal-running', apiProvider: 'fal', status: 'running', createdAt: 3_000, finishedAt: null, elapsed: null })
     const customAsyncRunning = task({ id: 'custom-running', apiProvider: 'custom-provider', customTaskId: 'task-1', status: 'running', createdAt: 4_000, finishedAt: null, elapsed: null })
     const customSyncRunning = task({ id: 'custom-sync-running', apiProvider: 'custom-provider', status: 'running', createdAt: 5_000, finishedAt: null, elapsed: null })
     const doneTask = task({ id: 'done-task', apiProvider: 'openai', status: 'done' })
 
-    const result = markInterruptedOpenAIRunningTasks([legacyRunning, openAIRunning, falRunning, customAsyncRunning, customSyncRunning, doneTask], now)
+    const result = markInterruptedRunningTasks([legacyRunning, openAIRunning, customAsyncRunning, customSyncRunning, doneTask], now)
 
     expect(result.interruptedTasks.map((item) => item.id)).toEqual(['legacy-running', 'openai-running', 'custom-sync-running'])
     expect(result.tasks.find((item) => item.id === 'legacy-running')).toMatchObject({
@@ -68,7 +67,6 @@ describe('task lifecycle patches', () => {
       finishedAt: now,
       elapsed: 8_000,
     })
-    expect(result.tasks.find((item) => item.id === 'fal-running')).toEqual(falRunning)
     expect(result.tasks.find((item) => item.id === 'custom-running')).toEqual(customAsyncRunning)
     expect(result.tasks.find((item) => item.id === 'custom-sync-running')).toMatchObject({ status: 'error', error: '请求中断' })
     expect(result.tasks.find((item) => item.id === 'done-task')).toEqual(doneTask)
@@ -94,12 +92,11 @@ describe('task actual params', () => {
     })
   })
 
-  it('keeps fal and async custom params per image while deriving gallery totals for other providers', () => {
+  it('keeps async custom params per image while deriving gallery totals for other providers', () => {
     const paramsList: Array<Partial<TaskParams>> = [{ output_format: 'png', size: '1254x1254' }]
 
-    expect(deriveGalleryActualParams('fal', false, { n: 8 }, paramsList, 1)).toEqual(paramsList[0])
-    expect(deriveGalleryActualParams('custom-provider', true, { n: 8 }, paramsList, 1)).toEqual(paramsList[0])
-    expect(deriveGalleryActualParams('openai', false, { output_format: 'png' }, paramsList, 2)).toEqual({
+    expect(deriveGalleryActualParams(true, { n: 8 }, paramsList, 1)).toEqual(paramsList[0])
+    expect(deriveGalleryActualParams(false, { output_format: 'png' }, paramsList, 2)).toEqual({
       output_format: 'png',
       size: '1254x1254',
       n: 2,

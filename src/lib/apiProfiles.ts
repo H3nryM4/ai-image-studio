@@ -18,12 +18,10 @@ const DEFAULT_API_URL_PATCH = isImportableConfigUrl(RAW_DEFAULT_API_URL)
 const DEFAULT_BASE_URL = DEFAULT_API_URL_PATCH?.baseUrl ?? ''
 export { DEFAULT_IMAGES_MODEL } from './imageModels'
 export const DEFAULT_RESPONSES_MODEL = 'gpt-6.1-sol'
-export const DEFAULT_FAL_BASE_URL = 'https://fal.run'
-export const DEFAULT_FAL_MODEL = 'openai/gpt-image-2'
 export const DEFAULT_OPENAI_PROFILE_ID = 'default-openai'
 export const DEFAULT_API_TIMEOUT = 600
 
-const BUILT_IN_PROVIDER_IDS = new Set<ApiProvider>(['openai', 'sb2api-async', 'fal'])
+const BUILT_IN_PROVIDER_IDS = new Set<ApiProvider>(['openai'])
 const DEFAULT_CUSTOM_PROVIDER_PATHS = {
   generationPath: 'images/generations',
   editPath: 'images/edits',
@@ -49,40 +47,6 @@ const DEFAULT_EDIT_FILES: CustomProviderFileMapping[] = [
   { field: 'image[]', source: 'inputImages', array: true },
   { field: 'mask', source: 'mask' },
 ]
-
-const SUB2API_PROVIDER: CustomProviderDefinition = {
-  id: 'sb2api-async',
-  name: 'sub2api（异步）',
-  template: 'http-image',
-  submit: {
-    path: 'images/generations/async',
-    method: 'POST',
-    contentType: 'json',
-    body: DEFAULT_GENERATE_BODY,
-    taskIdPath: 'task_id',
-  },
-  editSubmit: {
-    path: 'images/edits/async',
-    method: 'POST',
-    contentType: 'multipart',
-    body: DEFAULT_EDIT_BODY,
-    files: DEFAULT_EDIT_FILES,
-    taskIdPath: 'task_id',
-  },
-  poll: {
-    path: 'images/tasks/{task_id}',
-    method: 'GET',
-    intervalSeconds: 3,
-    statusPath: 'status',
-    successValues: ['completed'],
-    failureValues: ['failed'],
-    errorPath: 'error.message',
-    result: {
-      imageUrlPaths: ['result.data.*.url'],
-      b64JsonPaths: ['result.data.*.b64_json'],
-    },
-  },
-}
 
 type ApiProfileProviderDraft = NonNullable<ApiProfile['providerDrafts']>[ApiProvider]
 
@@ -122,7 +86,7 @@ function normalizeZipDownloadRoutes(value: unknown) {
 function normalizeProviderOrder(value: unknown, customProviders: CustomProviderDefinition[]): string[] | undefined {
   if (!Array.isArray(value)) return undefined
 
-  const providerIds = ['openai', 'sb2api-async', 'fal', ...customProviders.map((provider) => provider.id)]
+  const providerIds = ['openai', ...customProviders.map((provider) => provider.id)]
   const knownIds = new Set(providerIds)
   const ordered = value
     .map(String)
@@ -359,26 +323,6 @@ export function createDefaultOpenAIProfile(overrides: Partial<ApiProfile> = {}):
   }
 }
 
-export function createDefaultFalProfile(overrides: Partial<ApiProfile> = {}): ApiProfile {
-  return {
-    id: `fal-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
-    name: '新配置',
-    provider: 'fal',
-    baseUrl: DEFAULT_FAL_BASE_URL,
-    apiKey: '',
-    model: DEFAULT_FAL_MODEL,
-    imageGenerationModel: DEFAULT_IMAGES_MODEL,
-    timeout: DEFAULT_API_TIMEOUT,
-    apiMode: 'images',
-    codexCli: false,
-    apiProxy: false,
-    streamImages: false,
-    streamPartialImages: DEFAULT_STREAM_PARTIAL_IMAGES,
-    transparentBackgroundMethod: 'api',
-    ...overrides,
-  }
-}
-
 export function switchApiProfileProvider(profile: ApiProfile, provider: ApiProvider, customProvider?: CustomProviderDefinition): ApiProfile {
   const providerDrafts = {
     ...profile.providerDrafts,
@@ -398,33 +342,13 @@ export function switchApiProfileProvider(profile: ApiProfile, provider: ApiProvi
   }
   const savedDraft = providerDrafts[provider]
 
-  if (provider === 'fal') {
-    return {
-      ...profile,
-      provider,
-      baseUrl: savedDraft?.baseUrl ?? DEFAULT_FAL_BASE_URL,
-      model: savedDraft?.model ?? DEFAULT_FAL_MODEL,
-      imageGenerationModel: savedDraft?.imageGenerationModel ?? profile.imageGenerationModel,
-      apiMode: 'images',
-      reasoningEffort: savedDraft?.reasoningEffort,
-      codexCli: false,
-      apiProxy: false,
-      responseFormatB64Json: savedDraft?.responseFormatB64Json,
-      streamImages: false,
-      streamPartialImages: savedDraft?.streamPartialImages ?? DEFAULT_STREAM_PARTIAL_IMAGES,
-      transparentBackgroundMethod: savedDraft?.transparentBackgroundMethod ?? 'api',
-      providerDrafts,
-    }
-  }
-
   if (customProvider) {
-    const shouldUseOpenAIDefaults = profile.provider === 'fal'
     const supportsNativeTransparentBackground = customProviderSupportsNativeTransparentBackground(customProvider)
     return {
       ...profile,
       provider: customProvider.id,
-      baseUrl: savedDraft?.baseUrl ?? (shouldUseOpenAIDefaults ? DEFAULT_BASE_URL : profile.baseUrl || DEFAULT_BASE_URL),
-      model: savedDraft?.model ?? (shouldUseOpenAIDefaults ? DEFAULT_IMAGES_MODEL : profile.model || DEFAULT_IMAGES_MODEL),
+      baseUrl: savedDraft?.baseUrl ?? (profile.baseUrl || DEFAULT_BASE_URL),
+      model: savedDraft?.model ?? (profile.model || DEFAULT_IMAGES_MODEL),
       imageGenerationModel: savedDraft?.imageGenerationModel ?? profile.imageGenerationModel,
       apiMode: 'images',
       reasoningEffort: savedDraft?.reasoningEffort,
@@ -473,9 +397,7 @@ function normalizeProviderDraft(
   if (!isRecord(input)) return undefined
   const nativeTransparentBackgroundUnavailable = customProviderIds.has(provider) && !nativeTransparentProviderIds.has(provider)
   const transparentBackgroundMethod = nativeTransparentBackgroundUnavailable ? 'local' : 'api'
-  const fallback = provider === 'fal'
-    ? createDefaultFalProfile()
-    : createDefaultOpenAIProfile({ transparentBackgroundMethod })
+  const fallback = createDefaultOpenAIProfile({ transparentBackgroundMethod })
   const baseUrl = typeof input.baseUrl === 'string' ? input.baseUrl : undefined
   const model = (typeof input.model === 'string' && normalizeModelList(input.model)) || undefined
   const imageGenerationModel = typeof input.imageGenerationModel === 'string' ? input.imageGenerationModel.trim() : ''
@@ -484,9 +406,7 @@ function normalizeProviderDraft(
   if (!knownProvider) return undefined
 
   return {
-    baseUrl: provider === 'fal'
-      ? baseUrl?.trim().replace(/\/+$/, '') || DEFAULT_FAL_BASE_URL
-      : baseUrl,
+    baseUrl,
     model,
     imageGenerationModel,
     apiMode,
@@ -523,14 +443,13 @@ export function normalizeApiProfile(
 ): ApiProfile {
   const record = input && typeof input === 'object' ? input as Record<string, unknown> : {}
   const rawProvider = typeof record.provider === 'string' ? record.provider : ''
-  const provider: ApiProvider = BUILT_IN_PROVIDER_IDS.has(rawProvider) || customProviderIds.has(rawProvider) ? rawProvider : 'openai'
+  // 保留失效接入的连接信息，避免恢复旧配置时静默改用其他协议。
+  const provider: ApiProvider = rawProvider || 'openai'
   const apiMode: ApiMode = provider === 'openai' && record.apiMode === 'responses' ? 'responses' : 'images'
   const providerFallback = customProviderIds.has(provider)
     ? { transparentBackgroundMethod: 'local' as const, ...fallback }
     : fallback
-  const defaults = provider === 'fal'
-    ? createDefaultFalProfile(providerFallback)
-    : createDefaultOpenAIProfile({ ...providerFallback, apiMode })
+  const defaults = createDefaultOpenAIProfile({ ...providerFallback, apiMode })
   const rawBaseUrl = typeof record.baseUrl === 'string' ? record.baseUrl : defaults.baseUrl
   const streamImages = provider === 'openai'
     ? typeof record.streamImages === 'boolean' ? record.streamImages : defaults.streamImages
@@ -544,7 +463,7 @@ export function normalizeApiProfile(
     name: typeof record.name === 'string' && record.name.trim() ? record.name : defaults.name,
     description: typeof record.description === 'string' && record.description.trim() ? record.description : undefined,
     provider,
-    baseUrl: provider === 'fal' ? rawBaseUrl.trim().replace(/\/+$/, '') : rawBaseUrl,
+    baseUrl: rawBaseUrl,
     apiKey: typeof record.apiKey === 'string' ? record.apiKey : defaults.apiKey,
     model: (typeof record.model === 'string' && normalizeModelList(record.model)) || defaults.model,
     selectedModel: typeof record.selectedModel === 'string' && record.selectedModel.trim() ? record.selectedModel.trim() : undefined,
@@ -555,7 +474,7 @@ export function normalizeApiProfile(
     apiMode,
     reasoningEffort: normalizeReasoningEffort(record.reasoningEffort, defaults.reasoningEffort),
     codexCli: Boolean(record.codexCli),
-    apiProxy: provider === 'sb2api-async' ? false : typeof record.apiProxy === 'boolean' ? record.apiProxy : defaults.apiProxy,
+    apiProxy: typeof record.apiProxy === 'boolean' ? record.apiProxy : defaults.apiProxy,
     responseFormatB64Json: record.responseFormatB64Json === true ? true : undefined,
     streamImages,
     streamPartialImages: normalizeStreamPartialImages(record.streamPartialImages, defaults.streamPartialImages),
@@ -711,16 +630,13 @@ export function normalizeSettings(input: Partial<AppSettings> | unknown): AppSet
 }
 
 export function getCustomProviderDefinition(settings: Partial<AppSettings> | unknown, provider: ApiProvider): CustomProviderDefinition | null {
-  if (provider === 'sb2api-async') return SUB2API_PROVIDER
   const normalized = normalizeSettings(settings)
   return normalized.customProviders.find((item) => item.id === provider) ?? null
 }
 
 export function getApiProviderLabel(settings: Partial<AppSettings> | unknown, provider: ApiProvider): string {
-  if (provider === 'fal') return 'fal.ai'
   if (provider === 'openai') return 'OpenAI'
-  if (provider === 'sb2api-async') return SUB2API_PROVIDER.name
-  return getCustomProviderDefinition(settings, provider)?.name ?? provider
+  return getCustomProviderDefinition(settings, provider)?.name ?? '接入已失效'
 }
 
 export function isOpenAICompatibleProvider(settings: Partial<AppSettings> | unknown, provider: ApiProvider): boolean {
@@ -839,9 +755,10 @@ export function getActiveApiProfile(settings: Partial<AppSettings> | unknown): A
   })
 }
 
-export function validateApiProfile(profile: ApiProfile): string | null {
+export function validateApiProfile(profile: ApiProfile, settings?: Partial<AppSettings> | unknown): string | null {
+  if (!isOpenAICompatibleProvider(settings, profile.provider)) return '接入方式已不可用，请重新选择'
   if (!profile.name.trim()) return '缺少名称'
-  if (profile.provider !== 'fal' && !profile.baseUrl.trim() && !shouldUseApiProxy(profile.apiProxy)) return '缺少 API URL'
+  if (!profile.baseUrl.trim() && !shouldUseApiProxy(profile.apiProxy)) return '缺少 API URL'
   if (!profile.apiKey.trim()) return '缺少 API Key'
   if (!profile.model.trim()) return '缺少模型 ID'
   return null

@@ -49,7 +49,7 @@ export function getDefaultPresetProfileId() {
 
 export function getDefaultPresetBaseUrl() {
   const profile = presetProfiles.find((profile) => profile.id === defaultPresetProfileId)
-  if (!profile || profile.provider === 'fal') return ''
+  if (!profile) return ''
   return profile.baseUrl
 }
 

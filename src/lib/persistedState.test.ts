@@ -45,7 +45,7 @@ describe('persisted state codec', () => {
 
   it.each([undefined, 'draft-image-model', ''])('restores saved provider tool model %s instead of inheriting the active model', (imageGenerationModel) => {
     const result = normalizePersistedState({ settings: { profiles: [{
-      provider: 'fal',
+      provider: 'custom-provider',
       imageGenerationModel: DEFAULT_IMAGES_MODEL,
       providerDrafts: { openai: { apiMode: 'responses', model: 'saved-text-model', ...(imageGenerationModel === undefined ? {} : { imageGenerationModel }) } },
     }] } }, fallback(), 100)!

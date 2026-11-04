@@ -14,7 +14,7 @@ body:
 
         **以下情况不属于本项目的支持范围，请向对应项目或服务商反馈：**
 
-        1. [Wei-Shaw/sub2api](https://github.com/Wei-Shaw/sub2api) 的 Image API 存在跨域限制问题，请直接向该项目反馈。如果仍需在本项目中使用，也可以参考 README，部署 Docker 版并配置代理，或使用本地版配置代理来绕过跨域限制。
+        1. 第三方 API 的跨域限制问题，请直接向对应服务商反馈。也可以参考 README，部署 Docker 版并配置代理，或使用本地版配置代理来绕过跨域限制。
         2. 如果你使用的是 [basketikun/chatgpt2api](https://github.com/basketikun/chatgpt2api) 等反代或中转项目，遇到响应格式不兼容等问题，请向原始项目反馈并要求其遵循官方 API 格式。你也可以参考对应项目的 API 文档，尝试生成自定义服务商配置，具体操作方式见 README。本项目没有义务为各种非标准格式做无尽的兼容兜底。
         3. 如果你希望使用 Codex 的 API，建议使用 [router-for-me/CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI)。
         4. 如果你使用某些服务商的 API，遇到返回的图片是图床 URL 且限制跨域、或无法返回 Base64 URL 等问题，这属于服务商自身的限制，本项目无法解决，请向该服务商反馈。

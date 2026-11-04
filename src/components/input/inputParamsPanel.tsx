@@ -98,8 +98,6 @@ export default function InputParamsPanel({
   activeProfile,
   modelOptions,
   onModelChange,
-  isFalProvider,
-  isFalTextToImage,
   displaySize,
   qualityOptions,
   selectClass,
@@ -112,8 +110,6 @@ export default function InputParamsPanel({
   outputCompressionInput,
   setOutputCompressionInput,
   commitOutputCompression,
-  moderationHint,
-  moderationDisabled,
   outputImageLimit,
   nInput,
   setNInputFocused,
@@ -143,8 +139,6 @@ export default function InputParamsPanel({
   activeProfile: ApiProfile
   modelOptions: Array<{ label: string; value: string }>
   onModelChange: (model: string) => void
-  isFalProvider: boolean
-  isFalTextToImage: boolean
   displaySize: string
   qualityOptions: Array<{ label: string; value: string }>
   selectClass: string
@@ -157,8 +151,6 @@ export default function InputParamsPanel({
   outputCompressionInput: string
   setOutputCompressionInput: (value: string) => void
   commitOutputCompression: () => void
-  moderationHint: HintTooltipState
-  moderationDisabled: boolean
   outputImageLimit: number
   nInput: string
   setNInputFocused: (focused: boolean) => void
@@ -189,7 +181,7 @@ export default function InputParamsPanel({
     showTransparentOutputControl
       ? `透明 ${transparentOutputEnabled}`
       : compressionDisabled ? null : `压缩 ${outputCompressionInput || '默认'}`,
-    moderationDisabled ? null : `审核 ${params.moderation}`,
+    `审核 ${params.moderation}`,
   ].filter(Boolean).join(' · ')
   const prefix = (text: string) => <span className="mr-1.5 text-gray-400 dark:text-gray-500">{text}</span>
 
@@ -228,10 +220,8 @@ export default function InputParamsPanel({
           <span className="font-mono">{displaySize}</span>
         </button>
         <ButtonTooltip
-          visible={(isFalTextToImage || activeProfile.codexCli) && sizeHint.visible}
-          text={isFalTextToImage
-            ? <>fal.ai 的文生图模式不支持 <code className="rounded bg-white/10 px-1 py-0.5 font-mono">auto</code> 参数</>
-            : 'Codex CLI 不支持尺寸参数，此处设置仅基于提示词工程'}
+          visible={activeProfile.codexCli && sizeHint.visible}
+          text="Codex CLI 不支持尺寸参数，此处设置仅基于提示词工程"
         />
       </div>
       <div
@@ -244,7 +234,7 @@ export default function InputParamsPanel({
         onClick={qualityHint.show}
       >
         <Select
-          value={activeProfile.codexCli ? 'auto' : isFalProvider && params.quality === 'auto' ? 'high' : params.quality}
+          value={activeProfile.codexCli ? 'auto' : params.quality}
           onChange={(val) => {
             if (!activeProfile.codexCli) setParams({ quality: val as TaskParams['quality'] })
           }}
@@ -255,8 +245,8 @@ export default function InputParamsPanel({
           className={activeProfile.codexCli ? CHIP_DISABLED_CLASS : CHIP_CLASS}
         />
         <ButtonTooltip
-          visible={(activeProfile.codexCli || isFalProvider) && qualityHint.visible}
-          text={isFalProvider ? <>fal.ai 不支持 <code className="rounded bg-white/10 px-1 py-0.5 font-mono">auto</code> 质量参数</> : 'Codex CLI 不支持质量参数'}
+          visible={activeProfile.codexCli && qualityHint.visible}
+          text="Codex CLI 不支持质量参数"
         />
       </div>
       <label
@@ -383,38 +373,25 @@ export default function InputParamsPanel({
                 />
                 <ButtonTooltip
                   visible={compressionHint.visible}
-                  text={isFalProvider ? 'fal.ai 不支持压缩率参数' : '仅 JPEG 和 WebP 支持压缩率'}
+                  text="仅 JPEG 和 WebP 支持压缩率"
                 />
               </label>
             )}
-            <div
-              className={ROW_CLASS}
-              onMouseEnter={moderationHint.show}
-              onMouseLeave={moderationHint.hide}
-              onTouchStart={moderationHint.startTouch}
-              onTouchEnd={moderationHint.clearTimer}
-              onTouchCancel={moderationHint.hide}
-              onClick={moderationHint.show}
-            >
+            <div className={ROW_CLASS}>
               <span className={ROW_LABEL_CLASS}>审核</span>
               <div className="w-28">
                 <Select
-                  value={moderationDisabled ? 'auto' : params.moderation}
+                  value={params.moderation}
                   onChange={(val) => {
-                    if (!moderationDisabled) setParams({ moderation: val as TaskParams['moderation'] })
+                    setParams({ moderation: val as TaskParams['moderation'] })
                   }}
                   options={[
                     { label: 'auto', value: 'auto' },
                     { label: 'low', value: 'low' },
                   ]}
-                  disabled={moderationDisabled}
-                  className={moderationDisabled ? CONTROL_DISABLED_CLASS : selectClass}
+                  className={selectClass}
                 />
               </div>
-              <ButtonTooltip
-                visible={moderationDisabled && moderationHint.visible}
-                text="fal.ai 不支持审核参数"
-              />
             </div>
       </ParamPopoverChip>
       {showBatch && (

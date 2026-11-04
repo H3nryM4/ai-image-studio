@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
-  createDefaultFalProfile,
   createDefaultOpenAIProfile,
   DEFAULT_IMAGES_MODEL,
   DEFAULT_SETTINGS,
@@ -351,12 +350,12 @@ describe('URL settings params', () => {
     })
   })
 
-  it('creates an OpenAI profile from legacy params even when fal is active', () => {
-    const falProfile = createDefaultFalProfile({ id: 'fal-active', apiKey: 'fal-key' })
+  it('creates an OpenAI profile from legacy params when an unavailable connection is active', () => {
+    const altProfile = createDefaultOpenAIProfile({ id: 'alternate-active', provider: 'removed-provider', apiKey: 'alternate-key' })
     const current = normalizeSettings({
       ...DEFAULT_SETTINGS,
-      profiles: [falProfile],
-      activeProfileId: falProfile.id,
+      profiles: [altProfile],
+      activeProfileId: altProfile.id,
     })
     const next = normalizeSettings({
       ...current,
@@ -396,12 +395,12 @@ describe('URL settings params', () => {
     expect(next.profiles[0]).toMatchObject({ provider: 'custom-provider', codexCli: true })
   })
 
-  it('applies the transparent background method to the active fal profile', () => {
-    const falProfile = createDefaultFalProfile({ id: 'fal-profile' })
+  it('applies the transparent background method to the active OpenAI profile', () => {
+    const altProfile = createDefaultOpenAIProfile({ id: 'alternate-profile' })
     const current = normalizeSettings({
       ...DEFAULT_SETTINGS,
-      profiles: [falProfile],
-      activeProfileId: falProfile.id,
+      profiles: [altProfile],
+      activeProfileId: altProfile.id,
     })
     const next = normalizeSettings({
       ...current,
@@ -913,7 +912,7 @@ describe('URL settings params', () => {
     params.set('settings', JSON.stringify({
       profiles: [{
         id: 'preset-b',
-        provider: 'fal',
+        provider: 'conflicting-provider',
         apiKey: 'json-key',
         model: 'conflicting-model',
       }],

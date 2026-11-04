@@ -1,4 +1,4 @@
-import type { ApiProvider, TaskParams, TaskRecord } from '../types'
+import type { TaskParams, TaskRecord } from '../types'
 
 type TaskLifecyclePatch = Pick<TaskRecord, 'status' | 'error' | 'finishedAt' | 'elapsed'>
 type ActualParams = Partial<TaskParams>
@@ -22,16 +22,14 @@ export function createTaskErrorPatch(task: Pick<TaskRecord, 'createdAt' | 'start
   }
 }
 
-export function markInterruptedOpenAIRunningTasks(tasks: TaskRecord[], now: number) {
+export function markInterruptedRunningTasks(tasks: TaskRecord[], now: number) {
   const interruptedTasks: TaskRecord[] = []
   const updatedTasks = tasks.map((task) => {
-    const isOpenAITask = (task.apiProvider ?? 'openai') !== 'fal'
-    if (task.status !== 'running' || !isOpenAITask || task.customTaskId) return task
+    if (task.status !== 'running' || task.customTaskId) return task
 
     const updated: TaskRecord = {
       ...task,
       ...createTaskErrorPatch(task, '请求中断', now),
-      falRecoverable: false,
       elapsed: Math.max(0, now - (task.startedAt ?? task.createdAt)),
     }
     interruptedTasks.push(updated)
@@ -68,13 +66,12 @@ export function addImageSizeParam(params: ActualParams | undefined, size: ImageS
 }
 
 export function deriveGalleryActualParams(
-  provider: ApiProvider,
   isAsyncCustomTask: boolean,
   resultParams: ActualParams | undefined,
   paramsList: Array<ActualParams | undefined> | undefined,
   outputCount: number,
 ): ActualParams | undefined {
-  if (provider === 'fal' || isAsyncCustomTask) return firstActualParams(paramsList)
+  if (isAsyncCustomTask) return firstActualParams(paramsList)
   const firstParams = firstActualParams(paramsList)
   return {
     ...resultParams,

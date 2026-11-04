@@ -180,7 +180,7 @@ function buildPresetConfigOnlySettingsFromUrlParams(currentSettings: Partial<App
           if (matched.transparentBackgroundMethod === 'api' || matched.transparentBackgroundMethod === 'local') {
             patch.transparentBackgroundMethod = matched.transparentBackgroundMethod
           }
-          if (targetProfile.provider !== 'fal' && typeof matched.codexCli === 'boolean') patch.codexCli = matched.codexCli
+          if (typeof matched.codexCli === 'boolean') patch.codexCli = matched.codexCli
           if (isOpenAI) {
             if (matched.apiMode === 'images' || matched.apiMode === 'responses') patch.apiMode = matched.apiMode
             if (matched.reasoningEffort !== undefined) patch.reasoningEffort = normalizeReasoningEffort(matched.reasoningEffort)
@@ -209,7 +209,7 @@ function buildPresetConfigOnlySettingsFromUrlParams(currentSettings: Partial<App
       patch.transparentBackgroundMethod = transparentBackgroundMethodParam
     }
   }
-  if (targetProfile.provider !== 'fal' && !apiKeyOnly) {
+  if (!apiKeyOnly) {
     const codexCliParam = searchParams.get('codexCli')
     if (codexCliParam !== null) patch.codexCli = codexCliParam.trim().toLowerCase() === 'true'
   }
@@ -272,13 +272,13 @@ function buildRegularSettingsFromUrlParams(currentSettings: Partial<AppSettings>
   const requestedNonOpenAIProfile = requestedProfileId
     ? settings.profiles.find((item) => item.id === requestedProfileId && item.provider !== 'openai')
     : undefined
-  if (requestedNonOpenAIProfile && (transparentBackgroundMethod !== undefined || (requestedNonOpenAIProfile.provider !== 'fal' && codexCliParam !== null))) {
+  if (requestedNonOpenAIProfile && (transparentBackgroundMethod !== undefined || codexCliParam !== null)) {
     return normalizeSettings({
       ...settings,
       profiles: settings.profiles.map((item) => item.id === requestedProfileId
         ? {
             ...item,
-            ...(requestedNonOpenAIProfile.provider !== 'fal' && codexCliParam !== null ? { codexCli: codexCliParam.trim().toLowerCase() === 'true' } : {}),
+            ...(codexCliParam !== null ? { codexCli: codexCliParam.trim().toLowerCase() === 'true' } : {}),
             ...(transparentBackgroundMethod ? { transparentBackgroundMethod } : {}),
           }
         : item),
