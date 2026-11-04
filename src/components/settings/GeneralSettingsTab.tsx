@@ -143,6 +143,13 @@ export default function GeneralSettingsTab({
             {draft.retryMode === 'overwriteAll' && <p className="mt-2 text-xs text-amber-600 dark:text-amber-500">重试成功任务也会清空旧结果。</p>}
           </div>
           <SettingSwitch
+            label="收藏夹页新任务自动收藏"
+            help="开启后，在收藏夹页提交或重试出的新任务会自动加入当前收藏夹，重试出的任务同时沿用原任务的收藏夹；在收藏夹总览或“全部收藏”中提交的任务加入默认收藏夹。"
+            checked={draft.saveTasksToActiveFavoriteCollection}
+            onChange={() => commitSettings({ ...draft, saveTasksToActiveFavoriteCollection: !draft.saveTasksToActiveFavoriteCollection })}
+            className="py-3"
+          />
+          <SettingSwitch
             label="任务通知"
             help="图像生成完成或失败时发送系统通知，需要浏览器允许通知权限。"
             checked={draft.taskCompletionNotification}

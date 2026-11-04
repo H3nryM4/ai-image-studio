@@ -5,6 +5,7 @@ import { createDefaultOpenAIProfile, DEFAULT_SETTINGS, normalizeSettings } from 
 import type { ExportData, StoredImage, StoredImageThumbnail, TaskRecord } from './types'
 import { getImageCommentToken } from './lib/promptImageComments'
 import { hasActiveDataOperations } from './lib/dataOperations'
+import { ALL_FAVORITES_COLLECTION_ID } from './lib/favoriteState'
 import { normalizePersistedState } from './lib/persistedState'
 import { setPresetConfig } from './lib/presetConfig'
 vi.mock('./lib/db', () => {
@@ -1941,5 +1942,60 @@ describe('task failure notification', () => {
     await vi.waitFor(() => expect(useStore.getState().tasks[0]?.status).toBe('error'))
 
     expect(showBrowserNotification).not.toHaveBeenCalled()
+  })
+})
+
+describe('favorites page task collection', () => {
+  const collectionA = { id: 'collection-a', name: '收藏夹 A', createdAt: 1, updatedAt: 1 }
+  const collectionB = { id: 'collection-b', name: '收藏夹 B', createdAt: 1, updatedAt: 1 }
+
+  beforeEach(async () => {
+    await clearTasks()
+    await clearImages()
+    vi.mocked(callImageApi).mockReset()
+    vi.mocked(callImageApi).mockResolvedValue({ images: [], actualParams: {}, actualParamsList: [], revisedPrompts: [] })
+    useStore.setState({
+      settings: normalizeSettings({
+        ...DEFAULT_SETTINGS,
+        profiles: [createDefaultOpenAIProfile({ baseUrl: 'https://api.example.com/v1', apiKey: 'test-key' })],
+        retryMode: 'new',
+        saveTasksToActiveFavoriteCollection: true,
+      }),
+      tasks: [],
+      prompt: 'prompt',
+      inputImages: [],
+      params: { ...DEFAULT_PARAMS },
+      showToast: vi.fn(),
+      detailTaskId: null,
+      filterFavorite: true,
+      activeFavoriteCollectionId: collectionA.id,
+      favoriteCollections: [collectionA, collectionB],
+      defaultFavoriteCollectionId: collectionA.id,
+    })
+  })
+
+  it('adds tasks submitted or retried on a favorites page to the active collection', async () => {
+    const failed = task({ status: 'error', error: '上次失败' })
+    useStore.setState({ tasks: [failed] })
+
+    await retryTask(failed)
+    expect(useStore.getState().tasks[0]).toMatchObject({ favoriteCollectionIds: [collectionA.id], isFavorite: true })
+
+    await submitTask()
+    expect(useStore.getState().tasks[0]).toMatchObject({ favoriteCollectionIds: [collectionA.id], isFavorite: true })
+
+    useStore.setState({ settings: { ...useStore.getState().settings, saveTasksToActiveFavoriteCollection: false } })
+    await submitTask()
+    expect(useStore.getState().tasks[0].isFavorite).toBeUndefined()
+    await vi.waitFor(() => expect(useStore.getState().tasks.every((item) => item.status !== 'running')).toBe(true))
+  })
+
+  it('keeps the source collections when retrying on the all favorites page', async () => {
+    const failed = task({ status: 'error', error: '上次失败', favoriteCollectionIds: [collectionB.id], isFavorite: true })
+    useStore.setState({ activeFavoriteCollectionId: ALL_FAVORITES_COLLECTION_ID, tasks: [failed] })
+
+    await retryTask(failed)
+    expect(useStore.getState().tasks[0]).toMatchObject({ favoriteCollectionIds: [collectionB.id], isFavorite: true })
+    await vi.waitFor(() => expect(useStore.getState().tasks[0].status).not.toBe('running'))
   })
 })
