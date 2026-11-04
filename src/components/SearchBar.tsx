@@ -73,6 +73,7 @@ export default function SearchBar() {
   const inCollectionOverview = filterFavorite && !activeFavoriteCollectionId
   const isFailedFilter = filterStatus === 'error'
   const favoriteTooltip = activeFavoriteCollectionId ? '返回收藏夹' : filterFavorite ? '退出收藏夹' : '收藏夹'
+  const selectionKey = /Mac|iPod|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl'
   const selectionTooltip = useTooltip()
   useCloseOnEscape(selectionMode, () => setSelectionMode(false))
 
@@ -226,9 +227,15 @@ export default function SearchBar() {
           </svg>
           {selectionMode ? '完成' : '多选'}
         </button>
-        <ViewportTooltip visible={selectionTooltip.visible} className="whitespace-nowrap text-left">
-          <div className="[@media(hover:none)]:hidden">{selectionMode ? '点击完成，或按 Esc 退出多选' : '框选或按住 Ctrl/⌘ 点选'}</div>
-          <div className="hidden [@media(hover:none)]:block">{selectionMode ? '点击完成退出多选' : '左右滑动卡片可选中或取消'}</div>
+        <ViewportTooltip visible={selectionTooltip.visible} className="w-max max-w-[calc(100vw-1rem)] text-left">
+          {selectionMode ? <>
+            <div className="[@media(hover:none)]:hidden">点击完成，或按 Esc 退出多选</div>
+            <div className="hidden [@media(hover:none)]:block">点击完成退出多选</div>
+          </> : <>
+            <div>点击后选择多个{inCollectionOverview ? '收藏夹' : '任务'}</div>
+            <div className="mt-1 text-gray-300 [@media(hover:none)]:hidden">也可拖动框选，或按住 {selectionKey} 点击卡片</div>
+            <div className="mt-1 hidden text-gray-300 [@media(hover:none)]:block">也可左右滑动卡片进行选择</div>
+          </>}
         </ViewportTooltip>
       </div>
     </div>

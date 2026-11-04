@@ -130,9 +130,14 @@ export default function InputBatchBars() {
             <span>{imageCount} 张图片</span>
           </> : `点击卡片选择${inOverview ? '收藏夹' : '任务'}`}
         </p>
-        <button type="button" onClick={() => setSelectionMode(false)} className="flex min-h-9 shrink-0 items-center gap-1 rounded-full px-2 text-xs text-gray-500 transition-colors hover:bg-gray-200/60 hover:text-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.06] dark:hover:text-gray-200">
-          <CloseIcon className="h-3.5 w-3.5" />完成
-        </button>
+        <TooltipButton
+          tooltip="退出多选"
+          wrapperClassName="relative inline-flex shrink-0"
+          onClick={() => setSelectionMode(false)}
+          className="flex h-11 w-11 items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-gray-200/60 hover:text-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.06] dark:hover:text-gray-200"
+        >
+          <CloseIcon className="h-4 w-4" aria-hidden="true" />
+        </TooltipButton>
       </div>
       <div className="flex flex-col rounded-3xl border border-gray-200/50 bg-white/90 p-1.5 shadow-[0_8px_30px_rgb(0,0,0,0.12)] backdrop-blur-xl dark:border-white/10 dark:bg-gray-800/90 sm:flex-row sm:items-center sm:justify-center sm:rounded-full">
         <div className="grid grid-cols-3 sm:flex sm:items-center">
@@ -171,7 +176,7 @@ export default function InputBatchBars() {
             onClick={inOverview ? clearCollectionSelection : clearSelection}
             className={`${ACTION_CLASS} text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-white/[0.06]`}
           >
-            <CloseIcon className="h-4 w-4 shrink-0" />清空
+            <CloseIcon className="h-4 w-4 shrink-0" />清空选择
           </TooltipButton>
         </div>
         <div aria-hidden="true" className="mx-3 my-1 h-px bg-gray-200/70 dark:bg-white/10 sm:mx-1 sm:my-0 sm:h-5 sm:w-px" />
