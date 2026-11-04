@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { normalizeBaseUrl } from '../lib/api'
 import { hasActiveDataOperations } from '../lib/dataOperations'
@@ -238,10 +238,14 @@ export default function SettingsModal({ onImportProfile }: { onImportProfile: (s
     : '逐张下载'
 
   const wasSettingsOpenRef = useRef(false)
+  const tabScrollRef = useRef<HTMLDivElement>(null)
+  // 各分页共用一个滚动容器，按分页记录滚动位置，切换时各自恢复
+  const tabScrollTopsRef = useRef<Partial<Record<SettingsTab, number>>>({})
 
   useEffect(() => {
     if (!showSettings) {
       wasSettingsOpenRef.current = false
+      tabScrollTopsRef.current = {}
       setProfileMenu(null)
       setCopyImportUrlProfile(null)
       setShowCustomConnectionImport(false)
@@ -275,6 +279,10 @@ export default function SettingsModal({ onImportProfile }: { onImportProfile: (s
   useEffect(() => {
     if (showSettings && settingsTabRequest) setActiveTab(settingsTabRequest)
   }, [settingsTabRequest, showSettings])
+
+  useLayoutEffect(() => {
+    if (tabScrollRef.current) tabScrollRef.current.scrollTop = tabScrollTopsRef.current[activeTab] ?? 0
+  }, [activeTab, showSettings])
 
   useEffect(() => {
     if (!showSettings) return
@@ -1088,7 +1096,11 @@ export default function SettingsModal({ onImportProfile }: { onImportProfile: (s
 
           {/* Content */}
           <div className="flex-1 flex flex-col min-w-0 min-h-0 bg-transparent relative overflow-hidden">
-            <div className="flex-1 overflow-y-auto overscroll-contain custom-scrollbar p-5 sm:p-6">
+            <div
+              ref={tabScrollRef}
+              onScroll={(e) => { tabScrollTopsRef.current[activeTab] = e.currentTarget.scrollTop }}
+              className="flex-1 overflow-y-auto overscroll-contain custom-scrollbar p-5 sm:p-6"
+            >
             {activeTab === 'general' && (
               <GeneralSettingsTab
                 draft={draft}
