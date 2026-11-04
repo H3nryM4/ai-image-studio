@@ -100,6 +100,7 @@ export type ReferenceImageEditAction = 'ask' | 'sketch' | 'mask'
 
 /** 重试任务时新建任务，还是覆盖原任务 */
 export type RetryMode = 'new' | 'overwriteFailed' | 'overwriteAll'
+export type ColorMode = 'system' | 'light' | 'dark'
 
 /** 打开画板的请求：baseImageSrc 为空时是空白画板，replaceImageId 表示完成后替换该参考图 */
 export interface SketchBoardRequest {
@@ -130,6 +131,7 @@ export interface AppSettings {
   allowPromptRewrite: boolean
   taskCompletionNotification: boolean
   enterSubmit: boolean
+  colorMode: ColorMode
   /** 偏好设置：是否在首页提供多提示词批量提交 */
   showBatchPrompt: boolean
   /** 多提示词批量提交，提示词之间空两行分隔 */

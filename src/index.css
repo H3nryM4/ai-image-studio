@@ -3,6 +3,7 @@
 
 @import "tailwindcss";
 @config "../tailwind.config.js";
+@custom-variant dark (&:where(.dark, .dark *));
 
 /* 保持 v3 的默认边框颜色，避免未指定颜色的边框变成 currentColor */
 @layer base {
@@ -79,23 +80,22 @@ body.drag-selecting * {
   user-select: none !important;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: 240 10% 4%;
-    --foreground: 0 0% 98%;
-    --muted: 240 4% 16%;
-    --muted-foreground: 240 5% 65%;
-    --border: 240 4% 22%;
-    --input: 240 4% 22%;
-    --primary: 217 91% 60%;
-    --primary-foreground: 0 0% 100%;
-    --sidebar: 240 5% 12%;
-    --sidebar-foreground: 0 0% 98%;
-  }
+:root.dark {
+  --background: 240 10% 4%;
+  --foreground: 0 0% 98%;
+  --muted: 240 4% 16%;
+  --muted-foreground: 240 5% 65%;
+  --border: 240 4% 22%;
+  --input: 240 4% 22%;
+  --primary: 217 91% 60%;
+  --primary-foreground: 0 0% 100%;
+  --sidebar: 240 5% 12%;
+  --sidebar-foreground: 0 0% 98%;
+}
 
-  * {
-    scrollbar-color: #3f3f46 transparent;
-  }
+:root.dark,
+:root.dark * {
+  scrollbar-color: #3f3f46 transparent;
 }
 
 ::-webkit-scrollbar { width: 8px; height: 8px; }
@@ -113,10 +113,8 @@ input[type="number"] {
   -moz-appearance: textfield;
 }
 
-@media (prefers-color-scheme: dark) {
-  ::-webkit-scrollbar-thumb { background: #3f3f46; }
-  ::-webkit-scrollbar-thumb:hover { background: #52525b; }
-}
+.dark ::-webkit-scrollbar-thumb { background: #3f3f46; }
+.dark ::-webkit-scrollbar-thumb:hover { background: #52525b; }
 
 @keyframes pulse-border {
   0%, 100% { border-color: #3b82f6; }
@@ -215,26 +213,24 @@ input[type="number"] {
   border-radius: 0.75rem;
 }
 
-@media (prefers-color-scheme: dark) {
-  .markdown-renderer :where(blockquote) {
-    color: #a1a1aa;
-  }
+.dark .markdown-renderer :where(blockquote) {
+  color: #a1a1aa;
+}
 
-  .markdown-renderer :where(a) {
-    color: #60a5fa;
-  }
+.dark .markdown-renderer :where(a) {
+  color: #60a5fa;
+}
 
-  .markdown-renderer :where(:not(pre) > code) {
-    background: rgba(255, 255, 255, 0.1);
-  }
+.dark .markdown-renderer :where(:not(pre) > code) {
+  background: rgba(255, 255, 255, 0.1);
+}
 
-  .markdown-renderer :where(th, td) {
-    border-color: rgba(255, 255, 255, 0.12);
-  }
+.dark .markdown-renderer :where(th, td) {
+  border-color: rgba(255, 255, 255, 0.12);
+}
 
-  .markdown-renderer :where(th) {
-    background: rgba(255, 255, 255, 0.06);
-  }
+.dark .markdown-renderer :where(th) {
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .mask-edge-r {
@@ -424,35 +420,33 @@ input[type="number"] {
   box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.25);
 }
 
-@media (prefers-color-scheme: dark) {
-  .comment-tag {
-    background: rgba(59, 130, 246, 0.12);
-    color: #93c5fd;
-    border-color: rgba(59, 130, 246, 0.2);
-  }
+.dark .comment-tag {
+  background: rgba(59, 130, 246, 0.12);
+  color: #93c5fd;
+  border-color: rgba(59, 130, 246, 0.2);
+}
 
-  .comment-tag::selection,
-  .comment-tag *::selection {
-    background: transparent !important;
-    color: inherit !important;
-  }
+.dark .comment-tag::selection,
+.dark .comment-tag *::selection {
+  background: transparent !important;
+  color: inherit !important;
+}
 
-  [contenteditable]::selection,
-  [contenteditable] *::selection {
-    background: rgba(59, 130, 246, 0.3);
-    color: inherit;
-  }
+.dark [contenteditable]::selection,
+.dark [contenteditable] *::selection {
+  background: rgba(59, 130, 246, 0.3);
+  color: inherit;
+}
 
-  .comment-tag:hover {
-    background: rgba(59, 130, 246, 0.2);
-  }
+.dark .comment-tag:hover {
+  background: rgba(59, 130, 246, 0.2);
+}
 
-  .comment-tag.selected {
-    background: #3b82f6;
-    color: #ffffff;
-    border-color: #60a5fa;
-    box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.35);
-  }
+.dark .comment-tag.selected {
+  background: #3b82f6;
+  color: #ffffff;
+  border-color: #60a5fa;
+  box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.35);
 }
 
 /* 修复 iOS/Webkit 上带圆角的滚动容器内容/滚动条溢出的 bug */

@@ -526,6 +526,7 @@ export function normalizeSettings(input: Partial<AppSettings> | unknown): AppSet
     allowPromptRewrite: typeof record.allowPromptRewrite === 'boolean' ? record.allowPromptRewrite : false,
     taskCompletionNotification: typeof record.taskCompletionNotification === 'boolean' ? record.taskCompletionNotification : false,
     enterSubmit: typeof record.enterSubmit === 'boolean' ? record.enterSubmit : false,
+    colorMode: record.colorMode === 'light' || record.colorMode === 'dark' ? record.colorMode : 'system',
     showBatchPrompt: typeof record.showBatchPrompt === 'boolean' ? record.showBatchPrompt : false,
     batchPromptEnabled: typeof record.batchPromptEnabled === 'boolean' ? record.batchPromptEnabled : false,
     batchPromptMode: record.batchPromptMode === 'concurrent' ? 'concurrent' : 'queue',

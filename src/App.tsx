@@ -6,6 +6,7 @@ import { createDefaultOpenAIProfile, hasDefaultPresetConfig, normalizeSettings }
 import { getCustomConnectionConfigUrl, hasEmbeddedDefaultConfig, loadCustomConnectionSettingsFromUrl, loadEmbeddedDefaultConfig } from './lib/customConnectionConfigUrl'
 import { getDefaultPresetProfileId, getPresetProfileIds, isPresetConfigOnlyEnabled, setPresetConfig } from './lib/presetConfig'
 import { useDockerApiUrlMigrationNotice } from './hooks/useDockerApiUrlMigrationNotice'
+import { useColorMode } from './hooks/useColorMode'
 import Header from './components/Header'
 import SearchBar from './components/SearchBar'
 import TaskGrid from './components/TaskGrid'
@@ -31,6 +32,7 @@ export default function App() {
   const [settingsReady, setSettingsReady] = useState(false)
   const [profileImportSource, setProfileImportSource] = useState<string | null>(null)
   useDockerApiUrlMigrationNotice()
+  useColorMode()
   useGlobalClickSuppression()
 
   useEffect(() => {
