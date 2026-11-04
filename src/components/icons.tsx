@@ -162,16 +162,6 @@ export function InstallIcon(props: SVGProps<SVGSVGElement>) {
   )
 }
 
-export function HelpCircleIcon(props: SVGProps<SVGSVGElement>) {
-  return (
-    <svg fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" {...props}>
-      <circle cx="12" cy="12" r="10" />
-      <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
-      <path d="M12 17h.01" />
-    </svg>
-  )
-}
-
 export function SettingsIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" {...props}>

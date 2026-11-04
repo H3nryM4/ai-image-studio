@@ -1,7 +1,7 @@
 import { useRef, useEffect, useCallback, useState, useMemo, useLayoutEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { deleteFavoriteCollection, useStore, submitTask, stopBatchPrompts, addImageFromFile, removeMultipleTasks, taskMatchesFilterStatus, taskMatchesSearchQuery } from '../store'
-import { DEFAULT_PARAMS, MAX_INPUT_IMAGES, type TaskRecord } from '../types'
+import { useStore, submitTask, stopBatchPrompts, addImageFromFile } from '../store'
+import { DEFAULT_PARAMS, MAX_INPUT_IMAGES } from '../types'
 import { getActiveApiProfile, isApiConnectionAvailable, normalizeSettings, resolveApiProfileModel, splitModelList } from '../lib/apiProfiles'
 import { getImageGenerationModel, isGptImage25Model } from '../lib/imageModels'
 import { ensureImageCached } from '../lib/imageCache'
@@ -12,10 +12,8 @@ import { normalizeCodexCliImageSize, normalizeImageSize } from '../lib/size'
 import { createMaskPreviewDataUrl } from '../lib/canvasImage'
 import { getSafeBoundingClientRect } from '../lib/domRect'
 import { suppressGlobalClicks } from '../lib/clickSuppression'
-import { ALL_FAVORITES_COLLECTION_ID, getTaskFavoriteCollectionIds } from '../lib/favoriteState'
 import { getContentEditableCursor, getContentEditablePlainText, getContentEditableSelection, getMentionTagHtml, setContentEditableCursor, setContentEditableSelection, syncMentionTagSelection } from '../lib/contentEditableMentions'
 import { useHintTooltip } from '../hooks/useHintTooltip'
-import { downloadImageEntriesAsZip, downloadImageIds, formatExportFileTime, getTaskOutputImageZipEntries } from '../lib/downloadImages'
 import SizePickerModal from './SizePickerModal'
 import { CloseIcon, CollapseIcon, ExpandIcon, SketchIcon } from './icons'
 import { CommentBadge } from './CommentMarks'
@@ -23,16 +21,6 @@ import ButtonTooltip from './input/buttonTooltip'
 import DragUploadOverlay from './input/dragUploadOverlay'
 import InputBatchBars from './input/inputBatchBars'
 import InputParamsPanel from './input/inputParamsPanel'
-
-function getFavoriteCollectionTasksForBatch(collectionId: string, tasks: TaskRecord[], defaultFavoriteCollectionId: string | null) {
-  const favoriteTasks = tasks.filter((task) => task.isFavorite)
-  if (collectionId === ALL_FAVORITES_COLLECTION_ID) return favoriteTasks
-  return favoriteTasks.filter((task) => getTaskFavoriteCollectionIds(task, defaultFavoriteCollectionId).includes(collectionId))
-}
-
-function delay(ms: number) {
-  return new Promise((resolve) => window.setTimeout(resolve, ms))
-}
 
 function useIsMobile() {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 640)
@@ -66,210 +54,7 @@ export default function InputBar() {
   const setLightboxImageId = useStore((s) => s.setLightboxImageId)
   const showToast = useStore((s) => s.showToast)
   const setConfirmDialog = useStore((s) => s.setConfirmDialog)
-  const selectedTaskIds = useStore((s) => s.selectedTaskIds)
-  const setSelectedTaskIds = useStore((s) => s.setSelectedTaskIds)
-  const clearSelection = useStore((s) => s.clearSelection)
-  const selectedFavoriteCollectionIds = useStore((s) => s.selectedFavoriteCollectionIds)
-  const setSelectedFavoriteCollectionIds = useStore((s) => s.setSelectedFavoriteCollectionIds)
-  const clearFavoriteCollectionSelection = useStore((s) => s.clearFavoriteCollectionSelection)
-  const tasks = useStore((s) => s.tasks)
-  const favoriteCollections = useStore((s) => s.favoriteCollections)
-  const defaultFavoriteCollectionId = useStore((s) => s.defaultFavoriteCollectionId)
-  const filterStatus = useStore((s) => s.filterStatus)
-  const filterFavorite = useStore((s) => s.filterFavorite)
-  const activeFavoriteCollectionId = useStore((s) => s.activeFavoriteCollectionId)
-  const openFavoritePicker = useStore((s) => s.openFavoritePicker)
-  const searchQuery = useStore((s) => s.searchQuery)
-
-  const filteredTasks = useMemo(() => {
-    const sorted = [...tasks].sort((a, b) => b.createdAt - a.createdAt)
-    const q = searchQuery.trim().toLowerCase()
-
-    return sorted.filter((t) => {
-      if (filterFavorite) {
-        if (!t.isFavorite) return false
-        if (activeFavoriteCollectionId && activeFavoriteCollectionId !== ALL_FAVORITES_COLLECTION_ID && !getTaskFavoriteCollectionIds(t, defaultFavoriteCollectionId).includes(activeFavoriteCollectionId)) return false
-      }
-      if (!taskMatchesFilterStatus(t, filterStatus)) return false
-      return taskMatchesSearchQuery(t, q)
-    })
-  }, [tasks, searchQuery, filterStatus, filterFavorite, activeFavoriteCollectionId, defaultFavoriteCollectionId])
-
-  const inCollectionOverview = filterFavorite && !activeFavoriteCollectionId
-
-  const favoriteCollectionCards = useMemo(() => {
-    return [
-      {
-        id: ALL_FAVORITES_COLLECTION_ID,
-        name: '全部',
-        tasks: getFavoriteCollectionTasksForBatch(ALL_FAVORITES_COLLECTION_ID, tasks, defaultFavoriteCollectionId),
-      },
-      ...favoriteCollections.map((collection) => ({
-        id: collection.id,
-        name: collection.name,
-        collection,
-        tasks: getFavoriteCollectionTasksForBatch(collection.id, tasks, defaultFavoriteCollectionId),
-      })),
-    ]
-  }, [defaultFavoriteCollectionId, favoriteCollections, tasks])
-
-  const filteredFavoriteCollectionCards = useMemo(() => {
-    if (!searchQuery.trim()) return favoriteCollectionCards
-    const lowerQuery = searchQuery.toLowerCase()
-    return favoriteCollectionCards.filter((collection) => collection.name.toLowerCase().includes(lowerQuery))
-  }, [favoriteCollectionCards, searchQuery])
-
-  const handleSelectAllVisibleTasks = useCallback(() => {
-    setSelectedTaskIds(filteredTasks.map((task) => task.id))
-  }, [filteredTasks, setSelectedTaskIds])
-
-  const handleInvertVisibleTasks = useCallback(() => {
-    const visibleIds = new Set(filteredTasks.map((task) => task.id))
-    setSelectedTaskIds((current) => {
-      const currentSet = new Set(current)
-      const next = current.filter((id) => !visibleIds.has(id))
-      filteredTasks.forEach((task) => {
-        if (!currentSet.has(task.id)) next.push(task.id)
-      })
-      return next
-    })
-  }, [filteredTasks, setSelectedTaskIds])
-
-  const handleSelectAllVisibleFavoriteCollections = useCallback(() => {
-    setSelectedFavoriteCollectionIds(filteredFavoriteCollectionCards.map((collection) => collection.id))
-  }, [filteredFavoriteCollectionCards, setSelectedFavoriteCollectionIds])
-
-  const handleInvertVisibleFavoriteCollections = useCallback(() => {
-    const visibleIds = new Set(filteredFavoriteCollectionCards.map((collection) => collection.id))
-    setSelectedFavoriteCollectionIds((current) => {
-      const currentSet = new Set(current)
-      const next = current.filter((id) => !visibleIds.has(id))
-      filteredFavoriteCollectionCards.forEach((collection) => {
-        if (!currentSet.has(collection.id)) next.push(collection.id)
-      })
-      return next
-    })
-  }, [filteredFavoriteCollectionCards, setSelectedFavoriteCollectionIds])
-
-  const handleToggleFavorite = useCallback(() => {
-    openFavoritePicker(selectedTaskIds)
-  }, [openFavoritePicker, selectedTaskIds])
-
-  const handleDeleteSelected = useCallback(() => {
-    setConfirmDialog({
-      title: '批量删除',
-      message: `确定要删除选中的 ${selectedTaskIds.length} 个任务吗？`,
-      action: () => {
-        removeMultipleTasks(selectedTaskIds)
-      },
-    })
-  }, [selectedTaskIds, setConfirmDialog])
-
-  const handleDownloadSelected = useCallback(async () => {
-    const selectedTasks = tasks.filter((t) => selectedTaskIds.includes(t.id))
-    const imageIds = selectedTasks.flatMap(t => t.outputImages || [])
-    if (imageIds.length === 0) {
-      showToast('选中的任务没有图片', 'info')
-      return
-    }
-
-    try {
-      const timeStr = formatExportFileTime(new Date())
-      const fileNameBase = `batch-${timeStr}`
-      const { successCount, failCount } = settings.zipDownloadRoutes.includes('task-selection')
-        ? await downloadImageEntriesAsZip(getTaskOutputImageZipEntries(selectedTasks), fileNameBase)
-        : await downloadImageIds(imageIds, fileNameBase)
-
-      if (successCount === 0) {
-        showToast('下载失败', 'error')
-      } else if (failCount > 0) {
-        showToast(`部分下载失败：成功 ${successCount}，失败 ${failCount}`, 'error')
-      } else {
-        showToast(successCount > 1 ? `下载成功：${successCount} 张图片` : '下载成功', 'success')
-      }
-    } catch (err) {
-      console.error(err)
-      showToast('下载失败', 'error')
-    }
-    clearSelection()
-  }, [tasks, selectedTaskIds, settings.zipDownloadRoutes, showToast, clearSelection])
-
-  const handleDownloadSelectedFavoriteCollections = useCallback(async () => {
-    const selectedIdSet = new Set(selectedFavoriteCollectionIds)
-    const selectedCollections = favoriteCollectionCards.filter((collection) => selectedIdSet.has(collection.id))
-    if (selectedCollections.length === 0) return
-
-    let successCount = 0
-    let failCount = 0
-    let downloadedCollectionCount = 0
-    const useZipDownload = settings.zipDownloadRoutes.includes('favorite-collection-selection')
-    const timeStr = formatExportFileTime(new Date())
-
-    try {
-      for (const collection of selectedCollections) {
-        const entries = getTaskOutputImageZipEntries(collection.tasks)
-        if (entries.length === 0) continue
-        const zipName = collection.id === ALL_FAVORITES_COLLECTION_ID
-          ? `favorites-all-${timeStr}`
-          : `favorites-${collection.name}-${timeStr}`
-        const result = useZipDownload
-          ? await downloadImageEntriesAsZip(entries, zipName)
-          : await downloadImageIds(entries.map((entry) => entry.imageId), zipName)
-        successCount += result.successCount
-        failCount += result.failCount
-        if (result.successCount > 0) downloadedCollectionCount++
-        if (selectedCollections.length > 1) await delay(100)
-      }
-
-      if (successCount === 0) {
-        showToast('选中的收藏夹没有图片', 'info')
-      } else if (failCount > 0) {
-        showToast(`部分下载失败：成功 ${successCount}，失败 ${failCount}`, 'error')
-      } else {
-        showToast(useZipDownload && downloadedCollectionCount > 1 ? `下载成功：${downloadedCollectionCount} 个压缩包，${successCount} 张图片` : `下载成功：${successCount} 张图片`, 'success')
-      }
-    } catch (err) {
-      console.error(err)
-      showToast('下载失败', 'error')
-    }
-    clearFavoriteCollectionSelection()
-  }, [clearFavoriteCollectionSelection, favoriteCollectionCards, selectedFavoriteCollectionIds, settings.zipDownloadRoutes, showToast])
-
-  const handleDeleteSelectedFavoriteCollections = useCallback(() => {
-    const selectedIdSet = new Set(selectedFavoriteCollectionIds)
-    const selectedCollections = favoriteCollections.filter((collection) => selectedIdSet.has(collection.id))
-    if (selectedCollections.length === 0) {
-      showToast('没有可删除的收藏夹', 'info')
-      return
-    }
-    if (favoriteCollections.length - selectedCollections.length < 1) {
-      showToast('至少保留一个收藏夹', 'error')
-      return
-    }
-
-    const selectedCollectionIds = new Set(selectedCollections.map((collection) => collection.id))
-    const imageCount = new Set(
-      tasks
-        .filter((task) => getTaskFavoriteCollectionIds(task, defaultFavoriteCollectionId).some((id) => selectedCollectionIds.has(id)))
-        .flatMap((task) => task.outputImages || []),
-    ).size
-    setConfirmDialog({
-      title: '批量删除收藏夹',
-      message: `确定要删除选中的 ${selectedCollections.length} 个收藏夹吗？`,
-      checkbox: imageCount > 0
-        ? {
-            label: `同时删除收藏夹中的图片（${imageCount} 张）`,
-            tone: 'danger',
-          }
-        : undefined,
-      action: async (deleteImages = false) => {
-        for (const collection of selectedCollections) {
-          await deleteFavoriteCollection(collection.id, deleteImages)
-        }
-        clearFavoriteCollectionSelection()
-      },
-    })
-  }, [clearFavoriteCollectionSelection, defaultFavoriteCollectionId, favoriteCollections, selectedFavoriteCollectionIds, setConfirmDialog, showToast, tasks])
+  const selectionMode = useStore((s) => s.selectionMode)
 
   const maskDraft = useStore((s) => s.maskDraft)
   const moveInputImage = useStore((s) => s.moveInputImage)
@@ -315,6 +100,14 @@ export default function InputBar() {
   const [cursorPos, setCursorPos] = useState(0)
   const [menuLeft, setMenuLeft] = useState(0)
   const showPromptExpand = promptExpanded || promptCanExpand
+
+  useEffect(() => {
+    if (!selectionMode) return
+    setPromptExpanded(false)
+    setShowUploadMenu(false)
+    setAtImageMenuDismissed(true)
+    textareaRef.current?.blur()
+  }, [selectionMode])
 
   const updateInputBarClearance = useCallback(() => {
     const bar = cardRef.current?.closest<HTMLElement>('[data-input-bar]')
@@ -825,6 +618,7 @@ export default function InputBar() {
   // 粘贴图片
   useEffect(() => {
     const handlePaste = (e: ClipboardEvent) => {
+      if (useStore.getState().selectionMode) return
       const items = e.clipboardData?.items
       if (!items) return
       const imageFiles: File[] = []
@@ -850,7 +644,7 @@ export default function InputBar() {
       e.preventDefault()
       e.stopPropagation()
       dragCounter.current++
-      if (e.dataTransfer?.types.includes('Files')) {
+      if (!useStore.getState().selectionMode && e.dataTransfer?.types.includes('Files')) {
         setIsDragging(true)
       }
     }
@@ -874,6 +668,7 @@ export default function InputBar() {
       e.stopPropagation()
       dragCounter.current = 0
       setIsDragging(false)
+      if (useStore.getState().selectionMode) return
       const files = e.dataTransfer?.files
       if (files && files.length > 0) {
         handleFilesRef.current(files)
@@ -996,7 +791,7 @@ export default function InputBar() {
 
   useEffect(() => {
     adjustTextareaHeight()
-  }, [prompt, inputImages, adjustTextareaHeight, isMobile, mobileCollapsed, promptExpanded])
+  }, [prompt, inputImages, adjustTextareaHeight, isMobile, mobileCollapsed, promptExpanded, selectionMode])
 
   // 监听 selectionchange 更新光标位置（onSelect 在 contentEditable 下不可靠）
   useEffect(() => {
@@ -1569,12 +1364,9 @@ export default function InputBar() {
     />
   )
 
-  const showFavoriteCollectionBatchBar = inCollectionOverview && selectedFavoriteCollectionIds.length > 0
-  const showTaskBatchBar = !showFavoriteCollectionBatchBar && selectedTaskIds.length > 0
-
   return (
     <>
-      <DragUploadOverlay visible={isDragging} atImageLimit={atImageLimit} maxImages={MAX_INPUT_IMAGES} />
+      <DragUploadOverlay visible={isDragging && !selectionMode} atImageLimit={atImageLimit} maxImages={MAX_INPUT_IMAGES} />
 
       {showSizePicker && (
         <SizePickerModal
@@ -1587,30 +1379,14 @@ export default function InputBar() {
 
       <div
         data-input-bar
-        className={`fixed bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 z-30 w-full max-w-4xl sm:w-max sm:min-w-[min(56rem,100%)] sm:max-w-[min(80rem,100%)] px-3 sm:px-4 transition-all duration-300${promptExpanded ? ' flex flex-col' : ''}`}
-        style={promptExpanded ? { top: `${promptExpandedTop}px`, transitionProperty: 'none' } : undefined}
+        className={`fixed bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 z-30 w-full px-3 sm:px-4 ${selectionMode ? 'max-w-xl' : 'max-w-4xl sm:w-max sm:min-w-[min(56rem,100%)] sm:max-w-[min(80rem,100%)] transition-all duration-300'}${promptExpanded && !selectionMode ? ' flex flex-col' : ''}`}
+        style={promptExpanded && !selectionMode ? { top: `${promptExpandedTop}px`, transitionProperty: 'none' } : undefined}
       >
         {/* 桌面端输入栏宽度只由参数栏内容决定（最宽与任务卡片区域对齐），其余区域用 contain 排除在宽度计算之外 */}
-        <div className="sm:[contain:inline-size]">
-          <InputBatchBars
-            showFavoriteCollectionBatchBar={showFavoriteCollectionBatchBar}
-            showTaskBatchBar={showTaskBatchBar}
-            selectedTaskIds={selectedTaskIds}
-            tasks={tasks}
-            clearFavoriteCollectionSelection={clearFavoriteCollectionSelection}
-            onSelectAllVisibleFavoriteCollections={handleSelectAllVisibleFavoriteCollections}
-            onInvertVisibleFavoriteCollections={handleInvertVisibleFavoriteCollections}
-            onDownloadSelectedFavoriteCollections={handleDownloadSelectedFavoriteCollections}
-            onDeleteSelectedFavoriteCollections={handleDeleteSelectedFavoriteCollections}
-            clearSelection={clearSelection}
-            onSelectAllVisibleTasks={handleSelectAllVisibleTasks}
-            onInvertVisibleTasks={handleInvertVisibleTasks}
-            onToggleFavorite={handleToggleFavorite}
-            onDownloadSelected={handleDownloadSelected}
-            onDeleteSelected={handleDeleteSelected}
-          />
+        <div className={selectionMode ? '' : 'sm:[contain:inline-size]'}>
+          <InputBatchBars />
         </div>
-        <div ref={cardRef} className={`bg-white/70 dark:bg-gray-900/70 backdrop-blur-2xl border border-white/50 dark:border-white/[0.08] shadow-[0_8px_30px_rgb(0,0,0,0.08)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.3)] rounded-2xl sm:rounded-3xl p-3 sm:p-4 ring-1 ring-black/5 dark:ring-white/10${promptExpanded ? ' flex min-h-0 flex-1 flex-col' : ''}`}>
+        <div ref={cardRef} className={`${selectionMode ? 'hidden ' : ''}bg-white/70 dark:bg-gray-900/70 backdrop-blur-2xl border border-white/50 dark:border-white/[0.08] shadow-[0_8px_30px_rgb(0,0,0,0.08)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.3)] rounded-2xl sm:rounded-3xl p-3 sm:p-4 ring-1 ring-black/5 dark:ring-white/10${promptExpanded && !selectionMode ? ' flex min-h-0 flex-1 flex-col' : ''}`}>
           {/* 移动端拖动条 */}
           <div
             ref={handleRef}

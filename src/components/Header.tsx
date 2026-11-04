@@ -4,9 +4,8 @@ import { useVersionCheck } from '../hooks/useVersionCheck'
 import { useTooltip } from '../hooks/useTooltip'
 import { dismissAllTooltips } from '../lib/tooltipDismiss'
 import ViewportTooltip from './ViewportTooltip'
-import HelpModal from './HelpModal'
 import { useFavoriteCollectionTitle } from './FavoriteCollections'
-import { HelpCircleIcon, InstallIcon, SettingsIcon } from './icons'
+import { InstallIcon, SettingsIcon } from './icons'
 
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>
@@ -21,16 +20,13 @@ function isInstalledPwa() {
 export default function Header() {
   const setShowSettings = useStore((s) => s.setShowSettings)
   const setConfirmDialog = useStore((s) => s.setConfirmDialog)
-  const filterFavorite = useStore((s) => s.filterFavorite)
   const activeFavoriteCollectionId = useStore((s) => s.activeFavoriteCollectionId)
   const favoriteCollectionTitle = useFavoriteCollectionTitle()
   const showFavoriteCollectionTitle = Boolean(activeFavoriteCollectionId)
   const { hasUpdate, latestRelease, dismiss } = useVersionCheck()
-  const [showHelp, setShowHelp] = useState(false)
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null)
   const [isPwaInstalled, setIsPwaInstalled] = useState(isInstalledPwa)
   const installTooltip = useTooltip()
-  const helpTooltip = useTooltip()
   const settingsTooltip = useTooltip()
 
   useEffect(() => {
@@ -164,24 +160,6 @@ export default function Header() {
             )}
             <div
               className="relative"
-              {...helpTooltip.handlers}
-            >
-              <button
-                onClick={() => {
-                  dismissAllTooltips()
-                  setShowHelp(true)
-                }}
-                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-900 transition-colors"
-                aria-label="操作指南"
-              >
-                <HelpCircleIcon className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-              </button>
-              <ViewportTooltip visible={helpTooltip.visible} className="whitespace-nowrap">
-                操作指南
-              </ViewportTooltip>
-            </div>
-            <div
-              className="relative"
               {...settingsTooltip.handlers}
             >
               <button
@@ -202,7 +180,6 @@ export default function Header() {
       <div className="safe-area-top invisible pointer-events-none" aria-hidden="true">
         <div className="safe-header-inner" />
       </div>
-      {showHelp && <HelpModal isFavoriteCollectionOverview={filterFavorite && !activeFavoriteCollectionId} onClose={() => setShowHelp(false)} />}
     </>
   )
 }

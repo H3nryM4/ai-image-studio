@@ -20,6 +20,7 @@ export function FavoriteCollectionsView() {
   const setActiveFavoriteCollectionId = useStore((s) => s.setActiveFavoriteCollectionId)
   const setConfirmDialog = useStore((s) => s.setConfirmDialog)
   const selectedFavoriteCollectionIds = useStore((s) => s.selectedFavoriteCollectionIds)
+  const selectionMode = useStore((s) => s.selectionMode)
   const setSelectedFavoriteCollectionIds = useStore((s) => s.setSelectedFavoriteCollectionIds)
   const toggleFavoriteCollectionSelection = useStore((s) => s.toggleFavoriteCollectionSelection)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -146,6 +147,7 @@ export function FavoriteCollectionsView() {
                   isDefault={isDefault}
                   canDelete={canDelete}
                   isSelected={selectedFavoriteCollectionIds.includes(card.id)}
+                  selectionMode={selectionMode}
                   editingId={editingId}
                   editingName={editingName}
                   setEditingName={setEditingName}

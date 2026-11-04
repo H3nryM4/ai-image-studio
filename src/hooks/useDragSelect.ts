@@ -24,21 +24,16 @@ export function useDragSelect({
   const hasDragged = useRef(false)
   const dragScrollIntervalRef = useRef<number | null>(null)
   const dragScrollDirectionRef = useRef<-1 | 1 | null>(null)
-  const startedOnItem = useRef(false)
-  const startedWithCtrl = useRef(false)
   const initialSelection = useRef<string[]>([])
-  const isMac = /Mac|iPod|iPhone|iPad/.test(navigator.platform)
 
   const getPagePoint = useCallback((clientX: number, clientY: number) => ({
     pageX: clientX + window.scrollX,
     pageY: clientY + window.scrollY,
   }), [])
 
-  const beginSelection = useCallback((target: HTMLElement, clientX: number, clientY: number, isCtrl: boolean) => {
+  const beginSelection = useCallback((clientX: number, clientY: number) => {
     const point = getPagePoint(clientX, clientY)
 
-    startedOnItem.current = Boolean(target.closest(itemSelector))
-    startedWithCtrl.current = isCtrl
     initialSelection.current = [...initialSelectedIds]
 
     isDragging.current = true
@@ -53,7 +48,7 @@ export function useDragSelect({
       currentPageX: point.pageX,
       currentPageY: point.pageY,
     })
-  }, [getPagePoint, initialSelectedIds, itemSelector])
+  }, [getPagePoint, initialSelectedIds])
 
   const updateSelectionFromPoint = useCallback((pageX: number, pageY: number) => {
     const start = dragStart.current
@@ -116,13 +111,10 @@ export function useDragSelect({
       }, 16)
     }
 
-    const endSelection = (clearEmptySurfaceClick = false, suppressClick = false) => {
+    const endSelection = (suppressClick = false) => {
       if (isDragging.current) {
         document.body.classList.remove('select-none')
         document.body.classList.remove('drag-selecting')
-      }
-      if (isDragging.current && clearEmptySurfaceClick && !hasDragged.current && !startedOnItem.current && !startedWithCtrl.current) {
-        onSelectionChange([])
       }
       if (suppressClick && hasDragged.current) onSuppressClick?.()
       stopDragScroll()
@@ -159,8 +151,7 @@ export function useDragSelect({
         return
       }
 
-      const isCtrl = isMac ? e.metaKey : e.ctrlKey
-      beginSelection(target as HTMLElement, e.clientX, e.clientY, isCtrl)
+      beginSelection(e.clientX, e.clientY)
       e.preventDefault()
     }
 
@@ -219,7 +210,7 @@ export function useDragSelect({
     }
 
     const handleDocumentMouseUp = () => {
-      endSelection(true, true)
+      endSelection(true)
     }
 
     document.addEventListener('mousedown', handleDocumentMouseDown, true)
@@ -235,7 +226,7 @@ export function useDragSelect({
       document.removeEventListener('wheel', handleDocumentWheel, true)
       window.removeEventListener('scroll', handleDocumentScroll, true)
     }
-  }, [beginSelection, containerSelector, isMac, itemSelector, onSelectionChange, onSuppressClick, updateSelectionFromPoint])
+  }, [beginSelection, containerSelector, itemSelector, onSelectionChange, onSuppressClick, updateSelectionFromPoint])
 
   return { selectionBox, isDragging: isDragging.current }
 }

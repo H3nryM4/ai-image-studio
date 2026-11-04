@@ -5,8 +5,8 @@ import { Checkbox } from '../Checkbox'
 import { CloseIcon } from '../icons'
 
 export const ZIP_DOWNLOAD_ROUTE_OPTIONS: Array<{ route: ZipDownloadRoute; label: string; description: string }> = [
-  { route: 'task-selection', label: '任务列表 > 多选', description: '主页或收藏夹详情中框选、Ctrl/⌘ 点选或移动端滑动选中任务后的“下载选中”。' },
-  { route: 'favorite-collection-selection', label: '收藏夹列表 > 多选', description: '收藏夹概览页选中一个或多个收藏夹后的“下载选中”。' },
+  { route: 'task-selection', label: '任务列表 > 多选', description: '主页或收藏夹详情中，通过「多选」或快捷手势选择任务后的下载按钮。' },
+  { route: 'favorite-collection-selection', label: '收藏夹列表 > 多选', description: '收藏夹概览页通过「多选」选择一个或多个收藏夹后的下载按钮。' },
   { route: 'image-context-menu-all', label: '图片右键菜单 > 下载全部', description: '右键图片时下载同一组输出图片。' },
   { route: 'task-detail-all', label: '任务详情 > 下载全部', description: '任务详情弹窗中下载当前任务的所有输出图。' },
   { route: 'task-detail-partial', label: '任务详情 > 下载中间步骤图', description: '任务详情弹窗中下载流式生成保留的中间步骤图。' },

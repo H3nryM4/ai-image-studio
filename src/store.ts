@@ -188,6 +188,8 @@ interface AppState {
   setFilterFavorite: (f: boolean) => void
 
   // 多选
+  selectionMode: boolean
+  setSelectionMode: (enabled: boolean) => void
   selectedTaskIds: string[]
   setSelectedTaskIds: (ids: string[] | ((prev: string[]) => string[])) => void
   toggleTaskSelection: (id: string, force?: boolean) => void
@@ -494,7 +496,7 @@ export const useStore = create<AppState>()(
       )),
       activeFavoriteCollectionId: null,
       isManageCollectionsModalOpen: false,
-      setActiveFavoriteCollectionId: (activeFavoriteCollectionId) => set({ activeFavoriteCollectionId, selectedTaskIds: [], selectedFavoriteCollectionIds: [] }),
+      setActiveFavoriteCollectionId: (activeFavoriteCollectionId) => set({ activeFavoriteCollectionId, selectionMode: false, selectedTaskIds: [], selectedFavoriteCollectionIds: [] }),
       openManageCollectionsModal: () => set({ isManageCollectionsModalOpen: true }),
       closeManageCollectionsModal: () => set({ isManageCollectionsModalOpen: false }),
       favoritePickerTaskIds: null,
@@ -531,22 +533,26 @@ export const useStore = create<AppState>()(
 
       // Search & Filter
       searchQuery: '',
-      setSearchQuery: (searchQuery) => set({ searchQuery }),
+      setSearchQuery: (searchQuery) => set({ searchQuery, selectedTaskIds: [], selectedFavoriteCollectionIds: [] }),
       filterStatus: 'all',
-      setFilterStatus: (filterStatus) => set({ filterStatus }),
+      setFilterStatus: (filterStatus) => set({ filterStatus, selectedTaskIds: [] }),
       filterFavorite: false,
-      setFilterFavorite: (filterFavorite) => set(filterFavorite ? { filterFavorite, selectedTaskIds: [], selectedFavoriteCollectionIds: [] } : { filterFavorite, activeFavoriteCollectionId: null, selectedTaskIds: [], selectedFavoriteCollectionIds: [] }),
+      setFilterFavorite: (filterFavorite) => set(filterFavorite ? { filterFavorite, selectionMode: false, selectedTaskIds: [], selectedFavoriteCollectionIds: [] } : { filterFavorite, activeFavoriteCollectionId: null, selectionMode: false, selectedTaskIds: [], selectedFavoriteCollectionIds: [] }),
 
-      // Selection
+      // 多选状态仅保存在内存中，清空选择后仍保留模式，直到用户主动完成。
+      selectionMode: false,
+      setSelectionMode: (selectionMode) => set(selectionMode ? { selectionMode } : { selectionMode, selectedTaskIds: [], selectedFavoriteCollectionIds: [] }),
       selectedTaskIds: [],
-      setSelectedTaskIds: (updater) => set((s) => ({
-        selectedTaskIds: typeof updater === 'function' ? updater(s.selectedTaskIds) : updater
-      })),
+      setSelectedTaskIds: (updater) => set((s) => {
+        const ids = typeof updater === 'function' ? updater(s.selectedTaskIds) : updater
+        return { selectedTaskIds: ids, selectionMode: s.selectionMode || ids.length > 0 }
+      }),
       toggleTaskSelection: (id, force) => set((s) => {
         const isSelected = s.selectedTaskIds.includes(id)
         const shouldSelect = force !== undefined ? force : !isSelected
         if (shouldSelect === isSelected) return s
         return {
+          selectionMode: true,
           selectedTaskIds: shouldSelect
             ? [...s.selectedTaskIds, id]
             : s.selectedTaskIds.filter((x) => x !== id)
@@ -554,14 +560,16 @@ export const useStore = create<AppState>()(
       }),
       clearSelection: () => set({ selectedTaskIds: [] }),
       selectedFavoriteCollectionIds: [],
-      setSelectedFavoriteCollectionIds: (updater) => set((s) => ({
-        selectedFavoriteCollectionIds: typeof updater === 'function' ? updater(s.selectedFavoriteCollectionIds) : updater
-      })),
+      setSelectedFavoriteCollectionIds: (updater) => set((s) => {
+        const ids = typeof updater === 'function' ? updater(s.selectedFavoriteCollectionIds) : updater
+        return { selectedFavoriteCollectionIds: ids, selectionMode: s.selectionMode || ids.length > 0 }
+      }),
       toggleFavoriteCollectionSelection: (id, force) => set((s) => {
         const isSelected = s.selectedFavoriteCollectionIds.includes(id)
         const shouldSelect = force !== undefined ? force : !isSelected
         if (shouldSelect === isSelected) return s
         return {
+          selectionMode: true,
           selectedFavoriteCollectionIds: shouldSelect
             ? [...s.selectedFavoriteCollectionIds, id]
             : s.selectedFavoriteCollectionIds.filter((x) => x !== id)

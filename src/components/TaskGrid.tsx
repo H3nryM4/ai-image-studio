@@ -12,9 +12,9 @@ export default function TaskGrid() {
   const defaultFavoriteCollectionId = useStore((s) => s.defaultFavoriteCollectionId)
   const setDetailTaskId = useStore((s) => s.setDetailTaskId)
   const setConfirmDialog = useStore((s) => s.setConfirmDialog)
+  const selectionMode = useStore((s) => s.selectionMode)
   const selectedTaskIds = useStore((s) => s.selectedTaskIds)
   const setSelectedTaskIds = useStore((s) => s.setSelectedTaskIds)
-  const clearSelection = useStore((s) => s.clearSelection)
   const rootRef = useRef<HTMLDivElement>(null)
   const gridRef = useRef<HTMLDivElement>(null)
   const [selectionBox, setSelectionBox] = useState<{ startPageX: number; startPageY: number; currentPageX: number; currentPageY: number } | null>(null)
@@ -26,8 +26,6 @@ export default function TaskGrid() {
   const dragScrollDirectionRef = useRef<-1 | 1 | null>(null)
   const lastToastTimeRef = useRef(0)
   const suppressClickUntil = useRef(0)
-  const startedOnCard = useRef(false)
-  const startedWithCtrl = useRef(false)
   const initialSelection = useRef<string[]>([])
   const isMac = /Mac|iPod|iPhone|iPad/.test(navigator.platform)
 
@@ -58,11 +56,9 @@ export default function TaskGrid() {
     pageY: clientY + window.scrollY,
   })
 
-  const beginSelection = (target: HTMLElement, clientX: number, clientY: number, isCtrl: boolean) => {
+  const beginSelection = (clientX: number, clientY: number) => {
     const point = getPagePoint(clientX, clientY)
 
-    startedOnCard.current = Boolean(target.closest('.task-card-wrapper'))
-    startedWithCtrl.current = isCtrl
     initialSelection.current = [...useStore.getState().selectedTaskIds]
 
     isDragging.current = true
@@ -137,13 +133,10 @@ export default function TaskGrid() {
       }, 16)
     }
 
-    const endSelection = (clearEmptySurfaceClick = false, suppressClick = false) => {
+    const endSelection = (suppressClick = false) => {
       if (isDragging.current) {
         document.body.classList.remove('select-none')
         document.body.classList.remove('drag-selecting')
-      }
-      if (isDragging.current && clearEmptySurfaceClick && !hasDragged.current && !startedOnCard.current && !startedWithCtrl.current) {
-        clearSelection()
       }
       if (isDragging.current && suppressClick && hasDragged.current) {
         suppressClickUntil.current = Date.now() + 250
@@ -169,8 +162,7 @@ export default function TaskGrid() {
       if (target.closest('[data-no-drag-select], [data-lightbox-root]')) return
       if (target.closest('button, a, input, textarea, select')) return
 
-      const isCtrl = isMac ? e.metaKey : e.ctrlKey
-      beginSelection(target as HTMLElement, e.clientX, e.clientY, isCtrl)
+      beginSelection(e.clientX, e.clientY)
       e.preventDefault()
     }
 
@@ -236,7 +228,7 @@ export default function TaskGrid() {
     }
 
     const handleDocumentMouseUp = () => {
-      endSelection(true, true)
+      endSelection(true)
     }
 
     document.addEventListener('mousedown', handleDocumentMouseDown, true)
@@ -252,7 +244,7 @@ export default function TaskGrid() {
       document.removeEventListener('wheel', handleDocumentWheel, true)
       window.removeEventListener('scroll', handleDocumentScroll, true)
     }
-  }, [clearSelection, isMac])
+  }, [isMac])
 
   if (!filteredTasks.length) {
     return (
@@ -299,7 +291,7 @@ export default function TaskGrid() {
                 }
                 suppressClickUntil.current = 0
                 const isCtrl = isMac ? e.metaKey : e.ctrlKey
-                if (isCtrl) {
+                if (selectionMode || isCtrl) {
                   useStore.getState().toggleTaskSelection(task.id)
                   return
                 }
@@ -310,6 +302,7 @@ export default function TaskGrid() {
               onEditOutputs={() => editOutputs(task)}
               onDelete={() => handleDelete(task)}
               isSelected={selectedTaskIds.includes(task.id)}
+              selectionMode={selectionMode}
             />
           </div>
         ))}

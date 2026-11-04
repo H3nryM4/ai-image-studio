@@ -2,6 +2,7 @@ import { useEffect, useRef, type ReactNode } from 'react'
 import { clearFailedTasks, useStore, taskMatchesFilterStatus, taskMatchesSearchQuery } from '../store'
 import { ALL_FAVORITES_COLLECTION_ID, getTaskFavoriteCollectionIds } from '../lib/favoriteState'
 import { useTooltip } from '../hooks/useTooltip'
+import { useCloseOnEscape } from '../hooks/useCloseOnEscape'
 import Select from './Select'
 import { ChevronLeftIcon, CollectionManageIcon, FavoriteIcon, TrashIcon } from './icons'
 import ViewportTooltip from './ViewportTooltip'
@@ -50,7 +51,8 @@ export default function SearchBar() {
   const setSearchQuery = useStore((s) => s.setSearchQuery)
   const filterStatus = useStore((s) => s.filterStatus)
   const setFilterStatus = useStore((s) => s.setFilterStatus)
-  const clearSelection = useStore((s) => s.clearSelection)
+  const selectionMode = useStore((s) => s.selectionMode)
+  const setSelectionMode = useStore((s) => s.setSelectionMode)
   const filterFavorite = useStore((s) => s.filterFavorite)
   const setFilterFavorite = useStore((s) => s.setFilterFavorite)
   const activeFavoriteCollectionId = useStore((s) => s.activeFavoriteCollectionId)
@@ -71,6 +73,8 @@ export default function SearchBar() {
   const inCollectionOverview = filterFavorite && !activeFavoriteCollectionId
   const isFailedFilter = filterStatus === 'error'
   const favoriteTooltip = activeFavoriteCollectionId ? '返回收藏夹' : filterFavorite ? '退出收藏夹' : '收藏夹'
+  const selectionTooltip = useTooltip()
+  useCloseOnEscape(selectionMode, () => setSelectionMode(false))
 
   useEffect(() => {
     const handleDocumentMouseDown = (event: MouseEvent) => {
@@ -126,11 +130,10 @@ export default function SearchBar() {
   const handleStatusChange = (val: any) => {
     if (val === filterStatus) return
     setFilterStatus(val)
-    clearSelection()
   }
 
   return (
-    <div ref={rootRef} data-no-drag-select className="mt-6 mb-4 flex gap-3">
+    <div ref={rootRef} data-no-drag-select className="mt-6 mb-4 flex flex-wrap items-center gap-2 sm:gap-3">
       <div className="flex gap-2 flex-shrink-0 z-20">
         <SearchActionButton
           tooltip={favoriteTooltip}
@@ -143,7 +146,7 @@ export default function SearchBar() {
         >
           {activeFavoriteCollectionId ? <ChevronLeftIcon className="w-5 h-5" /> : <FavoriteIcon filled={filterFavorite} className="w-5 h-5" />}
         </SearchActionButton>
-        {inCollectionOverview && (
+        {inCollectionOverview && !selectionMode && (
           <SearchActionButton
             tooltip="管理收藏夹"
             onClick={openManageCollectionsModal}
@@ -167,7 +170,7 @@ export default function SearchBar() {
                 className="px-3 py-2.5 rounded-xl border border-transparent bg-black/[0.04] dark:bg-white/[0.06] hover:bg-black/[0.07] dark:hover:bg-white/[0.1] text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition"
               />
             </div>
-            {isFailedFilter && (
+            {isFailedFilter && !selectionMode && (
               <button
                 type="button"
                 onClick={handleClearFailed}
@@ -182,7 +185,7 @@ export default function SearchBar() {
           </>
         )}
       </div>
-      <div className="relative z-10 flex-1">
+      <div className="relative z-10 order-last basis-full min-w-0 flex-1 sm:order-none sm:basis-0">
         <svg
           className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500"
           fill="none"
@@ -204,6 +207,29 @@ export default function SearchBar() {
           placeholder={inCollectionOverview ? '搜索收藏夹名称...' : '搜索提示词、参数...'}
           className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-transparent bg-black/[0.04] dark:bg-white/[0.06] text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition"
         />
+      </div>
+      <div className="relative ml-auto shrink-0" {...selectionTooltip.handlers}>
+        <button
+          type="button"
+          onClick={() => {
+            selectionTooltip.dismiss()
+            setSelectionMode(!selectionMode)
+          }}
+          aria-pressed={selectionMode}
+          className={`flex min-h-11 items-center gap-1.5 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${selectionMode
+            ? 'bg-blue-500/10 text-blue-500 hover:bg-blue-500/15 dark:text-blue-400'
+            : 'bg-black/[0.04] text-gray-600 hover:bg-black/[0.07] dark:bg-white/[0.06] dark:text-gray-300 dark:hover:bg-white/[0.1]'
+          }`}
+        >
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+            {selectionMode ? <path d="M5 12l4 4L19 6" /> : <><rect x="3" y="3" width="18" height="18" rx="3" /><path d="M7 12l3 3 7-7" /></>}
+          </svg>
+          {selectionMode ? '完成' : '多选'}
+        </button>
+        <ViewportTooltip visible={selectionTooltip.visible} className="whitespace-nowrap text-left">
+          <div className="[@media(hover:none)]:hidden">{selectionMode ? '点击完成，或按 Esc 退出多选' : '框选或按住 Ctrl/⌘ 点选'}</div>
+          <div className="hidden [@media(hover:none)]:block">{selectionMode ? '点击完成退出多选' : '左右滑动卡片可选中或取消'}</div>
+        </ViewportTooltip>
       </div>
     </div>
   )

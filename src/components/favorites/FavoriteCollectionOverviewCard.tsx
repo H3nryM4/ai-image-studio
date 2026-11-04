@@ -3,6 +3,7 @@ import type { TaskRecord, FavoriteCollection } from '../../types'
 import { ensureImageThumbnailCached, subscribeImageThumbnail } from '../../lib/imageCache'
 import { TooltipButton as FavoriteActionButton } from '../TooltipButton'
 import { EditIcon, FavoriteIcon, TrashIcon } from '../icons'
+import SelectionCheckbox from '../selectionCheckbox'
 import type { CollectionCard } from './favoriteUtils'
 
 function FolderIcon(props: SVGProps<SVGSVGElement>) {
@@ -49,6 +50,7 @@ export function FavoriteCollectionOverviewCard({
   isDefault,
   canDelete,
   isSelected,
+  selectionMode,
   editingId,
   editingName,
   setEditingName,
@@ -67,6 +69,7 @@ export function FavoriteCollectionOverviewCard({
   isDefault: boolean
   canDelete: boolean
   isSelected: boolean
+  selectionMode: boolean
   editingId: string | null
   editingName: string
   setEditingName: (value: string) => void
@@ -216,7 +219,7 @@ export function FavoriteCollectionOverviewCard({
             return
           }
           const isCtrl = /Mac|iPod|iPhone|iPad/.test(navigator.platform) ? e.metaKey : e.ctrlKey
-          if (isCtrl) {
+          if (selectionMode || isCtrl) {
             e.preventDefault()
             onToggleSelection()
             return
@@ -228,13 +231,14 @@ export function FavoriteCollectionOverviewCard({
         onTouchEnd={handleTouchEnd}
         onTouchCancel={resetSwipe}
       >
+        {selectionMode && <SelectionCheckbox checked={isSelected} label={`选择收藏夹「${card.name}」`} onChange={onToggleSelection} />}
         <div className="flex h-40">
-          <div className="w-40 min-w-[10rem] h-full bg-gray-100 dark:bg-black/20 relative flex items-center justify-center overflow-hidden flex-shrink-0">
+          <div className={`${selectionMode ? 'w-32 min-w-[8rem] sm:w-40 sm:min-w-[10rem]' : 'w-40 min-w-[10rem]'} h-full bg-gray-100 dark:bg-black/20 relative flex items-center justify-center overflow-hidden flex-shrink-0`}>
             <CoverThumbnail task={coverTask} />
           </div>
           <div className="flex-1 p-3 flex flex-col min-w-0">
             <div className="flex-1 min-h-0 mb-2 overflow-hidden">
-              <div className="flex items-center gap-2 text-sm font-bold text-gray-900 dark:text-gray-100 mb-2">
+              <div className={`flex items-center gap-2 text-sm font-bold text-gray-900 dark:text-gray-100 mb-2${selectionMode ? ' pr-7' : ''}`}>
                 {isVirtualAll ? <FavoriteIcon filled className="h-4 w-4 shrink-0 text-yellow-500" /> : <FolderIcon className="h-4 w-4 shrink-0 text-gray-400 dark:text-gray-400" />}
                 {editingId === card.id ? (
                   <input
@@ -253,7 +257,7 @@ export function FavoriteCollectionOverviewCard({
               </div>
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">{card.tasks.length} 条任务</p>
             </div>
-            <div className="mt-auto flex items-center justify-end gap-1">
+            <div className={`${selectionMode ? 'hidden' : 'flex'} mt-auto items-center justify-end gap-1`}>
               {!isVirtualAll && card.collection && (
                 <>
                   <FavoriteActionButton

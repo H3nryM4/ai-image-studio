@@ -62,6 +62,7 @@ export function useTooltip(delay = 500) {
     onBlur: hide,
     onTouchStart: () => {
       clearTimer()
+      suppressedRef.current = false
       longPressTriggeredRef.current = false
       timerRef.current = window.setTimeout(() => {
         longPressTriggeredRef.current = true
