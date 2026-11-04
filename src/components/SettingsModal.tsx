@@ -1169,10 +1169,10 @@ export default function SettingsModal({ onImportProfile }: { onImportProfile: (s
                           id="profile-list-menu"
                           role="group"
                           aria-label="配置列表"
-                          className="absolute right-0 top-full z-50 mt-1.5 w-full overflow-hidden overflow-y-auto rounded-xl border border-transparent bg-white/95 shadow-[0_8px_30px_rgb(0,0,0,0.12)] ring-1 ring-black/5 backdrop-blur-xl animate-dropdown-down dark:bg-gray-800/95 dark:shadow-[0_8px_30px_rgb(0,0,0,0.4)] dark:ring-white/[0.06] custom-scrollbar"
+                          className="absolute right-0 top-full z-50 mt-1.5 flex w-full flex-col overflow-hidden rounded-xl border border-transparent bg-white/95 shadow-[0_8px_30px_rgb(0,0,0,0.12)] ring-1 ring-black/5 backdrop-blur-xl animate-dropdown-down dark:bg-gray-800/95 dark:shadow-[0_8px_30px_rgb(0,0,0,0.4)] dark:ring-white/[0.06]"
                           style={{ maxHeight: profileMenuMaxHeight }}
                         >
-                          <div>
+                          <div className="custom-scrollbar ios-rounded-scroll-fix min-h-0 overflow-y-auto rounded-[11px]">
                             {visibleProfiles.map((profile) => {
                               const canDelete = !presetConfigOnly && draft.profiles.length > 1 && (presetProfileIds.has(profile.id) ? !presetDeletionPrevented : profile.id !== defaultProfileId)
                               return (

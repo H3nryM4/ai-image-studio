@@ -207,11 +207,12 @@ export default function Select({ value, onChange, onReorder, options, disabled, 
 
       {isOpen && (
         <div
-          className={`absolute z-50 w-full overflow-hidden overflow-y-auto rounded-xl border border-transparent bg-white/95 shadow-[0_8px_30px_rgb(0,0,0,0.12)] ring-1 ring-black/5 backdrop-blur-xl dark:bg-gray-800/95 dark:shadow-[0_8px_30px_rgb(0,0,0,0.4)] dark:ring-white/[0.06] custom-scrollbar ${menuClassName ?? ''} ${
+          className={`absolute z-50 flex w-full flex-col overflow-hidden rounded-xl border border-transparent bg-white/95 shadow-[0_8px_30px_rgb(0,0,0,0.12)] ring-1 ring-black/5 backdrop-blur-xl dark:bg-gray-800/95 dark:shadow-[0_8px_30px_rgb(0,0,0,0.4)] dark:ring-white/[0.06] ${menuClassName ?? ''} ${
             placement === 'top' ? 'bottom-full mb-1.5 animate-dropdown-up' : 'top-full mt-1.5 animate-dropdown-down'
           }`}
           style={{ maxHeight: menuMaxHeight }}
         >
+          <div className="custom-scrollbar ios-rounded-scroll-fix min-h-0 overflow-y-auto rounded-[11px]">
           {options.map((option) => (
             <div
               key={option.value}
@@ -480,6 +481,7 @@ export default function Select({ value, onChange, onReorder, options, disabled, 
               )}
             </div>
           ))}
+          </div>
         </div>
       )}
 
