@@ -1543,3 +1543,97 @@ describe('callImageApi', () => {
     })
   })
 })
+
+describe('custom connection reference image templates', () => {
+  function settingsWith(body: Record<string, unknown>) {
+    return {
+      ...DEFAULT_SETTINGS,
+      customConnections: [{
+        id: 'custom-links',
+        name: 'Custom Links',
+        submit: {
+          path: 'images/generations',
+          body,
+          result: { b64JsonPaths: ['data.*.b64_json'] },
+        },
+      }],
+      activeProfileId: 'custom-links-profile',
+      profiles: [{
+        ...DEFAULT_SETTINGS.profiles[0],
+        id: 'custom-links-profile',
+        connectionId: 'custom-links',
+        baseUrl: 'https://api.example.com/v1',
+        apiKey: 'test-key',
+        model: 'model',
+      }],
+    }
+  }
+
+  it('sends raw base64 via $inputImages.base64', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
+      data: [{ b64_json: 'aW1hZ2U=' }],
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+
+    await callImageApi({
+      settings: settingsWith({ model: '$profile.model', prompt: '$prompt', image: '$inputImages.base64' }),
+      prompt: 'prompt',
+      params: { ...DEFAULT_PARAMS },
+      inputImageDataUrls: ['data:image/png;base64,aW1hZ2Ux', 'data:image/jpeg;base64,aW1hZ2Uy'],
+    })
+
+    const body = JSON.parse(String((fetchMock.mock.calls[0][1] as RequestInit).body))
+    expect(body.image).toEqual(['aW1hZ2Ux', 'aW1hZ2Uy'])
+  })
+
+  it('sends original links via $inputImages.urls', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
+      data: [{ b64_json: 'aW1hZ2U=' }],
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+
+    await callImageApi({
+      settings: settingsWith({ model: '$profile.model', prompt: '$prompt', image: '$inputImages.urls' }),
+      prompt: 'prompt',
+      params: { ...DEFAULT_PARAMS },
+      inputImageDataUrls: ['data:image/png;base64,aW1hZ2U=', 'data:image/png;base64,aW1hZ2Uy'],
+      inputImageUrls: ['https://cdn.example.com/a.png?e=1&token=x', 'https://oss.example.com/b.png'],
+    })
+
+    const body = JSON.parse(String((fetchMock.mock.calls[0][1] as RequestInit).body))
+    expect(body.image).toEqual([
+      'https://cdn.example.com/a.png?e=1&token=x',
+      'https://oss.example.com/b.png',
+    ])
+  })
+
+  it('rejects local reference images when the connection only accepts links', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+
+    await expect(callImageApi({
+      settings: settingsWith({ model: '$profile.model', prompt: '$prompt', image: '$inputImages.urls' }),
+      prompt: 'prompt',
+      params: { ...DEFAULT_PARAMS },
+      inputImageDataUrls: ['data:image/png;base64,aW1hZ2U=', 'data:image/png;base64,aW1hZ2Uy'],
+      inputImageUrls: ['https://cdn.example.com/a.png', null],
+    })).rejects.toThrow('只接受链接参考图')
+
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('treats links as optional when the template also sends base64 images', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
+      data: [{ b64_json: 'aW1hZ2U=' }],
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+
+    await callImageApi({
+      settings: settingsWith({ model: '$profile.model', prompt: '$prompt', image: '$inputImages.base64', image_urls: '$inputImages.urls' }),
+      prompt: 'prompt',
+      params: { ...DEFAULT_PARAMS },
+      inputImageDataUrls: ['data:image/png;base64,aW1hZ2Ux', 'data:image/png;base64,aW1hZ2Uy'],
+      inputImageUrls: ['https://cdn.example.com/a.png', null],
+    })
+
+    const body = JSON.parse(String((fetchMock.mock.calls[0][1] as RequestInit).body))
+    expect(body.image).toEqual(['aW1hZ2Ux', 'aW1hZ2Uy'])
+    expect(body.image_urls).toEqual(['https://cdn.example.com/a.png'])
+  })
+})

@@ -1,6 +1,7 @@
 import type { AppSettings, FavoriteCollection, InputImage, MaskDraft, PresetConfig, TaskParams } from '../types'
 import { normalizeSettings } from './apiProfiles'
 import { ensureDefaultFavoriteCollection, normalizeFavoriteCollections, resolveDefaultFavoriteCollectionId } from './favoriteState'
+import { isHttpUrl } from './imageApiShared'
 
 export interface PersistedAppState {
   settings: AppSettings
@@ -15,6 +16,7 @@ export interface PersistedAppState {
   dismissedCodexCliPrompts: string[]
   favoriteCollections: FavoriteCollection[]
   defaultFavoriteCollectionId: string | null
+  imageSourceUrls?: Record<string, string>
 }
 
 type PersistedStateSource = PersistedAppState & {
@@ -73,6 +75,7 @@ export function createPersistedState(state: PersistedStateSource): Partial<Persi
     dismissedCodexCliPrompts: state.dismissedCodexCliPrompts,
     favoriteCollections: state.favoriteCollections,
     defaultFavoriteCollectionId: state.defaultFavoriteCollectionId,
+    imageSourceUrls: state.imageSourceUrls,
   }
 }
 
@@ -112,6 +115,9 @@ export function normalizePersistedState(persistedState: unknown, fallback: Persi
     dismissedCodexCliPrompts: normalizeStringArray(persistedState.dismissedCodexCliPrompts, fallback.dismissedCodexCliPrompts),
     favoriteCollections,
     defaultFavoriteCollectionId: resolveDefaultFavoriteCollectionId(favoriteCollections, preferredDefaultFavoriteCollectionId),
+    imageSourceUrls: isRecord(persistedState.imageSourceUrls)
+      ? Object.fromEntries(Object.entries(persistedState.imageSourceUrls).filter((entry): entry is [string, string] => isHttpUrl(entry[1])))
+      : {},
     prompt: settings.persistInputOnRestart && typeof persistedState.prompt === 'string' ? persistedState.prompt : '',
     inputImages,
     maskDraft,

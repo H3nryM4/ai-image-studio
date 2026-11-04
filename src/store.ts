@@ -9,7 +9,7 @@ import { getTaskPromptText, remapImageCommentsForOrder } from './lib/promptImage
 import { getAllTasks, putTask, deleteTask as dbDeleteTask, commitTaskDeletion, clearTasks as dbClearTasks, getImage, getStoredImageThumbnail, getImageThumbnail, getAllImageIds, putImage, putImageThumbnail, deleteImage, clearImages, storeImage, storeImageWithSize } from './lib/db'
 import { callImageApi } from './lib/api'
 import { showBrowserNotification } from './lib/browserNotification'
-import { IMAGE_FETCH_CORS_HINT } from './lib/imageApiShared'
+import { IMAGE_FETCH_CORS_HINT, isHttpUrl } from './lib/imageApiShared'
 import { getCustomQueuedImageResult } from './lib/openaiCompatibleImageApi'
 import { validateMaskMatchesImage } from './lib/canvasImage'
 import { orderInputImagesForMask } from './lib/mask'
@@ -140,6 +140,8 @@ interface AppState {
   promptSelection: { start: number; end: number; prompt: string } | null
   setPromptSelection: (selection: { start: number; end: number }) => void
   inputImages: InputImage[]
+  /** 通过链接添加的参考图 id 到原链接，供只接受链接参考图的自定义服务商使用 */
+  imageSourceUrls: Record<string, string>
   addInputImage: (img: InputImage) => void
   replaceInputImage: (idx: number, img: InputImage) => void
   removeInputImage: (idx: number) => void
@@ -273,6 +275,15 @@ export async function deleteImageIfUnreferenced(imageId: string) {
   }
 }
 
+function forgetImageSourceUrl(imageId: string) {
+  if (!(imageId in useStore.getState().imageSourceUrls)) return
+  useStore.setState((s) => {
+    const imageSourceUrls = { ...s.imageSourceUrls }
+    delete imageSourceUrls[imageId]
+    return { imageSourceUrls }
+  })
+}
+
 async function deleteStoredImageIfUnreferenced(imageId: string) {
   if (isImageReferencedByState(useStore.getState(), imageId)) return
   const [image, thumbnail] = await Promise.all([getImage(imageId), getStoredImageThumbnail(imageId)])
@@ -281,6 +292,7 @@ async function deleteStoredImageIfUnreferenced(imageId: string) {
   await deleteImage(imageId)
   if (!isImageReferencedByState(useStore.getState(), imageId)) {
     deleteImageCacheEntry(imageId)
+    forgetImageSourceUrl(imageId)
     return
   }
 
@@ -390,6 +402,7 @@ export const useStore = create<AppState>()(
       promptSelection: null,
       setPromptSelection: (selection) => set((s) => ({ promptSelection: { ...selection, prompt: s.prompt } })),
       inputImages: [],
+      imageSourceUrls: {},
       addInputImage: (img) =>
         set((s) => {
           if (s.inputImages.find((i) => i.id === img.id)) return s
@@ -942,6 +955,10 @@ export async function initStore() {
     if (referencedIds.has(id)) referencedImageIds.push(id)
     else await deleteImage(id)
   }
+  const imageSourceUrls = useStore.getState().imageSourceUrls
+  if (Object.keys(imageSourceUrls).some((id) => !referencedIds.has(id))) {
+    useStore.setState({ imageSourceUrls: Object.fromEntries(Object.entries(imageSourceUrls).filter(([id]) => referencedIds.has(id))) })
+  }
   scheduleThumbnailBackfill(referencedImageIds)
 
   const images: InputImage[] = []
@@ -1341,6 +1358,7 @@ async function executeTask(taskId: string) {
       params: task.params,
       nativeTransparentBackground: task.params.transparent_output && !task.transparentOutput,
       inputImageDataUrls: inputDataUrls,
+      inputImageUrls: task.inputImageIds.map((id) => useStore.getState().imageSourceUrls[id] ?? null),
       maskDataUrl,
       onCustomTaskEnqueued: (request) => {
         if (taskExecutions.get(taskId) !== execution) return
@@ -1849,6 +1867,7 @@ export async function clearData(options: ClearOptions = { clearConfig: true, cle
     setTasks([])
     clearInputImages()
     clearMaskDraft()
+    useStore.setState({ imageSourceUrls: {} })
   }
 
   if (options.clearConfig) {
@@ -1950,6 +1969,7 @@ export async function exportData(options: ExportOptions = { exportConfig: true, 
       settings,
       tasks,
       imageTasks: tasks,
+      imageSourceUrls: state.imageSourceUrls,
       favoriteCollections,
       defaultFavoriteCollectionId,
     }
@@ -2084,6 +2104,11 @@ export async function importData(input: File | File[], options: ImportOptions = 
             height: info.height,
           })
           cacheImage(id, dataUrl)
+          // 备份文件来自外部，只接受 http(s) 链接
+          if (isHttpUrl(info.sourceUrl)) {
+            const sourceUrl = info.sourceUrl
+            useStore.setState((s) => ({ imageSourceUrls: { ...s.imageSourceUrls, [id]: sourceUrl } }))
+          }
           importedImageIds.push(id)
         }
 
@@ -2185,16 +2210,21 @@ export async function createInputImageFromFile(file: File): Promise<InputImage |
   const dataUrl = await fileToDataUrl(file)
   const id = await storeImage(dataUrl, 'upload')
   cacheImage(id, dataUrl)
+  // 本地添加的图片即使与链接添加的内容相同，也不再沿用当时的链接，以免提交已过期的链接
+  forgetImageSourceUrl(id)
   return { id, dataUrl }
 }
 
-/** 添加图片到输入（右键菜单）—— 支持 data/blob/http URL */
+/** 添加图片到输入（右键菜单、添加链接）—— 支持 data/blob/http URL */
 export async function addImageFromUrl(src: string): Promise<void> {
   const res = await fetch(src)
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
   const blob = await res.blob()
   if (!blob.type.startsWith('image/')) throw new Error('不是有效的图片')
   const dataUrl = await blobToDataUrl(blob)
   const id = await storeImage(dataUrl, 'upload')
   cacheImage(id, dataUrl)
+  // 内容相同的图片共用一个 id，记录最近一次添加的链接
+  if (isHttpUrl(src)) useStore.setState((s) => ({ imageSourceUrls: { ...s.imageSourceUrls, [id]: src } }))
   useStore.getState().addInputImage({ id, dataUrl })
 }

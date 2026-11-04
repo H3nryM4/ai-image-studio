@@ -18,6 +18,7 @@ function source(settings: AppSettings = DEFAULT_SETTINGS) {
     dismissedCodexCliPrompts: [],
     favoriteCollections: [collectionA],
     defaultFavoriteCollectionId: collectionA.id,
+    imageSourceUrls: { [imageA.id]: 'https://example.com/a.png' },
   }
 }
 
@@ -74,6 +75,15 @@ describe('persisted state codec', () => {
     expect(restored.maskDraft).toEqual(current.maskDraft)
     expect(restored.maskEditorImageId).toBe(imageA.id)
     expect(restored.defaultFavoriteCollectionId).toBe(collectionA.id)
+    expect(restored.imageSourceUrls).toEqual({ [imageA.id]: 'https://example.com/a.png' })
+  })
+
+  it('only restores http(s) image source links', () => {
+    const restored = normalizePersistedState({
+      ...source(),
+      imageSourceUrls: { a: 'https://example.com/a.png', b: 'javascript:alert(1)', c: 42 },
+    }, fallback())!
+    expect(restored.imageSourceUrls).toEqual({ a: 'https://example.com/a.png' })
   })
 
   it('omits and does not restore input when restart input persistence is disabled', () => {
