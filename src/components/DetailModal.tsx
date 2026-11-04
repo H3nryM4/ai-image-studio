@@ -10,7 +10,7 @@ import { copyImageSourceToClipboard, copyTextToClipboard, getClipboardFailureMes
 import { createMaskPreviewDataUrl } from '../lib/canvasImage'
 import { dismissAllTooltips } from '../lib/tooltipDismiss'
 import { downloadImageEntriesAsZip, downloadImageIds, getImageZipEntries } from '../lib/downloadImages'
-import { getImageComments, getTaskPromptText, replaceImageMentionsForApi } from '../lib/promptImageMentions'
+import { getImageComments, getTaskPromptText } from '../lib/promptImageComments'
 import { getApiConnectionLabel, getActiveApiProfile } from '../lib/apiProfiles'
 import { CloseIcon, CodeIcon, CopyIcon, DownloadIcon, EditIcon, LinkIcon, TrashIcon } from './icons'
 
@@ -243,12 +243,12 @@ export default function DetailModal() {
     ? baseActualParams
     : { ...(baseActualParams ?? {}), size: currentImageSize.replace('×', 'x') }
   const currentRevisedPrompt = currentOutputImageId ? task.revisedPromptByImage?.[currentOutputImageId]?.trim() : ''
-  // 将 @图N 等 mention 标记和透明背景追加提示词都按实际请求内容比较，
+  // 将画板评论和透明背景追加提示词都按实际请求内容比较，
   // 避免仅由本地请求预处理导致的不一致被当作“API 改写”。
   const requestPrompt = task.transparentOutput && task.transparentPrompt
     ? task.transparentPrompt
     : task.prompt
-  const promptSentToApi = replaceImageMentionsForApi(requestPrompt, task.inputImageIds.length).trim()
+  const promptSentToApi = getTaskPromptText(requestPrompt).trim()
   const showRevisedPrompt = Boolean(currentRevisedPrompt && currentRevisedPrompt !== promptSentToApi)
   const codexCliPromptKey = getCodexCliPromptKey(settings)
   const hasHandledPromptWarning = getActiveApiProfile(settings).codexCli || dismissedCodexCliPrompts.includes(codexCliPromptKey)
@@ -323,7 +323,7 @@ export default function DetailModal() {
   const handleCopyPrompt = async () => {
     if (!task.prompt) return
     try {
-      await copyTextToClipboard(getTaskPromptText(task.prompt, task.inputImageIds.length))
+      await copyTextToClipboard(getTaskPromptText(task.prompt))
       showToast('提示词已复制', 'success')
     } catch (err) {
       showToast(getClipboardFailureMessage('复制提示词失败', err), 'error')
@@ -865,7 +865,7 @@ export default function DetailModal() {
               )}
             </div>
             <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap mb-4">
-              {getTaskPromptText(task.prompt, task.inputImageIds.length) || '(无提示词)'}
+              {getTaskPromptText(task.prompt) || '(无提示词)'}
             </p>
             {showRevisedPrompt && currentRevisedPrompt && (
               <div className="mb-4">

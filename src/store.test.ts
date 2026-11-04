@@ -3,7 +3,7 @@ import { strToU8, zipSync } from 'fflate'
 import { DEFAULT_PARAMS } from './types'
 import { createDefaultOpenAIProfile, DEFAULT_SETTINGS, normalizeSettings } from './lib/apiProfiles'
 import type { ExportData, StoredImage, StoredImageThumbnail, TaskRecord } from './types'
-import { getSelectedImageMentionLabel } from './lib/promptImageMentions'
+import { getImageCommentToken } from './lib/promptImageComments'
 import { hasActiveDataOperations } from './lib/dataOperations'
 import { normalizePersistedState } from './lib/persistedState'
 import { setPresetConfig } from './lib/presetConfig'
@@ -203,21 +203,21 @@ describe('gallery startup', () => {
     }
   })
 
-  it('restores input images and clears a missing mask target while renumbering mentions', async () => {
+  it('restores input images and clears a missing mask target while renumbering comments', async () => {
     await clearTasks()
     await clearImages()
     await putImage({ id: imageB.id, dataUrl: imageB.dataUrl })
     useStore.setState({
       tasks: [],
       inputImages: [{ ...imageA, dataUrl: '' }, { ...imageB, dataUrl: '' }],
-      prompt: `修改 ${getSelectedImageMentionLabel(1)}`,
+      prompt: `修改 ${getImageCommentToken(1, [{ x: 0.5, y: 0.5, text: '修改颜色' }])}`,
       maskDraft: { targetImageId: imageA.id, maskDataUrl: 'mask', updatedAt: 1 },
       maskEditorImageId: imageA.id,
     })
     await initStore()
     expect(useStore.getState()).toMatchObject({
       inputImages: [imageB],
-      prompt: `修改 ${getSelectedImageMentionLabel(0)}`,
+      prompt: `修改 ${getImageCommentToken(0, [{ x: 0.5, y: 0.5, text: '修改颜色' }])}`,
       maskDraft: null,
       maskEditorImageId: null,
     })
@@ -546,6 +546,18 @@ describe('mask draft lifecycle in store actions', () => {
     expect(state.showToast).toHaveBeenCalledWith('任务已提交', 'success')
   })
 
+  it.each(['第一张图的人物，第二张图的画风', '@图1 name@example.com'])('sends all reference images with the plain prompt %s', async (prompt) => {
+    await putImage(imageA)
+    await putImage(imageB)
+    useStore.setState({ prompt, inputImages: [imageA, imageB] })
+    await submitTask()
+    await vi.waitFor(() => expect(useStore.getState().tasks[0]?.status).toBe('done'))
+    expect(callImageApi).toHaveBeenCalledWith(expect.objectContaining({
+      prompt,
+      inputImageDataUrls: [imageA.dataUrl, imageB.dataUrl],
+    }))
+  })
+
   it('does not apply the outer watchdog to concurrent Codex CLI custom requests', async () => {
     const request = deferred<Awaited<ReturnType<typeof callImageApi>>>()
     vi.mocked(callImageApi).mockImplementationOnce(() => request.promise)
@@ -845,9 +857,9 @@ describe('mask draft lifecycle in store actions', () => {
     await clearImages()
   })
 
-  it('preserves selected image mentions when replacing a mask target with an equivalent image id', () => {
+  it('preserves image comments when replacing a mask target with an equivalent image id', () => {
     const replacement = { id: 'image-a-replacement', dataUrl: imageA.dataUrl }
-    const prompt = `参考 ${getSelectedImageMentionLabel(0)} 生成`
+    const prompt = `参考 ${getImageCommentToken(0, [{ x: 0.5, y: 0.5, text: '修改颜色' }])} 生成`
     useStore.setState({
       prompt,
       inputImages: [imageA, imageB],
@@ -1810,14 +1822,14 @@ describe('reused task API profile', () => {
     expect(state.showToast).toHaveBeenCalledWith('已临时复用该任务的 API 配置「其他配置」', 'success')
   })
 
-  it('keeps selected image mentions when reusing a task with different current input images', async () => {
+  it('keeps image comments when reusing a task with different current input images', async () => {
     await clearImages()
     await putImage(imageA)
     await putImage(imageB)
-    const taskPrompt = `参考 ${getSelectedImageMentionLabel(1)} 生成`
+    const taskPrompt = `参考 ${getImageCommentToken(1, [{ x: 0.5, y: 0.5, text: '修改颜色' }])} 生成`
 
     useStore.setState({
-      prompt: `当前 ${getSelectedImageMentionLabel(1)}`,
+      prompt: `当前 ${getImageCommentToken(1, [{ x: 0.5, y: 0.5, text: '修改颜色' }])}`,
       inputImages: [
         { id: 'current-x', dataUrl: 'data:image/png;base64,x' },
         { id: 'current-y', dataUrl: 'data:image/png;base64,y' },

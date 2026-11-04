@@ -1,5 +1,5 @@
 import type { InputImage, MaskDraft } from '../types'
-import { remapImageMentionsForOrder } from './promptImageMentions'
+import { remapImageCommentsForOrder } from './promptImageComments'
 
 type InputDraftFields = {
   prompt: string
@@ -15,7 +15,7 @@ export function updateInputDraftImages(
   const shouldClearMask = options.clearMissingMask !== false && Boolean(draft.maskDraft) && !inputImages.some((img) => img.id === draft.maskDraft?.targetImageId)
   return {
     inputImages,
-    prompt: remapImageMentionsForOrder(draft.prompt, draft.inputImages, inputImages, options.equivalentImageIds),
+    prompt: remapImageCommentsForOrder(draft.prompt, draft.inputImages, inputImages, options.equivalentImageIds),
     ...(shouldClearMask ? { maskDraft: null, maskEditorImageId: null } : {}),
   }
 }

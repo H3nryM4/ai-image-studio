@@ -6,7 +6,7 @@ import { usePreventBackgroundScroll } from '../hooks/usePreventBackgroundScroll'
 import { createMaskPreviewDataUrl } from '../lib/canvasImage'
 import { suppressGlobalClicks } from '../lib/clickSuppression'
 import { ensureImageCached, getCachedImage } from '../lib/imageCache'
-import { getImageComments } from '../lib/promptImageMentions'
+import { getImageComments } from '../lib/promptImageComments'
 import { CommentPin } from './CommentMarks'
 import { EditIcon, RefreshIcon } from './icons'
 

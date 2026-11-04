@@ -361,8 +361,8 @@ input[type="number"] {
   }
 }
 
-/* contentEditable 中的 @图N 胶囊 tag */
-.mention-tag {
+/* contentEditable 中的画板评论胶囊 */
+.comment-tag {
   display: inline-flex;
   align-items: center;
   box-sizing: border-box;
@@ -382,8 +382,8 @@ input[type="number"] {
   transition: all 0.15s ease;
 }
 
-.mention-tag::selection,
-.mention-tag *::selection {
+.comment-tag::selection,
+.comment-tag *::selection {
   background: transparent !important;
   color: inherit !important;
 }
@@ -394,11 +394,11 @@ input[type="number"] {
   color: inherit;
 }
 
-.mention-tag:hover {
+.comment-tag:hover {
   background: #dbeafe;
 }
 
-.mention-tag.selected {
+.comment-tag.selected {
   background: #2563eb;
   color: #ffffff;
   border-color: #1d4ed8;
@@ -406,14 +406,14 @@ input[type="number"] {
 }
 
 @media (prefers-color-scheme: dark) {
-  .mention-tag {
+  .comment-tag {
     background: rgba(59, 130, 246, 0.12);
     color: #93c5fd;
     border-color: rgba(59, 130, 246, 0.2);
   }
 
-  .mention-tag::selection,
-  .mention-tag *::selection {
+  .comment-tag::selection,
+  .comment-tag *::selection {
     background: transparent !important;
     color: inherit !important;
   }
@@ -424,11 +424,11 @@ input[type="number"] {
     color: inherit;
   }
 
-  .mention-tag:hover {
+  .comment-tag:hover {
     background: rgba(59, 130, 246, 0.2);
   }
 
-  .mention-tag.selected {
+  .comment-tag.selected {
     background: #3b82f6;
     color: #ffffff;
     border-color: #60a5fa;

@@ -1,13 +1,11 @@
-import { getSelectedTextMentionLabel } from './promptImageMentions'
-
-function getMentionTagTextLength(el: Element) {
+function getCommentTagTextLength(el: Element) {
   return el.textContent?.length ?? 0
 }
 
 function getNodeVisibleTextLength(node: Node): number {
   if (node.nodeType === Node.TEXT_NODE) return node.textContent?.length ?? 0
-  if (node instanceof HTMLElement && node.classList.contains('mention-tag')) {
-    return getMentionTagTextLength(node)
+  if (node instanceof HTMLElement && node.classList.contains('comment-tag')) {
+    return getCommentTagTextLength(node)
   }
   return Array.from(node.childNodes).reduce((sum, child) => sum + getNodeVisibleTextLength(child), 0)
 }
@@ -26,8 +24,8 @@ function getVisibleOffsetBeforeNode(root: HTMLElement, target: Node): number {
       offset += node.textContent?.length ?? 0
       return
     }
-    if (node instanceof HTMLElement && node.classList.contains('mention-tag')) {
-      offset += getMentionTagTextLength(node)
+    if (node instanceof HTMLElement && node.classList.contains('comment-tag')) {
+      offset += getCommentTagTextLength(node)
       return
     }
     node.childNodes.forEach(walk)
@@ -37,15 +35,15 @@ function getVisibleOffsetBeforeNode(root: HTMLElement, target: Node): number {
   return offset
 }
 
-function getMentionTagForBoundary(root: HTMLElement, container: Node) {
+function getCommentTagForBoundary(root: HTMLElement, container: Node) {
   const el = container.nodeType === Node.ELEMENT_NODE
     ? container as Element
     : container.parentElement
-  const tag = el?.closest('.mention-tag')
+  const tag = el?.closest('.comment-tag')
   return tag && root.contains(tag) ? tag : null
 }
 
-function getBoundaryOffsetInMention(tag: Element, container: Node, offset: number) {
+function getBoundaryOffsetInComment(tag: Element, container: Node, offset: number) {
   try {
     const range = document.createRange()
     range.selectNodeContents(tag)
@@ -53,7 +51,7 @@ function getBoundaryOffsetInMention(tag: Element, container: Node, offset: numbe
     return range.toString().length
   } catch {
     // contenteditable=false 的内部 Range 边界存在浏览器兼容差异
-    return getMentionTagTextLength(tag)
+    return getCommentTagTextLength(tag)
   }
 }
 
@@ -87,13 +85,13 @@ function getContentEditableBoundaryOffset(
     return edge === 'start' ? 0 : root.textContent?.length ?? 0
   }
 
-  const mentionTag = getMentionTagForBoundary(root, container)
-  if (mentionTag) {
-    const mentionStart = getVisibleOffsetBeforeNode(root, mentionTag)
-    const mentionLength = getMentionTagTextLength(mentionTag)
-    if (!collapsed) return edge === 'start' ? mentionStart : mentionStart + mentionLength
-    const mentionOffset = getBoundaryOffsetInMention(mentionTag, container, offset)
-    return mentionStart + (mentionOffset < mentionLength / 2 ? 0 : mentionLength)
+  const commentTag = getCommentTagForBoundary(root, container)
+  if (commentTag) {
+    const commentStart = getVisibleOffsetBeforeNode(root, commentTag)
+    const commentLength = getCommentTagTextLength(commentTag)
+    if (!collapsed) return edge === 'start' ? commentStart : commentStart + commentLength
+    const commentOffset = getBoundaryOffsetInComment(commentTag, container, offset)
+    return commentStart + (commentOffset < commentLength / 2 ? 0 : commentLength)
   }
 
   if (container.nodeType === Node.TEXT_NODE) {
@@ -110,15 +108,6 @@ function getContentEditableBoundaryOffset(
   }
 
   return root.textContent?.length ?? 0
-}
-
-/** 获取 contentEditable 中光标的纯文本偏移量 */
-export function getContentEditableCursor(el: HTMLElement): number {
-  const sel = window.getSelection()
-  if (!sel || sel.rangeCount === 0) return el.textContent?.length ?? 0
-  const range = sel.getRangeAt(0)
-  if (!el.contains(range.startContainer)) return el.textContent?.length ?? 0
-  return getContentEditableBoundaryOffset(el, range.startContainer, range.startOffset, 'start', range.collapsed)
 }
 
 export function getContentEditableSelection(el: HTMLElement): { start: number; end: number } {
@@ -142,8 +131,8 @@ export function getContentEditablePlainText(el: HTMLElement): string {
       text += node.textContent ?? ''
       return
     }
-    if (node instanceof HTMLElement && node.classList.contains('mention-tag')) {
-      text += node.dataset.mentionText ?? node.textContent ?? ''
+    if (node instanceof HTMLElement && node.classList.contains('comment-tag')) {
+      text += node.dataset.commentText ?? node.textContent ?? ''
       return
     }
     node.childNodes.forEach(appendNodeText)
@@ -160,12 +149,12 @@ function escapeHtml(text: string) {
     .replace(/"/g, '&quot;')
 }
 
-export function getMentionTagHtml(text: string) {
-  return `<span contenteditable="false" class="mention-tag" data-mention-text="${escapeHtml(getSelectedTextMentionLabel(text))}">${escapeHtml(text)}</span>`
+export function getCommentTagHtml(text: string, rawText: string) {
+  return `<span contenteditable="false" class="comment-tag" data-comment-text="${escapeHtml(rawText)}">${escapeHtml(text)}</span>`
 }
 
-export function syncMentionTagSelection(el: HTMLElement) {
-  const tags = el.querySelectorAll<HTMLElement>('.mention-tag')
+export function syncCommentTagSelection(el: HTMLElement) {
+  const tags = el.querySelectorAll<HTMLElement>('.comment-tag')
   const sel = window.getSelection()
   if (!sel || sel.rangeCount === 0) {
     tags.forEach((tag) => tag.classList.remove('selected'))
@@ -199,14 +188,14 @@ export function setContentEditableCursor(el: HTMLElement, offset: number) {
   let node: Text | null = null
   while (walker.nextNode()) {
     node = walker.currentNode as Text
-    const mentionTag = node.parentElement?.closest('.mention-tag')
-    if (mentionTag) {
+    const commentTag = node.parentElement?.closest('.comment-tag')
+    if (commentTag) {
       if (remaining <= node.length) {
         const range = document.createRange()
         if (remaining < node.length / 2) {
-          range.setStartBefore(mentionTag)
+          range.setStartBefore(commentTag)
         } else {
-          range.setStartAfter(mentionTag)
+          range.setStartAfter(commentTag)
         }
         range.collapse(true)
         sel.removeAllRanges()
@@ -234,66 +223,4 @@ export function setContentEditableCursor(el: HTMLElement, offset: number) {
     sel.removeAllRanges()
     sel.addRange(range)
   }
-}
-
-export function setContentEditableSelection(el: HTMLElement, start: number, end: number) {
-  const sel = window.getSelection()
-  if (!sel) return
-
-  type Boundary =
-    | { type: 'offset'; node: Node; offset: number }
-    | { type: 'before'; element: Element }
-    | { type: 'after'; element: Element }
-
-  const findBoundary = (targetOffset: number, edge: 'start' | 'end'): Boundary => {
-    let remaining = targetOffset
-    let lastBoundary: Boundary = { type: 'offset', node: el, offset: 0 }
-
-    const walk = (current: Node): Boundary | null => {
-      if (current.nodeType === Node.TEXT_NODE) {
-        const node = current as Text
-        lastBoundary = { type: 'offset', node, offset: node.length }
-        if (remaining <= node.length) return { type: 'offset', node, offset: remaining }
-        remaining -= node.length
-        return null
-      }
-
-      if (current instanceof HTMLElement && current.classList.contains('mention-tag')) {
-        const length = getMentionTagTextLength(current)
-        if (remaining <= 0) return { type: 'before', element: current }
-        if (remaining < length) return edge === 'start' ? { type: 'before', element: current } : { type: 'after', element: current }
-        if (remaining === length) return { type: 'after', element: current }
-        remaining -= length
-        return null
-      }
-
-      for (const child of Array.from(current.childNodes)) {
-        const boundary = walk(child)
-        if (boundary) return boundary
-      }
-      return null
-    }
-
-    return walk(el) ?? lastBoundary
-  }
-
-  const applyBoundary = (range: Range, boundary: Boundary, target: 'start' | 'end') => {
-    if (boundary.type === 'before') {
-      target === 'start' ? range.setStartBefore(boundary.element) : range.setEndBefore(boundary.element)
-      return
-    }
-    if (boundary.type === 'after') {
-      target === 'start' ? range.setStartAfter(boundary.element) : range.setEndAfter(boundary.element)
-      return
-    }
-    target === 'start' ? range.setStart(boundary.node, boundary.offset) : range.setEnd(boundary.node, boundary.offset)
-  }
-
-  const startBoundary = findBoundary(start, 'start')
-  const endBoundary = findBoundary(end, 'end')
-  const range = document.createRange()
-  applyBoundary(range, startBoundary, 'start')
-  applyBoundary(range, endBoundary, 'end')
-  sel.removeAllRanges()
-  sel.addRange(range)
 }

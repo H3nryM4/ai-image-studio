@@ -7,12 +7,12 @@ import { getImageGenerationModel, isGptImage25Model } from '../lib/imageModels'
 import { ensureImageCached } from '../lib/imageCache'
 import { splitBatchPrompts } from '../lib/batchPrompts'
 import { getChangedParams, MAX_OPENAI_OUTPUT_IMAGES, normalizeParamsForSettings } from '../lib/paramCompatibility'
-import { getAtImageQuery, getImageComments, getImageMentionLabel, getPromptIndexFromVisibleIndex, getPromptMentionParts, getSelectedImageMentionLabel, imageMentionMatches, insertImageMentionAtVisibleRange, isCursorInSelectedImageMention, stripImageMentionMarkers } from '../lib/promptImageMentions'
+import { getImageComments, getPromptIndexFromVisibleIndex, getPromptCommentParts, stripPromptCommentData } from '../lib/promptImageComments'
 import { normalizeCodexCliImageSize, normalizeImageSize } from '../lib/size'
 import { createMaskPreviewDataUrl } from '../lib/canvasImage'
 import { getSafeBoundingClientRect } from '../lib/domRect'
 import { suppressGlobalClicks } from '../lib/clickSuppression'
-import { getContentEditableCursor, getContentEditablePlainText, getContentEditableSelection, getMentionTagHtml, setContentEditableCursor, setContentEditableSelection, syncMentionTagSelection } from '../lib/contentEditableMentions'
+import { getContentEditablePlainText, getContentEditableSelection, getCommentTagHtml, setContentEditableCursor, syncCommentTagSelection } from '../lib/contentEditableComments'
 import { useHintTooltip } from '../hooks/useHintTooltip'
 import SizePickerModal from './SizePickerModal'
 import { CloseIcon, CollapseIcon, ExpandIcon, SketchIcon } from './icons'
@@ -31,8 +31,6 @@ function useIsMobile() {
   }, [])
   return isMobile
 }
-
-type AtImageOption = { key: string; label: string; imageId: string; dataUrl: string; imageIndex: number }
 
 export default function InputBar() {
   const prompt = useStore((s) => s.prompt)
@@ -82,8 +80,6 @@ export default function InputBar() {
   const [maskPreviewUrl, setMaskPreviewUrl] = useState('')
   const [imageDragIndex, setImageDragIndex] = useState<number | null>(null)
   const [imageDragOverIndex, setImageDragOverIndex] = useState<number | null>(null)
-  const [atImageMenuIndex, setAtImageMenuIndex] = useState(0)
-  const [atImageMenuDismissed, setAtImageMenuDismissed] = useState(false)
   const [touchDragPreview, setTouchDragPreview] = useState<{ src: string; x: number; y: number } | null>(null)
   const handleRef = useRef<HTMLDivElement>(null)
   const dragTouchRef = useRef({ startY: 0, moved: false })
@@ -97,15 +93,12 @@ export default function InputBar() {
   const isComposingRef = useRef(false)
   const imageHintLockedRef = useRef(false)
   const imageHintReleaseRef = useRef<(() => void) | null>(null)
-  const [cursorPos, setCursorPos] = useState(0)
-  const [menuLeft, setMenuLeft] = useState(0)
   const showPromptExpand = promptExpanded || promptCanExpand
 
   useEffect(() => {
     if (!selectionMode) return
     setPromptExpanded(false)
     setShowUploadMenu(false)
-    setAtImageMenuDismissed(true)
     textareaRef.current?.blur()
   }, [selectionMode])
 
@@ -211,15 +204,13 @@ export default function InputBar() {
     ? '尚未完成 API 配置，请在右上角设置中进行'
     : '批量任务进行中，请等待完成或停止后再提交'
   const promptPlaceholder = batchEnabled
-    ? '每条提示词之间空两行分隔，可输入 @ 来指定参考图...'
-    : '描述你想生成的图片，可输入 @ 来指定参考图...'
+    ? '每条提示词之间空两行分隔...'
+    : '描述你想生成的图片...'
   const syncPromptFromContentEditable = useCallback(() => {
     const el = textareaRef.current
     if (!el) return
     isUserInputRef.current = true
-    const range = getContentEditableSelection(el)
-    setCursorPos(range.start)
-    syncMentionTagSelection(el)
+    syncCommentTagSelection(el)
     setPrompt(getContentEditablePlainText(el))
   }, [setPrompt])
   const showTransparentOutputControl = (params.output_format === 'png' || params.output_format === 'webp')
@@ -261,58 +252,6 @@ export default function InputBar() {
   const referenceImages = maskTargetImage
     ? inputImages.filter((img) => img.id !== maskTargetImage.id)
     : inputImages
-  const cursorPosition = cursorPos
-  const visiblePrompt = stripImageMentionMarkers(prompt)
-  const atImageSourceCount = inputImages.length
-  const atImageQuery = isCursorInSelectedImageMention(prompt, cursorPosition)
-    ? null
-    : getAtImageQuery(visiblePrompt, cursorPosition, { length: atImageSourceCount })
-  const atImageOptions = atImageQuery
-    ? [
-        ...inputImages
-          .map((img, index) => ({
-            key: `input:${img.id}:${index}`,
-            label: getImageMentionLabel(index),
-            imageId: img.id,
-            dataUrl: img.dataUrl,
-            imageIndex: index,
-          } satisfies AtImageOption))
-          .filter((option) => imageMentionMatches(atImageQuery.query, option.imageIndex)),
-      ]
-    : []
-  const showAtImageMenu = !atImageMenuDismissed && atImageOptions.length > 0
-
-  const selectAtImageOption = useCallback((option: AtImageOption) => {
-    const el = textareaRef.current
-    const cursor = el ? getContentEditableCursor(el) : prompt.length
-    const query = getAtImageQuery(stripImageMentionMarkers(prompt), cursor, { length: atImageSourceCount })
-    setAtImageMenuDismissed(true)
-    setAtImageMenuIndex(0)
-    if (!query) return
-
-    const mentionText = getImageMentionLabel(option.imageIndex)
-    const nextCursor = query.start + mentionText.length
-    if (el) {
-      el.focus()
-      setContentEditableSelection(el, query.start, cursor)
-      if (document.execCommand('insertHTML', false, getMentionTagHtml(mentionText))) {
-        setContentEditableCursor(el, nextCursor)
-        syncPromptFromContentEditable()
-        return
-      }
-    }
-
-    const next = insertImageMentionAtVisibleRange(prompt, query.start, cursor, option.imageIndex)
-    isUserInputRef.current = false
-    setPrompt(next.prompt)
-    window.setTimeout(() => {
-      if (textareaRef.current) {
-        textareaRef.current.focus()
-        setContentEditableCursor(textareaRef.current, next.cursor)
-      }
-    }, 0)
-  }, [atImageSourceCount, prompt, setPrompt, syncPromptFromContentEditable])
-
   const insertPromptTextAtSelection = useCallback((text: string) => {
     const el = textareaRef.current
     // 换行文本改用 state 渲染以避免 execCommand 插入 <br>/<div> 导致高度和换行异常
@@ -543,30 +482,6 @@ export default function InputBar() {
       return
     }
 
-    if (showAtImageMenu) {
-      if (e.key === 'ArrowDown') {
-        e.preventDefault()
-        setAtImageMenuIndex((idx) => (idx + 1) % atImageOptions.length)
-        return
-      }
-      if (e.key === 'ArrowUp') {
-        e.preventDefault()
-        setAtImageMenuIndex((idx) => (idx - 1 + atImageOptions.length) % atImageOptions.length)
-        return
-      }
-      if ((e.key === 'Enter' && !e.shiftKey) || e.key === 'Tab') {
-        e.preventDefault()
-        selectAtImageOption(atImageOptions[atImageMenuIndex] ?? atImageOptions[0])
-        return
-      }
-      if (e.key === 'Escape') {
-        e.preventDefault()
-        setAtImageMenuIndex(0)
-        textareaRef.current?.blur()
-        return
-      }
-    }
-
     // 阻止 contentEditable 默认换行
     if (e.key === 'Enter') {
       e.preventDefault()
@@ -608,11 +523,10 @@ export default function InputBar() {
 
     const promptStart = getPromptIndexFromVisibleIndex(prompt, selection.start)
     const promptEnd = getPromptIndexFromVisibleIndex(prompt, selection.end)
-    const text = stripImageMentionMarkers(prompt.slice(promptStart, promptEnd))
-    const copyText = /^\s*@图\d+\s*$/.test(text) ? text.trim() : text
+    const text = stripPromptCommentData(prompt.slice(promptStart, promptEnd))
 
     e.preventDefault()
-    e.clipboardData.setData('text/plain', copyText)
+    e.clipboardData.setData('text/plain', text)
   }
 
   // 粘贴图片
@@ -760,11 +674,11 @@ export default function InputBar() {
       isUserInputRef.current = false
       return
     }
-    const parts = getPromptMentionParts(prompt, inputImages)
+    const parts = getPromptCommentParts(prompt, inputImages)
     const html = prompt
       ? parts.map((part) =>
-          part.type === 'mention'
-              ? `<span contenteditable="false" class="mention-tag" data-mention-text="${part.mentionText ?? getSelectedImageMentionLabel(part.imageIndex)}">${part.text}</span>`
+          part.type === 'comment'
+            ? getCommentTagHtml(part.text, part.rawText)
             : part.text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
         ).join('')
       : ''
@@ -793,7 +707,7 @@ export default function InputBar() {
     adjustTextareaHeight()
   }, [prompt, inputImages, adjustTextareaHeight, isMobile, mobileCollapsed, promptExpanded, selectionMode])
 
-  // 监听 selectionchange 更新光标位置（onSelect 在 contentEditable 下不可靠）
+  // 监听 selectionchange 记录选区，供画板评论插入（onSelect 在 contentEditable 下不可靠）
   useEffect(() => {
     const handleSelectionChange = () => {
       const el = textareaRef.current
@@ -804,7 +718,7 @@ export default function InputBar() {
       const domRange = sel.getRangeAt(0)
       try {
         if (!domRange.intersectsNode(el)) {
-          syncMentionTagSelection(el)
+          syncCommentTagSelection(el)
           return
         }
       } catch {
@@ -812,18 +726,12 @@ export default function InputBar() {
       }
 
       const range = getContentEditableSelection(el)
-      setCursorPos(range.start)
       // 记到 store 中，画板等弹窗关闭后可把评论胶囊插回这里，并覆盖选中的内容；
       // 只记录完全落在输入框内的选区，整页全选或拖选越界时不能当成要覆盖的范围
       if (el.contains(domRange.startContainer) && el.contains(domRange.endContainer)) {
         useStore.getState().setPromptSelection(range)
       }
-      syncMentionTagSelection(el)
-
-      const rangeRect = domRange.getBoundingClientRect()
-      const elRect = el.getBoundingClientRect()
-      if (rangeRect.width === 0 && rangeRect.height === 0) return
-      setMenuLeft(rangeRect.left - elRect.left)
+      syncCommentTagSelection(el)
     }
     document.addEventListener('selectionchange', handleSelectionChange)
     return () => document.removeEventListener('selectionchange', handleSelectionChange)
@@ -1104,31 +1012,6 @@ export default function InputBar() {
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         onTouchCancel={handleTouchCancel}
-        onContextMenu={(e) => {
-          e.preventDefault()
-          const el = textareaRef.current
-          // 按输入框最后的选区插入，选中了其他内容（包括胶囊）时直接覆盖
-          const visibleLength = stripImageMentionMarkers(prompt).length
-          const recorded = useStore.getState().promptSelection
-          const selection = recorded?.prompt === prompt ? recorded : { start: visibleLength, end: visibleLength }
-          if (el) {
-            el.focus()
-            setContentEditableSelection(el, selection.start, selection.end)
-            if (document.execCommand('insertHTML', false, getMentionTagHtml(getImageMentionLabel(idx)))) {
-              syncPromptFromContentEditable()
-              return
-            }
-          }
-          const next = insertImageMentionAtVisibleRange(prompt, selection.start, selection.end, idx)
-          isUserInputRef.current = false
-          setPrompt(next.prompt)
-          window.setTimeout(() => {
-            if (textareaRef.current) {
-              textareaRef.current.focus()
-              setContentEditableCursor(textareaRef.current, next.cursor)
-            }
-          }, 0)
-        }}
       >
         <ButtonTooltip
           visible={imageHintId === img.id && Boolean(imageHintText) && (!isMobile || isMaskTarget)}
@@ -1424,32 +1307,6 @@ export default function InputBar() {
 
           {/* 输入框 */}
           <div className={`relative grid sm:[contain:inline-size]${promptExpanded ? ' min-h-0 flex-1' : ''}`}>
-            {showAtImageMenu && (
-              <div style={{ left: `${menuLeft}px` }} className="absolute bottom-full z-50 mb-2 w-64 overflow-hidden rounded-2xl border border-transparent bg-white/95 p-1.5 shadow-xl ring-1 ring-black/5 backdrop-blur-xl dark:bg-gray-800/95 dark:ring-white/[0.06]">
-                <div className="px-2 pb-1 pt-0.5 text-[11px] text-gray-400 dark:text-gray-500">选择图片引用</div>
-                <div className="max-h-56 overflow-y-auto custom-scrollbar">
-                  {atImageOptions.map((option, optionIndex) => (
-                    <button
-                      key={option.key}
-                      type="button"
-                      onMouseDown={(e) => {
-                        e.preventDefault()
-                        selectAtImageOption(option)
-                      }}
-                      onMouseEnter={() => setAtImageMenuIndex(optionIndex)}
-                      className={`flex w-full items-center gap-2 rounded-xl px-2 py-1.5 text-left text-xs transition-colors ${
-                        optionIndex === atImageMenuIndex
-                          ? 'bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-300'
-                          : 'text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-white/[0.06]'
-                        }`}
-                    >
-                      <span className="h-9 w-9 shrink-0 overflow-hidden rounded-lg border border-gray-200/70 bg-gray-100 dark:border-white/[0.08] dark:bg-white/[0.04]"><img src={option.dataUrl} className="h-full w-full object-cover" alt="" /></span>
-                      <span className="min-w-0 flex-1 truncate font-medium">{option.label}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
             <div
               ref={textareaRef}
               contentEditable
@@ -1457,21 +1314,13 @@ export default function InputBar() {
               onInput={(e) => {
                 isUserInputRef.current = true
                 const el = e.currentTarget
-                const range = getContentEditableSelection(el)
-                setCursorPos(range.start)
-                syncMentionTagSelection(el)
+                syncCommentTagSelection(el)
                 const text = getContentEditablePlainText(el)
                 setPrompt(text)
-                setAtImageMenuIndex(0)
-                setAtImageMenuDismissed(false)
               }}
               onSelect={(e) => {
                 const el = e.currentTarget
-                const range = getContentEditableSelection(el)
-                setCursorPos(range.start)
-                syncMentionTagSelection(el)
-                setAtImageMenuIndex(0)
-                setAtImageMenuDismissed(false)
+                syncCommentTagSelection(el)
               }}
               onKeyDown={handleKeyDown}
               onCompositionStart={() => {
@@ -1486,19 +1335,19 @@ export default function InputBar() {
                 const el = textareaRef.current
                 if (!el) return
                 const target = e.target as HTMLElement
-                if (target.classList.contains('mention-tag')) {
+                if (target.classList.contains('comment-tag')) {
                   const sel = window.getSelection()
                   if (sel) {
                     const range = document.createRange()
                     range.selectNode(target)
                     sel.removeAllRanges()
                     sel.addRange(range)
-                    syncMentionTagSelection(el)
+                    syncCommentTagSelection(el)
                   }
                   return
                 }
 
-                syncMentionTagSelection(el)
+                syncCommentTagSelection(el)
               }}
               aria-label={promptPlaceholder}
               className={`col-start-1 row-start-1 min-h-[42px] w-full overflow-hidden ios-rounded-scroll-fix whitespace-pre-wrap break-words rounded-2xl border border-gray-200/60 bg-white/50 pl-4 pr-10 py-3 text-sm leading-relaxed shadow-sm outline-none transition-[border-color,box-shadow] duration-200 focus:ring-1 focus:ring-blue-300/40 dark:border-white/[0.08] dark:bg-white/[0.03] dark:text-gray-100 dark:focus:ring-blue-500/30${promptExpanded ? ' !h-full !overflow-y-auto' : ''}`}

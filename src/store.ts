@@ -5,7 +5,7 @@ import { DEFAULT_PARAMS, DEFAULT_STREAM_PARTIAL_IMAGES } from './types'
 import { DEFAULT_SETTINGS, getActiveApiProfile, isOpenAIConnection, getCustomConnectionDefinition, mergeImportedSettings, mergePresetImportedSettings, normalizeSettings, resolveApiProfileModel, splitModelList, validateApiProfile } from './lib/apiProfiles'
 import { enforcePresetConfigPolicy, getPresetConfig, getPresetProfileIds, getPresetConnectionIds, isPresetConfigDeletionPrevented, isPresetConfigOnlyEnabled, isPresetConfigParamsLocked, isPresetProfile, isPresetConnectionDeletionPrevented } from './lib/presetConfig'
 import { dismissAllTooltips } from './lib/tooltipDismiss'
-import { getTaskPromptText, remapImageMentionsForOrder, replaceImageMentionsForApi } from './lib/promptImageMentions'
+import { getTaskPromptText, remapImageCommentsForOrder } from './lib/promptImageComments'
 import { getAllTasks, putTask, deleteTask as dbDeleteTask, commitTaskDeletion, clearTasks as dbClearTasks, getImage, getStoredImageThumbnail, getImageThumbnail, getAllImageIds, putImage, putImageThumbnail, deleteImage, clearImages, storeImage, storeImageWithSize } from './lib/db'
 import { callImageApi } from './lib/api'
 import { showBrowserNotification } from './lib/browserNotification'
@@ -450,7 +450,7 @@ export const useStore = create<AppState>()(
           return {
             maskDraft,
             inputImages,
-            prompt: remapImageMentionsForOrder(s.prompt, s.inputImages, inputImages),
+            prompt: remapImageCommentsForOrder(s.prompt, s.inputImages, inputImages),
           }
         }),
       clearMaskDraft: () => set({ maskDraft: null }),
@@ -713,7 +713,7 @@ export function taskMatchesFilterStatus(task: TaskRecord, filterStatus: AppState
 export function taskMatchesSearchQuery(task: TaskRecord, query: string) {
   const q = query.trim().toLowerCase()
   if (!q) return true
-  const prompt = getTaskPromptText(task.prompt || '', task.inputImageIds.length).toLowerCase()
+  const prompt = getTaskPromptText(task.prompt || '').toLowerCase()
   const paramStr = JSON.stringify(task.params).toLowerCase()
   const errorStr = [task.error, ...(task.outputErrors ?? []).map((item) => item.error)].filter(Boolean).join('\n').toLowerCase()
   return prompt.includes(q) || paramStr.includes(q) || errorStr.includes(q)
@@ -1319,7 +1319,7 @@ async function executeTask(taskId: string) {
 
     const result = await callImageApi({
       settings: requestSettings,
-      prompt: replaceImageMentionsForApi(requestPrompt, inputDataUrls.length),
+      prompt: getTaskPromptText(requestPrompt),
       params: task.params,
       nativeTransparentBackground: task.params.transparent_output && !task.transparentOutput,
       inputImageDataUrls: inputDataUrls,
@@ -1673,8 +1673,8 @@ export async function reuseConfig(task: TaskRecord) {
     }
   }
   setInputImages(imgs)
-  // 部分参考图可能已被删除，按图片 id 重新对齐提示词中的图片序号，避免评论和提及错位到其他图片
-  setPrompt(remapImageMentionsForOrder(task.prompt, task.inputImageIds.map((id) => ({ id, dataUrl: '' })), useStore.getState().inputImages))
+  // 部分参考图可能已被删除，按图片 id 重新对齐评论，避免错位到其他图片
+  setPrompt(remapImageCommentsForOrder(task.prompt, task.inputImageIds.map((id) => ({ id, dataUrl: '' })), useStore.getState().inputImages))
   const maskTargetImageId = task.maskTargetImageId ?? (task.maskImageId ? task.inputImageIds[0] : null)
   if (maskTargetImageId && task.maskImageId && imgs.some((img) => img.id === maskTargetImageId)) {
     const maskDataUrl = await ensureImageCached(task.maskImageId)

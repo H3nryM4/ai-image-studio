@@ -5,7 +5,7 @@ import { ensureImageThumbnailCached, subscribeImageThumbnail } from '../lib/imag
 import { formatImageRatio } from '../lib/size'
 import { getParamDisplay, ActualValueBadge } from '../lib/paramDisplay'
 import { DEFAULT_IMAGES_MODEL } from '../lib/apiProfiles'
-import { getTaskPromptText } from '../lib/promptImageMentions'
+import { getTaskPromptText } from '../lib/promptImageComments'
 import { CodeIcon, TransparentBgIcon } from './icons'
 import ViewportTooltip from './ViewportTooltip'
 import SelectionCheckbox from './selectionCheckbox'
@@ -325,7 +325,7 @@ export default function TaskCard({
 
   const showModel = task.apiModel && task.apiModel !== DEFAULT_IMAGES_MODEL
   const isInterrupted = task.status === 'error' && task.error === '已停止生成。'
-  const promptText = getTaskPromptText(task.prompt, task.inputImageIds.length) || '(无提示词)'
+  const promptText = getTaskPromptText(task.prompt) || '(无提示词)'
 
   return (
     <div className="relative rounded-xl">

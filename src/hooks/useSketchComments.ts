@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import { useStore } from '../store'
 import { createSketchId, type SketchComment } from '../lib/sketch'
-import { getImageComments, upsertImageCommentMention } from '../lib/promptImageMentions'
+import { getImageComments, upsertImageComment } from '../lib/promptImageComments'
 
 /**
  * 画板评论：重新编辑参考图时从提示词中该图的评论胶囊恢复，保存时写回胶囊。
@@ -95,7 +95,7 @@ export function useSketchComments(replaceImageId: string | undefined, onCommit: 
     const latest = useStore.getState()
     const next = merge ? [...getImageComments(latest.prompt, idx), ...commentData] : commentData
     const selection = latest.promptSelection?.prompt === latest.prompt ? latest.promptSelection : { start: Infinity, end: Infinity }
-    const result = upsertImageCommentMention(latest.prompt, idx, next, selection.start, selection.end)
+    const result = upsertImageComment(latest.prompt, idx, next, selection.start, selection.end)
     latest.setPrompt(result.prompt)
     // 输入框不在焦点上不会同步选区，手动移到新胶囊之后，避免下次插入仍按旧选区覆盖
     if (result.cursor != null) latest.setPromptSelection({ start: result.cursor, end: result.cursor })
