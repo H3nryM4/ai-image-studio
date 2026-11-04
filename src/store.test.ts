@@ -162,10 +162,10 @@ describe('gallery startup', () => {
   it('stops recovery for unavailable connections while retaining completed tasks and images', async () => {
     await clearTasks()
     await clearImages()
-    const profile = createDefaultOpenAIProfile({ id: 'removed-profile', provider: 'removed-provider', apiKey: 'old-key' })
-    const completed = task({ id: 'completed-task', apiProvider: profile.provider, outputImages: [imageA.id] })
-    const interrupted = task({ id: 'interrupted-task', apiProvider: profile.provider, status: 'running' })
-    const pending = task({ id: 'pending-task', apiProvider: profile.provider, apiProfileId: profile.id, status: 'running', customTaskId: 'old-job', customRecoverable: true })
+    const profile = createDefaultOpenAIProfile({ id: 'removed-profile', connectionId: 'removed-connection', apiKey: 'old-key' })
+    const completed = task({ id: 'completed-task', apiConnectionId: profile.connectionId, outputImages: [imageA.id] })
+    const interrupted = task({ id: 'interrupted-task', apiConnectionId: profile.connectionId, status: 'running' })
+    const pending = task({ id: 'pending-task', apiConnectionId: profile.connectionId, apiProfileId: profile.id, status: 'running', customTaskId: 'old-job', customRecoverable: true })
     await putImage(imageA)
     await Promise.all([completed, interrupted, pending].map((item) => putDbTask(item)))
     useStore.setState({ settings: normalizeSettings({ profiles: [profile], activeProfileId: profile.id }), inputImages: [] })
@@ -181,16 +181,16 @@ describe('gallery startup', () => {
   it('continues recovering valid custom HTTP tasks', async () => {
     await clearTasks()
     await clearImages()
-    const provider = {
+    const connection = {
       id: 'custom-async',
       name: 'Custom Async',
       submit: { path: 'generate', taskIdPath: 'id' },
       poll: { path: 'tasks/{task_id}', statusPath: 'status', successValues: ['completed'], failureValues: ['failed'], result: { b64JsonPaths: ['image'] } },
     }
-    const profile = createDefaultOpenAIProfile({ id: 'custom-profile', provider: provider.id, apiKey: 'custom-key', baseUrl: 'https://custom.example.com/' })
-    const pending = task({ apiProvider: provider.id, apiProfileId: profile.id, status: 'running', customTaskId: 'job-1' })
+    const profile = createDefaultOpenAIProfile({ id: 'custom-profile', connectionId: connection.id, apiKey: 'custom-key', baseUrl: 'https://custom.example.com/' })
+    const pending = task({ apiConnectionId: connection.id, apiProfileId: profile.id, status: 'running', customTaskId: 'job-1' })
     await putDbTask(pending)
-    useStore.setState({ settings: normalizeSettings({ customProviders: [provider], profiles: [profile], activeProfileId: profile.id }), inputImages: [], showToast: vi.fn() })
+    useStore.setState({ settings: normalizeSettings({ customConnections: [connection], profiles: [profile], activeProfileId: profile.id }), inputImages: [], showToast: vi.fn() })
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ status: 'completed', image: 'aW1hZ2U=' }), { headers: { 'Content-Type': 'application/json' } }))
 
     try {
@@ -280,7 +280,11 @@ describe('task retry', () => {
     await clearImages()
     vi.mocked(callImageApi).mockReset()
     useStore.setState({
-      settings: { ...DEFAULT_SETTINGS, baseUrl: 'https://api.example.com/v1', apiKey: 'test-key', retryMode: 'overwriteFailed' },
+      settings: {
+        ...DEFAULT_SETTINGS,
+        retryMode: 'overwriteFailed',
+        profiles: [createDefaultOpenAIProfile({ baseUrl: 'https://api.example.com/v1', apiKey: 'test-key' })],
+      },
       tasks: [],
       showToast: vi.fn(),
       detailTaskId: null,
@@ -409,7 +413,7 @@ describe('task retry', () => {
     useStore.setState({
       settings: {
         ...useStore.getState().settings,
-        profiles: useStore.getState().settings.profiles.map((profile) => ({ ...profile, apiMode: 'responses', codexCli: false, transparentBackgroundMethod: 'local' })),
+        profiles: useStore.getState().settings.profiles.map((profile) => ({ ...profile, connectionId: 'openai-responses', codexCli: false, transparentBackgroundMethod: 'local' as const })),
       },
       prompt: 'prompt',
       inputImages: [],
@@ -483,9 +487,7 @@ describe('mask draft lifecycle in store actions', () => {
     useStore.setState({
       settings: {
         ...DEFAULT_SETTINGS,
-        baseUrl: 'https://api.example.com/v1',
-        apiKey: 'test-key',
-        profiles: DEFAULT_SETTINGS.profiles.map((profile) => ({ ...profile, transparentBackgroundMethod: 'local' })),
+        profiles: (DEFAULT_SETTINGS.profiles.map((profile) => ({ ...profile, transparentBackgroundMethod: 'local' as const }))).map((profile) => ({ ...profile, baseUrl: 'https://api.example.com/v1', apiKey: 'test-key' })),
       },
       prompt: 'prompt',
       inputImages: [],
@@ -549,12 +551,12 @@ describe('mask draft lifecycle in store actions', () => {
     vi.mocked(callImageApi).mockImplementationOnce(() => request.promise)
     const profile = {
       ...createDefaultOpenAIProfile({ id: 'custom-sync-profile', apiKey: 'custom-key', timeout: 1, codexCli: true }),
-      provider: 'custom-sync',
+      connectionId: 'custom-sync',
     }
     useStore.setState({
       settings: normalizeSettings({
         ...DEFAULT_SETTINGS,
-        customProviders: [{
+        customConnections: [{
           id: 'custom-sync',
           name: 'Custom Sync',
           submit: { path: 'images/generations' },
@@ -731,7 +733,10 @@ describe('mask draft lifecycle in store actions', () => {
       revisedPrompts: [],
     })
     useStore.setState({
-      settings: { ...DEFAULT_SETTINGS, baseUrl: 'https://api.example.com/v1', apiKey: 'test-key' },
+      settings: {
+        ...DEFAULT_SETTINGS,
+        profiles: [createDefaultOpenAIProfile({ baseUrl: 'https://api.example.com/v1', apiKey: 'test-key' })],
+      },
       prompt: '透明玻璃瓶',
       params: {
         ...DEFAULT_PARAMS,
@@ -797,8 +802,8 @@ describe('mask draft lifecycle in store actions', () => {
 
   it('supports transparent background post-processing for custom gallery tasks', async () => {
     const { callImageApi } = await import('./lib/api')
-    const provider = { id: 'custom-images', name: 'Custom Images', submit: { path: 'generate' } }
-    const altProfile = createDefaultOpenAIProfile({ id: 'alternate-profile', provider: provider.id, apiKey: 'alternate-key' })
+    const connection = { id: 'custom-images', name: 'Custom Images', submit: { path: 'generate' } }
+    const altProfile = createDefaultOpenAIProfile({ id: 'alternate-profile', connectionId: connection.id, apiKey: 'alternate-key' })
     vi.mocked(callImageApi).mockClear()
     vi.mocked(removeKeyedBackgroundFromDataUrl).mockClear()
     vi.mocked(callImageApi).mockResolvedValueOnce({
@@ -810,8 +815,8 @@ describe('mask draft lifecycle in store actions', () => {
     useStore.setState({
       settings: normalizeSettings({
         ...DEFAULT_SETTINGS,
-        customProviders: [provider],
-        profiles: [{ ...altProfile, transparentBackgroundMethod: 'local' }],
+        customConnections: [connection],
+        profiles: [{ ...altProfile, transparentBackgroundMethod: 'local' as const }],
         activeProfileId: altProfile.id,
       }),
       prompt: '单主体图标素材',
@@ -833,7 +838,7 @@ describe('mask draft lifecycle in store actions', () => {
     }))
     expect(removeKeyedBackgroundFromDataUrl).toHaveBeenCalledWith('data:image/png;base64,alternate-generated')
     const [task] = useStore.getState().tasks
-    expect(task.apiProvider).toBe(provider.id)
+    expect(task.apiConnectionId).toBe(connection.id)
     expect(task.transparentOutput).toBe(true)
     expect(task.transparentOriginalImages).toHaveLength(1)
     await clearTasks()
@@ -884,20 +889,20 @@ describe('input persistence setting', () => {
     expect(persisted.inputImages).toEqual([])
   })
 
-  it('persists and restores normalized dismissed preset provider IDs', () => {
+  it('persists and restores normalized dismissed preset connection IDs', () => {
     useStore.setState({
       dismissedPresetProfileIds: ['profile-a'],
-      dismissedPresetProviderIds: ['provider-a'],
+      dismissedPresetConnectionIds: ['connection-a'],
     })
 
     const persisted = getPersistedState(useStore.getState())
     const restored = normalizePersistedState({
       ...persisted,
-      dismissedPresetProviderIds: ['provider-a', 1, null, 'provider-b'],
+      dismissedPresetConnectionIds: ['connection-a', 1, null, 'connection-b'],
     }, useStore.getState())!
 
-    expect(persisted.dismissedPresetProviderIds).toEqual(['provider-a'])
-    expect(restored.dismissedPresetProviderIds).toEqual(['provider-a', 'provider-b'])
+    expect(persisted.dismissedPresetConnectionIds).toEqual(['connection-a'])
+    expect(restored.dismissedPresetConnectionIds).toEqual(['connection-a', 'connection-b'])
   })
 })
 
@@ -908,16 +913,16 @@ describe('preset deletion state', () => {
   })
 
   it('removes an untouched preset after deployment removes it', async () => {
-    const providers = [
-      { id: 'preset-provider-a', name: 'Provider A', submit: { path: 'a' } },
-      { id: 'preset-provider-b', name: 'Provider B', submit: { path: 'b' } },
+    const connections = [
+      { id: 'preset-connection-a', name: 'Connection A', submit: { path: 'a' } },
+      { id: 'preset-connection-b', name: 'Connection B', submit: { path: 'b' } },
     ]
     const profiles = [
-      createDefaultOpenAIProfile({ id: 'preset-profile-a', provider: providers[0].id, isDefault: true }),
-      createDefaultOpenAIProfile({ id: 'preset-profile-b', provider: providers[1].id }),
+      createDefaultOpenAIProfile({ id: 'preset-profile-a', connectionId: connections[0].id, isDefault: true }),
+      createDefaultOpenAIProfile({ id: 'preset-profile-b', connectionId: connections[1].id }),
     ]
-    const previous = { customProviders: providers, profiles }
-    const next = { customProviders: [providers[0]], profiles: [profiles[0]] }
+    const previous = { customConnections: connections, profiles }
+    const next = { customConnections: [connections[0]], profiles: [profiles[0]] }
     useStore.setState({
       settings: normalizeSettings(DEFAULT_SETTINGS),
       previousPresetConfig: null,
@@ -931,13 +936,13 @@ describe('preset deletion state', () => {
 
     const state = useStore.getState()
     expect(state.settings.profiles.map((profile) => profile.id)).toEqual(['preset-profile-a'])
-    expect(state.settings.customProviders.map((provider) => provider.id)).toEqual(['preset-provider-a'])
+    expect(state.settings.customConnections.map((connection) => connection.id)).toEqual(['preset-connection-a'])
   })
 
   it('removes untouched presets when deployment removes the entire preset config', async () => {
-    const provider = { id: 'preset-provider', name: 'Preset Provider', submit: { path: 'generate' } }
-    const profile = createDefaultOpenAIProfile({ id: 'preset-profile', provider: provider.id, isDefault: true })
-    const preset = { customProviders: [provider], profiles: [profile] }
+    const connection = { id: 'preset-connection', name: 'Preset Connection', submit: { path: 'generate' } }
+    const profile = createDefaultOpenAIProfile({ id: 'preset-profile', connectionId: connection.id, isDefault: true })
+    const preset = { customConnections: [connection], profiles: [profile] }
     useStore.setState({
       settings: normalizeSettings(DEFAULT_SETTINGS),
       previousPresetConfig: null,
@@ -947,33 +952,33 @@ describe('preset deletion state', () => {
     await useStore.getState().setPresetImportedSettings(preset)
 
     setPresetConfig(null)
-    await useStore.getState().setPresetImportedSettings({ customProviders: [], profiles: [] })
+    await useStore.getState().setPresetImportedSettings({ customConnections: [], profiles: [] })
 
     const state = useStore.getState()
     expect(state.settings.profiles.map((item) => item.id)).toEqual([DEFAULT_SETTINGS.profiles[0].id])
-    expect(state.settings.customProviders).toEqual([])
+    expect(state.settings.customConnections).toEqual([])
     expect(state.previousPresetConfig).toBeNull()
   })
 
   it('clearData clears both dismissal lists and reapplies the current preset', async () => {
-    const provider = { id: 'preset-provider', name: 'Preset Provider', submit: { path: 'generate' } }
+    const connection = { id: 'preset-connection', name: 'Preset Connection', submit: { path: 'generate' } }
     const profile = createDefaultOpenAIProfile({
       id: 'preset-profile',
       isDefault: true,
-      provider: provider.id,
+      connectionId: connection.id,
       model: 'preset-model',
     })
-    const preset = { customProviders: [provider], profiles: [profile] }
+    const preset = { customConnections: [connection], profiles: [profile] }
     setPresetConfig(preset)
     useStore.setState({
       settings: normalizeSettings({
         ...DEFAULT_SETTINGS,
-        customProviders: [],
+        customConnections: [],
         profiles: [createDefaultOpenAIProfile({ id: 'user-profile' })],
         activeProfileId: 'user-profile',
       }),
       dismissedPresetProfileIds: [profile.id],
-      dismissedPresetProviderIds: [provider.id],
+      dismissedPresetConnectionIds: [connection.id],
       dismissedCodexCliPrompts: ['prompt-a'],
     })
 
@@ -981,60 +986,60 @@ describe('preset deletion state', () => {
 
     const state = useStore.getState()
     expect(state.dismissedPresetProfileIds).toEqual([])
-    expect(state.dismissedPresetProviderIds).toEqual([])
+    expect(state.dismissedPresetConnectionIds).toEqual([])
     expect(state.dismissedCodexCliPrompts).toEqual([])
-    expect(state.settings.customProviders).toEqual([expect.objectContaining({ id: provider.id })])
-    expect(state.settings.profiles).toEqual([expect.objectContaining({ id: profile.id, provider: provider.id })])
+    expect(state.settings.customConnections).toEqual([expect.objectContaining({ id: connection.id })])
+    expect(state.settings.profiles).toEqual([expect.objectContaining({ id: profile.id, connectionId: connection.id })])
   })
 
-  it('restores an explicitly reimported preset provider', () => {
-    const provider = { id: 'preset-provider', name: 'Preset Provider', submit: { path: 'generate' } }
-    const profile = createDefaultOpenAIProfile({ id: 'preset-profile', provider: provider.id })
-    setPresetConfig({ customProviders: [provider], profiles: [profile] })
+  it('restores an explicitly reimported preset connection', () => {
+    const connection = { id: 'preset-connection', name: 'Preset Connection', submit: { path: 'generate' } }
+    const profile = createDefaultOpenAIProfile({ id: 'preset-profile', connectionId: connection.id })
+    setPresetConfig({ customConnections: [connection], profiles: [profile] })
     useStore.setState({
       settings: normalizeSettings({
         ...DEFAULT_SETTINGS,
-        customProviders: [],
-        profiles: [{ ...profile, provider: 'openai' }],
+        customConnections: [],
+        profiles: [{ ...profile, connectionId: 'openai-images' }],
       }),
-      dismissedPresetProviderIds: [provider.id],
+      dismissedPresetConnectionIds: [connection.id],
     })
 
     const state = useStore.getState()
-    state.restorePresetProvider(provider.id)
-    state.setSettings({ customProviders: [provider], profiles: [profile] })
+    state.restorePresetConnection(connection.id)
+    state.setSettings({ customConnections: [connection], profiles: [profile] })
 
-    expect(useStore.getState().dismissedPresetProviderIds).toEqual([])
-    expect(useStore.getState().settings.customProviders).toEqual([expect.objectContaining({ id: provider.id })])
-    expect(useStore.getState().settings.profiles[0].provider).toBe(provider.id)
+    expect(useStore.getState().dismissedPresetConnectionIds).toEqual([])
+    expect(useStore.getState().settings.customConnections).toEqual([expect.objectContaining({ id: connection.id })])
+    expect(useStore.getState().settings.profiles[0].connectionId).toBe(connection.id)
   })
 
   it('restores only preset IDs explicitly selected by a URL import', async () => {
-    const providers = [
-      { id: 'preset-provider-a', name: 'Preset Provider A', submit: { path: 'generate-a' } },
-      { id: 'preset-provider-b', name: 'Preset Provider B', submit: { path: 'generate-b' } },
+    const connections = [
+      { id: 'preset-connection-a', name: 'Preset Connection A', submit: { path: 'generate-a' } },
+      { id: 'preset-connection-b', name: 'Preset Connection B', submit: { path: 'generate-b' } },
     ]
     const profiles = [
-      createDefaultOpenAIProfile({ id: 'preset-profile-a', provider: providers[0].id, isDefault: true }),
-      createDefaultOpenAIProfile({ id: 'preset-profile-b', provider: providers[1].id }),
+      createDefaultOpenAIProfile({ id: 'preset-profile-a', connectionId: connections[0].id, isDefault: true }),
+      createDefaultOpenAIProfile({ id: 'preset-profile-b', connectionId: connections[1].id }),
     ]
-    setPresetConfig({ customProviders: providers, profiles })
+    setPresetConfig({ customConnections: connections, profiles })
     useStore.setState({
       settings: normalizeSettings(DEFAULT_SETTINGS),
-      dismissedPresetProviderIds: providers.map((provider) => provider.id),
+      dismissedPresetConnectionIds: connections.map((connection) => connection.id),
       dismissedPresetProfileIds: profiles.map((profile) => profile.id),
     })
 
     const restored = await restoreExplicitPresetConfig({
-      providerIds: [providers[0].id, 'not-a-preset'],
+      connectionIds: [connections[0].id, 'not-a-preset'],
       profileIds: [profiles[0].id, 'not-a-preset'],
     })
 
     const state = useStore.getState()
     expect(restored).toBe(true)
-    expect(state.dismissedPresetProviderIds).toEqual([providers[1].id])
+    expect(state.dismissedPresetConnectionIds).toEqual([connections[1].id])
     expect(state.dismissedPresetProfileIds).toEqual([profiles[1].id])
-    expect(state.settings.customProviders).toEqual([expect.objectContaining({ id: providers[0].id })])
+    expect(state.settings.customConnections).toEqual([expect.objectContaining({ id: connections[0].id })])
     expect(state.settings.profiles).toEqual(expect.arrayContaining([expect.objectContaining({ id: profiles[0].id })]))
   })
 })
@@ -1049,7 +1054,10 @@ describe('data import', () => {
       version: 3,
       exportedAt: '2026-11-03',
       tasks: [task({ id: 'unsupported-task' })],
-      settings: { ...DEFAULT_SETTINGS, apiKey: 'unsupported-test-key' },
+      settings: {
+        ...DEFAULT_SETTINGS,
+        profiles: [createDefaultOpenAIProfile({ apiKey: 'unsupported-test-key' })],
+      },
       imageFiles: { unsupported: { path: 'images/unsupported.png' } },
     }, { 'images/unsupported.png': new Uint8Array([1, 2, 3]) }))
     expect(imported).toBe(false)
@@ -1079,7 +1087,7 @@ describe('data import', () => {
     })
 
     const imported = await importData(importFile({
-      version: 4,
+      version: 5,
       exportedAt: new Date(0).toISOString(),
       tasks: [importedTask],
       favoriteCollections: importedCollections,
@@ -1106,7 +1114,7 @@ describe('data import', () => {
     const invalid = { ...task({ id: 'imported-invalid-start' }), startedAt: 'bad' } as unknown as TaskRecord
 
     const imported = await importData(importFile({
-      version: 4,
+      version: 5,
       exportedAt: new Date(0).toISOString(),
       tasks: [valid, invalid],
       imageFiles: {},
@@ -1123,7 +1131,7 @@ describe('data import', () => {
     await clearImages()
     const importedTask = task({ id: 'multipart-task', outputImages: ['multipart-image-a', 'multipart-image-b'] })
     const part1 = importFile({
-      version: 4,
+      version: 5,
       exportedAt: new Date(0).toISOString(),
       backupPart: { id: 'backup-a', index: 1, total: 2 },
       tasks: [importedTask],
@@ -1131,7 +1139,7 @@ describe('data import', () => {
       imageFiles: { 'multipart-image-a': { path: 'images/image-a.png' } },
     }, { 'images/image-a.png': new Uint8Array([1, 2]) })
     const part2 = importFile({
-      version: 4,
+      version: 5,
       exportedAt: new Date(0).toISOString(),
       backupPart: { id: 'backup-a', index: 2, total: 2 },
       tasks: [task({ id: 'multipart-task-2' })],
@@ -1155,7 +1163,7 @@ describe('data import', () => {
     const collectionB = { id: 'regular-collection-b', name: '普通备份 B', createdAt: 2, updatedAt: 2 }
     const sharedTask = task({ id: 'regular-task-shared', outputImages: ['regular-image-shared'] })
     const backupA = importFile({
-      version: 4,
+      version: 5,
       exportedAt: new Date(0).toISOString(),
       tasks: [sharedTask, task({ id: 'regular-task-a', outputImages: ['regular-image-a'], favoriteCollectionIds: [collectionA.id], isFavorite: true })],
       favoriteCollections: [sharedCollection, collectionA],
@@ -1169,7 +1177,7 @@ describe('data import', () => {
       'images/image-a.png': new Uint8Array([1, 2]),
     })
     const backupB = importFile({
-      version: 4,
+      version: 5,
       exportedAt: new Date(1).toISOString(),
       tasks: [sharedTask, task({ id: 'regular-task-b', outputImages: ['regular-image-b'], favoriteCollectionIds: [collectionB.id], isFavorite: true })],
       favoriteCollections: [sharedCollection, collectionB],
@@ -1203,12 +1211,12 @@ describe('data import', () => {
     const profileA = createDefaultOpenAIProfile({ id: 'regular-profile-a', name: '普通配置 A', apiKey: 'key-a' })
     const profileB = createDefaultOpenAIProfile({ id: 'regular-profile-b', name: '普通配置 B', apiKey: 'key-b' })
     const backupA = importFile({
-      version: 4,
+      version: 5,
       exportedAt: new Date(0).toISOString(),
       settings: normalizeSettings({ ...DEFAULT_SETTINGS, profiles: [sharedProfile, profileA], activeProfileId: profileA.id }),
     })
     const backupB = importFile({
-      version: 4,
+      version: 5,
       exportedAt: new Date(1).toISOString(),
       settings: normalizeSettings({ ...DEFAULT_SETTINGS, profiles: [sharedProfile, profileB], activeProfileId: profileB.id }),
     })
@@ -1222,67 +1230,67 @@ describe('data import', () => {
   })
 
   it('preserves internal IDs when restoring config', async () => {
-    const provider = {
-      id: 'backup-provider-id',
-      name: 'Backup Provider',
+    const connection = {
+      id: 'backup-connection-id',
+      name: 'Backup Connection',
       submit: { path: 'v1/generate' },
     }
     const profile = createDefaultOpenAIProfile({
       id: 'backup-profile-id',
       isDefault: true,
-      provider: provider.id,
+      connectionId: connection.id,
       model: 'model-v1',
     })
     useStore.setState({ settings: DEFAULT_SETTINGS })
 
     const imported = await importData(importFile({
-      version: 4,
+      version: 5,
       exportedAt: new Date(0).toISOString(),
-      settings: normalizeSettings({ ...DEFAULT_SETTINGS, customProviders: [provider], profiles: [profile], activeProfileId: profile.id }),
+      settings: normalizeSettings({ ...DEFAULT_SETTINGS, customConnections: [connection], profiles: [profile], activeProfileId: profile.id }),
     }), { importConfig: true, importTasks: false })
     await useStore.getState().setPresetImportedSettings({
-      customProviders: [{ id: provider.id, name: 'Backup Provider', submit: { path: 'v2/generate' } }],
-      profiles: [{ ...profile, provider: provider.id, model: 'model-v2' }],
+      customConnections: [{ id: connection.id, name: 'Backup Connection', submit: { path: 'v2/generate' } }],
+      profiles: [{ ...profile, connectionId: connection.id, model: 'model-v2' }],
     })
 
     const settings = useStore.getState().settings
     expect(imported).toBe(true)
-    expect(settings.customProviders[0]).toMatchObject({ id: provider.id })
+    expect(settings.customConnections[0]).toMatchObject({ id: connection.id })
     expect(settings.profiles[0]).toMatchObject({ id: profile.id })
   })
 
-  it('restores dismissed preset provider and profile IDs explicitly included in a backup', async () => {
-    const provider = { id: 'preset-provider', name: 'Preset Provider', submit: { path: 'generate' } }
-    const profile = createDefaultOpenAIProfile({ id: 'preset-profile', provider: provider.id })
+  it('restores dismissed preset connection and profile IDs explicitly included in a backup', async () => {
+    const connection = { id: 'preset-connection', name: 'Preset Connection', submit: { path: 'generate' } }
+    const profile = createDefaultOpenAIProfile({ id: 'preset-profile', connectionId: connection.id })
     const otherProfile = createDefaultOpenAIProfile({ id: 'other-preset-profile' })
-    setPresetConfig({ customProviders: [provider], profiles: [profile, otherProfile] })
+    setPresetConfig({ customConnections: [connection], profiles: [profile, otherProfile] })
     useStore.setState({
       settings: normalizeSettings({
         ...DEFAULT_SETTINGS,
-        customProviders: [],
-        profiles: [{ ...profile, provider: 'openai' }],
+        customConnections: [],
+        profiles: [{ ...profile, connectionId: 'openai-images' }],
       }),
-      dismissedPresetProviderIds: [provider.id],
+      dismissedPresetConnectionIds: [connection.id],
       dismissedPresetProfileIds: [profile.id, 'other-preset-profile'],
     })
 
     try {
       const imported = await importData(importFile({
-        version: 4,
+        version: 5,
         exportedAt: new Date(0).toISOString(),
         settings: normalizeSettings({
           ...DEFAULT_SETTINGS,
-          customProviders: [provider],
+          customConnections: [connection],
           profiles: [profile],
           activeProfileId: profile.id,
         }),
       }), { importConfig: true, importTasks: false })
 
       expect(imported).toBe(true)
-      expect(useStore.getState().dismissedPresetProviderIds).toEqual([])
+      expect(useStore.getState().dismissedPresetConnectionIds).toEqual([])
       expect(useStore.getState().dismissedPresetProfileIds).toEqual(['other-preset-profile'])
-      expect(useStore.getState().settings.customProviders).toEqual([expect.objectContaining({ id: provider.id })])
-      expect(useStore.getState().settings.profiles[0].provider).toBe(provider.id)
+      expect(useStore.getState().settings.customConnections).toEqual([expect.objectContaining({ id: connection.id })])
+      expect(useStore.getState().settings.profiles[0].connectionId).toBe(connection.id)
     } finally {
       setPresetConfig(null)
     }
@@ -1291,18 +1299,18 @@ describe('data import', () => {
   it('preserves imported task references when restoring config into a non-empty workspace', async () => {
     await clearTasks()
     const localProfile = createDefaultOpenAIProfile({ id: 'local-profile', apiKey: 'local-key' })
-    const provider = { id: 'backup-provider', name: 'Backup Provider', submit: { path: 'generate' } }
-    const profile = createDefaultOpenAIProfile({ id: 'backup-profile', provider: provider.id, apiKey: 'backup-key' })
-    const importedTask = task({ id: 'backup-task', apiProfileId: profile.id, apiProvider: provider.id })
+    const connection = { id: 'backup-connection', name: 'Backup Connection', submit: { path: 'generate' } }
+    const profile = createDefaultOpenAIProfile({ id: 'backup-profile', connectionId: connection.id, apiKey: 'backup-key' })
+    const importedTask = task({ id: 'backup-task', apiProfileId: profile.id, apiConnectionId: connection.id })
     useStore.setState({
       settings: normalizeSettings({ ...DEFAULT_SETTINGS, profiles: [localProfile], activeProfileId: localProfile.id }),
       tasks: [],
     })
 
     const imported = await importData(importFile({
-      version: 4,
+      version: 5,
       exportedAt: new Date(0).toISOString(),
-      settings: normalizeSettings({ ...DEFAULT_SETTINGS, customProviders: [provider], profiles: [profile], activeProfileId: profile.id }),
+      settings: normalizeSettings({ ...DEFAULT_SETTINGS, customConnections: [connection], profiles: [profile], activeProfileId: profile.id }),
       tasks: [importedTask],
       imageFiles: {},
     }), { importConfig: true, importTasks: true })
@@ -1310,13 +1318,13 @@ describe('data import', () => {
     const state = useStore.getState()
     expect(imported).toBe(true)
     expect(state.settings.profiles.map((item) => item.id)).toEqual(expect.arrayContaining([localProfile.id, profile.id]))
-    expect(getTaskApiProfile(state.settings, state.tasks.find((item) => item.id === importedTask.id)!)).toMatchObject({ id: profile.id, provider: provider.id })
+    expect(getTaskApiProfile(state.settings, state.tasks.find((item) => item.id === importedTask.id)!)).toMatchObject({ id: profile.id, connectionId: connection.id })
   })
 
   it('rejects an incomplete multipart backup before importing data', async () => {
     await clearTasks()
     const part1 = importFile({
-      version: 4,
+      version: 5,
       exportedAt: new Date(0).toISOString(),
       backupPart: { id: 'backup-a', index: 1, total: 2 },
       tasks: [task({ id: 'incomplete-task' })],
@@ -1332,14 +1340,14 @@ describe('data import', () => {
   it('validates image entries in every part before writing earlier parts', async () => {
     await clearImages()
     const part1 = importFile({
-      version: 4,
+      version: 5,
       exportedAt: new Date(0).toISOString(),
       backupPart: { id: 'backup-a', index: 1, total: 2 },
       tasks: [],
       imageFiles: { 'preflight-image-a': { path: 'images/image-a.png' } },
     }, { 'images/image-a.png': new Uint8Array([1, 2]) })
     const part2 = importFile({
-      version: 4,
+      version: 5,
       exportedAt: new Date(0).toISOString(),
       backupPart: { id: 'backup-a', index: 2, total: 2 },
       imageFiles: { 'preflight-image-b': { path: 'images/missing.png' } },
@@ -1354,7 +1362,7 @@ describe('data import', () => {
   it('imports config with running tasks without requiring image parts', async () => {
     useStore.setState({ tasks: [task({ status: 'running' })] })
     const part1 = importFile({
-      version: 4,
+      version: 5,
       exportedAt: new Date(0).toISOString(),
       backupPart: { id: 'config-backup', index: 1, total: 3 },
       settings: DEFAULT_SETTINGS,
@@ -1523,7 +1531,10 @@ describe('task deletion', () => {
     const request = deferred<Awaited<ReturnType<typeof callImageApi>>>()
     vi.mocked(callImageApi).mockImplementationOnce(() => request.promise)
     useStore.setState({
-      settings: { ...DEFAULT_SETTINGS, apiKey: 'test-key' },
+      settings: {
+        ...DEFAULT_SETTINGS,
+        profiles: [createDefaultOpenAIProfile({ apiKey: 'test-key' })],
+      },
       prompt: 'prompt',
       params: { ...DEFAULT_PARAMS },
     })
@@ -1541,8 +1552,8 @@ describe('task deletion', () => {
   it('does not schedule custom recovery after a deleted task rejects late', async () => {
     const request = deferred<Awaited<ReturnType<typeof callImageApi>>>()
     const customProfile = {
-      ...createDefaultOpenAIProfile({ id: 'custom-profile', apiKey: 'custom-key', apiMode: 'images' }),
-      provider: 'custom-async',
+      ...createDefaultOpenAIProfile({ id: 'custom-profile', apiKey: 'custom-key', connectionId: 'openai-images' }),
+      connectionId: 'custom-async',
     }
     vi.mocked(callImageApi).mockImplementationOnce((opts) => {
       opts.onCustomTaskEnqueued?.({ taskId: 'custom-task' })
@@ -1553,7 +1564,7 @@ describe('task deletion', () => {
         ...DEFAULT_SETTINGS,
         profiles: [customProfile],
         activeProfileId: customProfile.id,
-        customProviders: [{
+        customConnections: [{
           id: 'custom-async',
           name: 'Custom Async',
           submit: { path: 'submit', taskIdPath: 'data.id' },
@@ -1623,8 +1634,7 @@ describe('task deletion', () => {
     useStore.setState({
       settings: {
         ...DEFAULT_SETTINGS,
-        apiKey: 'test-key',
-        profiles: DEFAULT_SETTINGS.profiles.map((profile) => ({ ...profile, transparentBackgroundMethod: 'local' })),
+        profiles: (DEFAULT_SETTINGS.profiles.map((profile) => ({ ...profile, transparentBackgroundMethod: 'local' as const }))).map((profile) => ({ ...profile, apiKey: 'test-key' })),
       },
       prompt: 'prompt',
       params: { ...DEFAULT_PARAMS, output_format: 'png', transparent_output: true },
@@ -1654,7 +1664,10 @@ describe('task deletion', () => {
       return request.promise
     })
     useStore.setState({
-      settings: { ...DEFAULT_SETTINGS, apiKey: 'test-key' },
+      settings: {
+        ...DEFAULT_SETTINGS,
+        profiles: [createDefaultOpenAIProfile({ apiKey: 'test-key' })],
+      },
       prompt: 'prompt',
       params: { ...DEFAULT_PARAMS },
     })
@@ -1712,14 +1725,14 @@ describe('reused task API profile', () => {
   })
 
   it('resolves a task API profile by stored profile id', () => {
-    const resolved = getTaskApiProfile(useStore.getState().settings, task({ apiProvider: 'openai', apiProfileId: altProfile.id }))
+    const resolved = getTaskApiProfile(useStore.getState().settings, task({ apiConnectionId: 'openai', apiProfileId: altProfile.id }))
 
     expect(resolved?.id).toBe(altProfile.id)
   })
 
   it('does not resolve a task API profile by stored name or model', () => {
     const resolved = getTaskApiProfile(useStore.getState().settings, task({
-      apiProvider: 'openai',
+      apiConnectionId: 'openai',
       apiProfileName: altProfile.name,
       apiModel: altProfile.model,
     }))
@@ -1728,15 +1741,15 @@ describe('reused task API profile', () => {
   })
 
   it('keeps unlocked preset settings and task profile references on refresh', async () => {
-    const provider = { id: 'provider-internal', name: 'Custom Provider', submit: { path: 'v1/generate' } }
-    const profile = createDefaultOpenAIProfile({ id: 'profile-internal', isDefault: true, provider: provider.id, model: 'model-v1' })
-    const sourceTask = task({ apiProvider: provider.id, apiProfileId: profile.id })
+    const connection = { id: 'connection-internal', name: 'Custom Connection', submit: { path: 'v1/generate' } }
+    const profile = createDefaultOpenAIProfile({ id: 'profile-internal', isDefault: true, connectionId: connection.id, model: 'model-v1' })
+    const sourceTask = task({ apiConnectionId: connection.id, apiProfileId: profile.id })
     await putDbTask(sourceTask)
     useStore.setState({
       settings: normalizeSettings({
         ...useStore.getState().settings,
         profiles: [profile, openaiProfile],
-        customProviders: [provider],
+        customConnections: [connection],
         activeProfileId: openaiProfile.id,
       }),
       tasks: [sourceTask],
@@ -1744,48 +1757,48 @@ describe('reused task API profile', () => {
     })
 
     await useStore.getState().setPresetImportedSettings({
-      customProviders: [{ id: provider.id, name: provider.name, submit: { path: 'v2/generate' } }],
-      profiles: [{ ...profile, provider: provider.id, model: 'model-v2' }],
+      customConnections: [{ id: connection.id, name: connection.name, submit: { path: 'v2/generate' } }],
+      profiles: [{ ...profile, connectionId: connection.id, model: 'model-v2' }],
     })
 
     const state = useStore.getState()
     expect(state.tasks[0]).toMatchObject({
       apiProfileId: profile.id,
-      apiProvider: provider.id,
+      apiConnectionId: connection.id,
     })
     expect(state.settings.profiles[0]).toMatchObject({ id: profile.id, model: 'model-v1' })
-    expect(state.settings.customProviders[0]).toMatchObject({ id: provider.id, submit: { path: 'generate' } })
+    expect(state.settings.customConnections[0]).toMatchObject({ id: connection.id, submit: { path: 'generate' } })
     expect(state.reusedTaskApiProfileId).toBe(profile.id)
     expect((await getAllTasks())[0]).toMatchObject({
       apiProfileId: profile.id,
-      apiProvider: provider.id,
+      apiConnectionId: connection.id,
     })
   })
 
-  it('does not change an unlocked preset provider on refresh', async () => {
-    const oldProvider = { id: 'provider-old', name: 'Old Provider', submit: { path: 'old' } }
-    const profile = createDefaultOpenAIProfile({ id: 'stable-profile', isDefault: true, provider: oldProvider.id })
-    const sourceTask = task({ apiProvider: oldProvider.id, apiProfileId: profile.id })
+  it('does not change an unlocked preset connection on refresh', async () => {
+    const oldConnection = { id: 'connection-old', name: 'Old Connection', submit: { path: 'old' } }
+    const profile = createDefaultOpenAIProfile({ id: 'stable-profile', isDefault: true, connectionId: oldConnection.id })
+    const sourceTask = task({ apiConnectionId: oldConnection.id, apiProfileId: profile.id })
     useStore.setState({
-      settings: normalizeSettings({ ...DEFAULT_SETTINGS, customProviders: [oldProvider], profiles: [profile] }),
+      settings: normalizeSettings({ ...DEFAULT_SETTINGS, customConnections: [oldConnection], profiles: [profile] }),
       tasks: [sourceTask],
     })
 
     await useStore.getState().setPresetImportedSettings({
-      customProviders: [{ id: 'provider-new', name: 'New Provider', submit: { path: 'new' } }],
-      profiles: [{ ...profile, provider: 'provider-new', model: 'model-new' }],
+      customConnections: [{ id: 'connection-new', name: 'New Connection', submit: { path: 'new' } }],
+      profiles: [{ ...profile, connectionId: 'connection-new', model: 'model-new' }],
     })
 
     expect(getTaskApiProfile(useStore.getState().settings, sourceTask)).toMatchObject({
       id: profile.id,
-      provider: 'provider-old',
+      connectionId: 'connection-old',
       model: 'gpt-image-2.5-sunburst',
     })
   })
 
   it('reuses the task API profile temporarily without switching the active profile', async () => {
     await reuseConfig(task({
-      apiProvider: 'openai',
+      apiConnectionId: 'openai',
       apiProfileId: altProfile.id,
       params: { ...DEFAULT_PARAMS, n: 8, size: 'auto', quality: 'auto' },
     }))
@@ -1812,7 +1825,7 @@ describe('reused task API profile', () => {
     })
 
     await reuseConfig(task({
-      apiProvider: 'openai',
+      apiConnectionId: 'openai',
       apiProfileId: openaiProfile.id,
       prompt: taskPrompt,
       inputImageIds: [imageA.id, imageB.id],
@@ -1824,7 +1837,7 @@ describe('reused task API profile', () => {
   })
 
   it('clears temporary reuse when switching current settings to the reused API profile', async () => {
-    await reuseConfig(task({ apiProvider: 'openai', apiProfileId: altProfile.id }))
+    await reuseConfig(task({ apiConnectionId: 'openai', apiProfileId: altProfile.id }))
 
     useStore.getState().setSettings({ activeProfileId: altProfile.id })
 
@@ -1843,7 +1856,7 @@ describe('reused task API profile', () => {
     })
 
     await reuseConfig(task({
-      apiProvider: 'openai',
+      apiConnectionId: 'openai',
       apiProfileId: altProfile.id,
       params: { ...DEFAULT_PARAMS, n: 8, size: 'auto', quality: 'auto' },
     }))
@@ -1855,7 +1868,7 @@ describe('reused task API profile', () => {
   })
 
   it('asks whether to submit with current API profile when the reused API profile is missing', async () => {
-    await reuseConfig(task({ apiProvider: 'openai', apiProfileId: 'missing-profile' }))
+    await reuseConfig(task({ apiConnectionId: 'openai', apiProfileId: 'missing-profile' }))
 
     const state = useStore.getState()
     expect(state.tasks).toEqual([])

@@ -1,12 +1,12 @@
-import type { ImportedProviderSettings } from './apiProfiles'
-import { importCustomProviderSettingsFromJson } from './apiProfiles'
+import type { ImportedConnectionSettings } from './apiProfiles'
+import { importCustomConnectionSettingsFromJson } from './apiProfiles'
 import { EMBEDDED_CONFIG_PREFIX, isImportableConfigUrl } from './importableConfigUrl'
 import { readRuntimeEnv } from './runtimeEnv'
 
 const DEFAULT_API_URL = readRuntimeEnv(import.meta.env.VITE_DEFAULT_API_URL)
 export { isImportableConfigUrl } from './importableConfigUrl'
 
-export function getCustomProviderConfigUrl(defaultApiUrl = DEFAULT_API_URL): string {
+export function getCustomConnectionConfigUrl(defaultApiUrl = DEFAULT_API_URL): string {
   const url = defaultApiUrl.trim()
   if (hasEmbeddedDefaultConfig(url)) return ''
   try {
@@ -25,12 +25,12 @@ export function hasEmbeddedDefaultConfig(
 
 export function loadEmbeddedDefaultConfig(
   defaultApiUrl = DEFAULT_API_URL,
-): ImportedProviderSettings | null {
+): ImportedConnectionSettings | null {
   const value = defaultApiUrl.trim()
   if (!value.startsWith(EMBEDDED_CONFIG_PREFIX)) return null
 
   const bytes = Uint8Array.from(atob(value.slice(EMBEDDED_CONFIG_PREFIX.length)), (char) => char.charCodeAt(0))
-  return importCustomProviderSettingsFromJson(new TextDecoder().decode(bytes), [], { deploymentConfig: true })
+  return importCustomConnectionSettingsFromJson(new TextDecoder().decode(bytes), [], { deploymentConfig: true })
 }
 
 function getSettingsJsonTextFromUrl(value: string): string | null {
@@ -48,11 +48,11 @@ function getSettingsJsonTextFromUrl(value: string): string | null {
   }
 }
 
-export async function loadCustomProviderSettingsFromUrl(configUrl: string): Promise<ImportedProviderSettings | null> {
+export async function loadCustomConnectionSettingsFromUrl(configUrl: string): Promise<ImportedConnectionSettings | null> {
   const url = configUrl.trim()
   if (!url) return null
 
   const settingsJsonText = getSettingsJsonTextFromUrl(url)
-  if (settingsJsonText) return importCustomProviderSettingsFromJson(settingsJsonText, [], { deploymentConfig: true })
+  if (settingsJsonText) return importCustomConnectionSettingsFromJson(settingsJsonText, [], { deploymentConfig: true })
   return null
 }

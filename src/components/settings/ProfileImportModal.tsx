@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { restoreExplicitPresetConfig, useStore } from '../../store'
-import { getApiProviderLabel, type ImportedProviderSettings } from '../../lib/apiProfiles'
+import { getApiConnectionLabel, type ImportedConnectionSettings } from '../../lib/apiProfiles'
 import { applyProfileImport, findSharedProfile, readProfileImport } from '../../lib/profileSharing'
 import { isPresetConfigOnlyEnabled, isPresetProfileLocked } from '../../lib/presetConfig'
 import { buildSettingsFromUrlParams, getExplicitUrlSettingsIds } from '../../lib/urlSettings'
@@ -17,7 +17,7 @@ interface ProfileImportModalProps {
 export default function ProfileImportModal({ source, onClose }: ProfileImportModalProps) {
   const settings = useStore((s) => s.settings)
   const [text, setText] = useState(source)
-  const [preview, setPreview] = useState<(ImportedProviderSettings & { params: URLSearchParams }) | null>(null)
+  const [preview, setPreview] = useState<(ImportedConnectionSettings & { params: URLSearchParams }) | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [mode, setMode] = useState<'add' | 'reuse' | 'replace'>('add')
   const [targetId, setTargetId] = useState(settings.activeProfileId)
@@ -97,13 +97,12 @@ export default function ProfileImportModal({ source, onClose }: ProfileImportMod
               <div key={profile.id} className="space-y-3 rounded-2xl bg-gray-50 p-4 dark:bg-white/[0.04]">
                 <div className="flex flex-wrap items-center gap-2">
                   <h4 className="break-all text-sm font-semibold text-gray-800 dark:text-gray-100">{profile.name}</h4>
-                  <span className="rounded-md bg-blue-50 px-2 py-0.5 text-xs text-blue-600 dark:bg-blue-500/10 dark:text-blue-400">{getApiProviderLabel({ ...settings, customProviders: preview.customProviders }, profile.provider)}</span>
+                  <span className="rounded-md bg-blue-50 px-2 py-0.5 text-xs text-blue-600 dark:bg-blue-500/10 dark:text-blue-400">{getApiConnectionLabel({ ...settings, customConnections: preview.customConnections }, profile.connectionId)}</span>
                 </div>
                 <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 text-xs">
                   <dt className="text-gray-400">API 地址</dt><dd className="break-all text-gray-600 dark:text-gray-300">{profile.baseUrl || '使用部署代理'}</dd>
-                  <dt className="text-gray-400">模型</dt><dd className="break-all text-gray-600 dark:text-gray-300">{profile.model}</dd>
-                  {profile.provider === 'openai' && <><dt className="text-gray-400">接口</dt><dd className="text-gray-600 dark:text-gray-300">{profile.apiMode === 'responses' ? 'Responses API' : 'Images API'}</dd></>}
-                  {profile.provider === 'openai' && profile.apiMode === 'responses' && <><dt className="text-gray-400">图像模型</dt><dd className="break-all text-gray-600 dark:text-gray-300">{profile.imageGenerationModel || 'API 默认'}</dd></>}
+                  <dt className="text-gray-400">{profile.connectionId === 'openai-responses' ? '请求模型' : '模型 ID'}</dt><dd className="break-all text-gray-600 dark:text-gray-300">{profile.model}</dd>
+                  {profile.connectionId === 'openai-responses' && <><dt className="text-gray-400">图像生成模型</dt><dd className="break-all text-gray-600 dark:text-gray-300">{profile.imageGenerationModel || 'API 默认'}</dd></>}
                 </dl>
                 {mode !== 'reuse' && <label className="block text-xs text-gray-500 dark:text-gray-400">
                   API Key

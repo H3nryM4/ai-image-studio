@@ -1,6 +1,5 @@
 // ===== 设置 =====
 
-export type ApiMode = 'images' | 'responses'
 export const REASONING_EFFORT_VALUES = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'] as const
 export type ReasoningEffort = typeof REASONING_EFFORT_VALUES[number]
 export const ZIP_DOWNLOAD_ROUTE_VALUES = [
@@ -12,58 +11,57 @@ export const ZIP_DOWNLOAD_ROUTE_VALUES = [
 ] as const
 export type ZipDownloadRoute = typeof ZIP_DOWNLOAD_ROUTE_VALUES[number]
 export const DEFAULT_ZIP_DOWNLOAD_ROUTES: ZipDownloadRoute[] = ['task-selection', 'favorite-collection-selection']
-export type BuiltInApiProvider = 'openai'
-export type ApiProvider = BuiltInApiProvider | string
-export type CustomProviderTemplate = 'http-image'
+export type ApiConnectionId = string
+export type CustomConnectionTemplate = 'http-image'
 export const DEFAULT_STREAM_PARTIAL_IMAGES = 1
 /** 接口允许的参考图数量上限 */
 export const MAX_INPUT_IMAGES = 16
 
-export type CustomProviderRequestMethod = 'GET' | 'POST'
-export type CustomProviderContentType = 'json' | 'multipart'
-export type CustomProviderFileSource = 'inputImages' | 'mask'
+export type CustomConnectionRequestMethod = 'GET' | 'POST'
+export type CustomConnectionContentType = 'json' | 'multipart'
+export type CustomConnectionFileSource = 'inputImages' | 'mask'
 
-export interface CustomProviderFileMapping {
+export interface CustomConnectionFileMapping {
   field: string
-  source: CustomProviderFileSource
+  source: CustomConnectionFileSource
   array?: boolean
 }
 
-export interface CustomProviderResultMapping {
+export interface CustomConnectionResultMapping {
   imageUrlPaths?: string[]
   b64JsonPaths?: string[]
 }
 
-export interface CustomProviderSubmitMapping {
+export interface CustomConnectionSubmitMapping {
   path: string
-  method?: CustomProviderRequestMethod
-  contentType?: CustomProviderContentType
+  method?: CustomConnectionRequestMethod
+  contentType?: CustomConnectionContentType
   query?: Record<string, string>
   body?: Record<string, unknown>
-  files?: CustomProviderFileMapping[]
+  files?: CustomConnectionFileMapping[]
   taskIdPath?: string
-  result?: CustomProviderResultMapping
+  result?: CustomConnectionResultMapping
 }
 
-export interface CustomProviderPollMapping {
+export interface CustomConnectionPollMapping {
   path: string
-  method?: CustomProviderRequestMethod
+  method?: CustomConnectionRequestMethod
   query?: Record<string, string>
   intervalSeconds?: number
   statusPath: string
   successValues: string[]
   failureValues: string[]
   errorPath?: string
-  result: CustomProviderResultMapping
+  result: CustomConnectionResultMapping
 }
 
-export interface CustomProviderDefinition {
+export interface CustomConnectionDefinition {
   id: string
   name: string
-  template?: CustomProviderTemplate
-  submit: CustomProviderSubmitMapping
-  editSubmit?: CustomProviderSubmitMapping
-  poll?: CustomProviderPollMapping
+  template?: CustomConnectionTemplate
+  submit: CustomConnectionSubmitMapping
+  editSubmit?: CustomConnectionSubmitMapping
+  poll?: CustomConnectionPollMapping
 }
 
 export interface ApiProfile {
@@ -73,7 +71,7 @@ export interface ApiProfile {
   name: string
   /** 预置配置的 Markdown 说明。 */
   description?: string
-  provider: ApiProvider
+  connectionId: ApiConnectionId
   baseUrl: string
   apiKey: string
   /** 模型 ID 列表，多个模型以 `, ` 分隔 */
@@ -82,7 +80,6 @@ export interface ApiProfile {
   selectedModel?: string
   imageGenerationModel?: string
   timeout: number
-  apiMode: ApiMode
   reasoningEffort?: ReasoningEffort
   codexCli: boolean
   apiProxy: boolean
@@ -90,11 +87,11 @@ export interface ApiProfile {
   streamImages?: boolean
   streamPartialImages?: number
   transparentBackgroundMethod: 'api' | 'local'
-  providerDrafts?: Partial<Record<ApiProvider, Partial<Pick<ApiProfile, 'baseUrl' | 'model' | 'imageGenerationModel' | 'apiMode' | 'reasoningEffort' | 'codexCli' | 'apiProxy' | 'responseFormatB64Json' | 'streamImages' | 'streamPartialImages' | 'transparentBackgroundMethod'>>>>
+  connectionDrafts?: Partial<Record<ApiConnectionId, Partial<Pick<ApiProfile, 'baseUrl' | 'model' | 'imageGenerationModel' | 'reasoningEffort' | 'codexCli' | 'apiProxy' | 'responseFormatB64Json' | 'streamImages' | 'streamPartialImages' | 'transparentBackgroundMethod'>>>>
 }
 
 export interface PresetConfig {
-  customProviders: CustomProviderDefinition[]
+  customConnections: CustomConnectionDefinition[]
   profiles: ApiProfile[]
 }
 
@@ -121,18 +118,8 @@ export interface BatchProgress {
 export type BatchPromptMode = 'queue' | 'concurrent'
 
 export interface AppSettings {
-  /** 旧版单配置字段：保留用于导入/查询参数兼容，实际请求以 active profile 为准 */
-  baseUrl: string
-  apiKey: string
-  model: string
-  timeout: number
-  apiMode: ApiMode
-  codexCli: boolean
-  apiProxy: boolean
-  streamImages?: boolean
-  streamPartialImages?: number
-  customProviders: CustomProviderDefinition[]
-  providerOrder?: string[]
+  customConnections: CustomConnectionDefinition[]
+  connectionOrder?: string[]
   clearInputAfterSubmit: boolean
   persistInputOnRestart: boolean
   reuseTaskApiProfileTemporarily: boolean
@@ -207,14 +194,12 @@ export interface TaskRecord {
   id: string
   prompt: string
   params: TaskParams
-  /** 生成时使用的 Provider 类型 */
-  apiProvider?: ApiProvider
+  /** 生成时使用的接入标识 */
+  apiConnectionId?: ApiConnectionId
   /** 生成时使用的 API 配置 ID */
   apiProfileId?: string
-  /** 生成时使用的 Provider 名称 */
+  /** 生成时使用的配置名称 */
   apiProfileName?: string
-  /** 生成时使用的 API 模式 */
-  apiMode?: ApiMode
   /** 生成时使用的模型 ID */
   apiModel?: string
   /** 自定义异步服务商任务 ID，用于重启后继续查询结果 */
@@ -358,7 +343,7 @@ export interface ExportData {
     index: number
     total: number
   }
-  settings?: Omit<AppSettings, 'customProviders'> & { customProviders?: CustomProviderDefinition[] }
+  settings?: Omit<AppSettings, 'customConnections'> & { customConnections?: CustomConnectionDefinition[] }
   tasks?: TaskRecord[]
   favoriteCollections?: FavoriteCollection[]
   defaultFavoriteCollectionId?: string | null

@@ -49,8 +49,8 @@ export interface ExportZipPlanPart {
 }
 
 function getExportSettings(settings: AppSettings): NonNullable<ExportData['settings']> {
-  if (settings.customProviders.length) return settings
-  const { customProviders, ...rest } = settings
+  if (settings.customConnections.length) return settings
+  const { customConnections, ...rest } = settings
   return rest
 }
 
@@ -97,7 +97,7 @@ export async function buildExportZip(params: BuildExportZipParams) {
   }
 
   const manifest: ExportData = {
-    version: 4,
+    version: 5,
     exportedAt: exportedAtDate.toISOString(),
   }
 
@@ -239,7 +239,7 @@ function assertExportZipFiles(manifest: ExportData, hasFile: (path: string) => b
 
 function getBaseManifestEstimatedBytes(params: Omit<BuildExportZipParams, 'images' | 'thumbnailsByImageId'>) {
   const manifest = {
-    version: 4,
+    version: 5,
     exportedAt: new Date(params.exportedAt).toISOString(),
     ...(params.options.exportConfig ? { settings: getExportSettings(params.settings) } : {}),
     ...(params.options.exportTasks ? {
@@ -323,7 +323,7 @@ function getUniqueImagePath(fileNameBase: string, ext: string, usedPaths: Set<st
 
 function parseExportManifest(bytes: Uint8Array): ExportData {
   const manifest = JSON.parse(strFromU8(bytes))
-  if (!manifest || typeof manifest !== 'object' || Array.isArray(manifest) || manifest.version !== 4) {
+  if (!manifest || typeof manifest !== 'object' || Array.isArray(manifest) || manifest.version !== 5) {
     throw new Error('不支持此备份版本，请使用新版应用导出的备份。')
   }
   return manifest

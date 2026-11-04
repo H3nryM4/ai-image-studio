@@ -1,3 +1,4 @@
+import { createDefaultOpenAIProfile } from './apiProfiles'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 afterEach(() => {
@@ -11,7 +12,7 @@ describe('preset config policy', () => {
     const { createDefaultOpenAIProfile } = await import('./apiProfiles')
     const policy = await import('./presetConfig')
     policy.setPresetConfig({
-      customProviders: [],
+      customConnections: [],
       profiles: [
         createDefaultOpenAIProfile({ id: 'preset-a', isDefault: true }),
         createDefaultOpenAIProfile({ id: 'preset-b' }),
@@ -27,7 +28,7 @@ describe('preset config policy', () => {
     const { createDefaultOpenAIProfile } = await import('./apiProfiles')
     const policy = await import('./presetConfig')
     policy.setPresetConfig({
-      customProviders: [],
+      customConnections: [],
       profiles: [createDefaultOpenAIProfile({ id: 'preset-a', description: '使用 [说明](https://example.com)' })],
     })
 
@@ -39,30 +40,30 @@ describe('preset config policy', () => {
     vi.stubEnv('VITE_SHOW_DEFAULT_CONFIG_ONLY', 'true')
     const { createDefaultOpenAIProfile } = await import('./apiProfiles')
     const policy = await import('./presetConfig')
-    policy.setPresetConfig({ customProviders: [], profiles: [createDefaultOpenAIProfile()] })
+    policy.setPresetConfig({ customConnections: [], profiles: [createDefaultOpenAIProfile()] })
 
     expect(policy.isPresetConfigOnlyEnabled()).toBe(true)
   })
 
-  it('locks preset parameters and providers except API keys without preventing profile deletion', async () => {
+  it('locks preset parameters and connections except API keys without preventing profile deletion', async () => {
     vi.stubEnv('VITE_LOCK_PRESET_CONFIG_PARAMS', 'true')
     const { createDefaultOpenAIProfile, normalizeSettings } = await import('./apiProfiles')
     const policy = await import('./presetConfig')
     const source = createDefaultOpenAIProfile({
       id: 'preset-a',
       isDefault: true,
-      provider: 'preset-provider',
+      connectionId: 'preset-connection',
       baseUrl: 'https://preset.example.com/v1',
       apiKey: 'deployed-key',
       model: 'preset-model',
     })
     const user = createDefaultOpenAIProfile({ id: 'user-profile', model: 'user-model' })
-    const provider = { id: 'preset-provider', name: 'Preset Provider', submit: { path: 'generate' } }
-    const removed = createDefaultOpenAIProfile({ id: 'preset-removed', provider: provider.id })
-    policy.setPresetConfig({ customProviders: [provider], profiles: [source, removed] })
+    const connection = { id: 'preset-connection', name: 'Preset Connection', submit: { path: 'generate' } }
+    const removed = createDefaultOpenAIProfile({ id: 'preset-removed', connectionId: connection.id })
+    policy.setPresetConfig({ customConnections: [connection], profiles: [source, removed] })
 
     const enforced = policy.enforcePresetConfigPolicy(normalizeSettings({
-      customProviders: [{ ...provider, submit: { path: 'local/generate' } }],
+      customConnections: [{ ...connection, submit: { path: 'local/generate' } }],
       profiles: [{ ...source, baseUrl: 'https://local.example.com/v1', apiKey: 'user-key', model: 'local-model' }, user],
       activeProfileId: user.id,
     }))
@@ -75,12 +76,12 @@ describe('preset config policy', () => {
     })
     expect(enforced.profiles[1]).toMatchObject({ id: user.id, model: 'user-model' })
     expect(enforced.profiles.some((profile) => profile.id === removed.id)).toBe(false)
-    expect(enforced.customProviders[0]).toEqual(provider)
+    expect(enforced.customConnections[0]).toEqual(connection)
     expect(enforced.activeProfileId).toBe(user.id)
     expect(policy.isPresetConfigDeletionPrevented()).toBe(false)
-    expect(policy.isPresetProviderLocked(provider.id)).toBe(true)
-    expect(policy.isPresetProviderDeletionPrevented(provider.id, enforced.profiles)).toBe(true)
-    expect(policy.isPresetProviderDeletionPrevented('user-provider', enforced.profiles)).toBe(false)
+    expect(policy.isPresetConnectionLocked(connection.id)).toBe(true)
+    expect(policy.isPresetConnectionDeletionPrevented(connection.id, enforced.profiles)).toBe(true)
+    expect(policy.isPresetConnectionDeletionPrevented('user-connection', enforced.profiles)).toBe(false)
   })
 
   it('allows removed presets to stay deleted by default', async () => {
@@ -89,7 +90,7 @@ describe('preset config policy', () => {
     const presetA = createDefaultOpenAIProfile({ id: 'preset-a', isDefault: true })
     const presetB = createDefaultOpenAIProfile({ id: 'preset-b' })
     const user = createDefaultOpenAIProfile({ id: 'user-profile' })
-    policy.setPresetConfig({ customProviders: [], profiles: [presetA, presetB] })
+    policy.setPresetConfig({ customConnections: [], profiles: [presetA, presetB] })
 
     const enforced = policy.enforcePresetConfigPolicy(normalizeSettings({
       profiles: [presetA, user],
@@ -107,7 +108,7 @@ describe('preset config policy', () => {
     const presetA = createDefaultOpenAIProfile({ id: 'preset-a', isDefault: true })
     const presetB = createDefaultOpenAIProfile({ id: 'preset-b' })
     const user = createDefaultOpenAIProfile({ id: 'user-profile' })
-    policy.setPresetConfig({ customProviders: [], profiles: [presetA, presetB] })
+    policy.setPresetConfig({ customConnections: [], profiles: [presetA, presetB] })
 
     const enforced = policy.enforcePresetConfigPolicy(normalizeSettings({
       profiles: [presetB, user, presetA],
@@ -122,57 +123,57 @@ describe('preset config policy', () => {
     vi.stubEnv('VITE_PREVENT_PRESET_CONFIG_DELETION', 'true')
     const { createDefaultOpenAIProfile, normalizeSettings } = await import('./apiProfiles')
     const policy = await import('./presetConfig')
-    const provider = { id: 'preset-provider', name: 'Preset Provider', submit: { path: 'generate' } }
+    const connection = { id: 'preset-connection', name: 'Preset Connection', submit: { path: 'generate' } }
     const presetA = createDefaultOpenAIProfile({ id: 'preset-a', isDefault: true })
     const presetB = createDefaultOpenAIProfile({ id: 'preset-b' })
     const user = createDefaultOpenAIProfile({ id: 'user-profile' })
-    policy.setPresetConfig({ customProviders: [provider], profiles: [presetA, presetB] })
+    policy.setPresetConfig({ customConnections: [connection], profiles: [presetA, presetB] })
 
     const enforced = policy.enforcePresetConfigPolicy(normalizeSettings({
-      customProviders: [{ ...provider, submit: { path: 'local/generate' } }],
+      customConnections: [{ ...connection, submit: { path: 'local/generate' } }],
       profiles: [presetA, user],
       activeProfileId: user.id,
     }))
 
     expect(policy.isPresetConfigDeletionPrevented()).toBe(true)
     expect(policy.isPresetConfigParamsLocked()).toBe(false)
-    expect(policy.isPresetProviderLocked(provider.id)).toBe(false)
-    expect(policy.isPresetProviderDeletionPrevented(provider.id, enforced.profiles)).toBe(true)
-    expect(enforced.customProviders[0].submit.path).toBe('local/generate')
+    expect(policy.isPresetConnectionLocked(connection.id)).toBe(false)
+    expect(policy.isPresetConnectionDeletionPrevented(connection.id, enforced.profiles)).toBe(true)
+    expect(enforced.customConnections[0].submit.path).toBe('local/generate')
     expect(enforced.profiles.map((profile) => profile.id)).toEqual(['preset-a', 'user-profile', 'preset-b'])
   })
 
-  it('preserves dismissed provider IDs while deletion is prevented', async () => {
+  it('preserves dismissed connection IDs while deletion is prevented', async () => {
     vi.stubEnv('VITE_PREVENT_PRESET_CONFIG_DELETION', 'true')
     const { createDefaultOpenAIProfile, DEFAULT_SETTINGS, normalizeSettings } = await import('./apiProfiles')
     const policy = await import('./presetConfig')
     const { useStore } = await import('../store')
-    const provider = { id: 'preset-provider', name: 'Preset Provider', submit: { path: 'generate' } }
-    const profile = createDefaultOpenAIProfile({ id: 'preset-profile', provider: provider.id })
-    const preset = { customProviders: [provider], profiles: [profile] }
+    const connection = { id: 'preset-connection', name: 'Preset Connection', submit: { path: 'generate' } }
+    const profile = createDefaultOpenAIProfile({ id: 'preset-profile', connectionId: connection.id })
+    const preset = { customConnections: [connection], profiles: [profile] }
     policy.setPresetConfig(preset)
     useStore.setState({
-      settings: normalizeSettings({ ...DEFAULT_SETTINGS, customProviders: [], profiles: [] }),
-      dismissedPresetProviderIds: [provider.id],
+      settings: normalizeSettings({ ...DEFAULT_SETTINGS, customConnections: [], profiles: [] }),
+      dismissedPresetConnectionIds: [connection.id],
     })
 
     await useStore.getState().setPresetImportedSettings(preset)
     useStore.getState().setSettings({ profiles: [profile] })
 
     const state = useStore.getState()
-    expect(state.settings.customProviders).toEqual([expect.objectContaining({ id: provider.id })])
-    expect(state.dismissedPresetProviderIds).toEqual([provider.id])
+    expect(state.settings.customConnections).toEqual([expect.objectContaining({ id: connection.id })])
+    expect(state.dismissedPresetConnectionIds).toEqual([connection.id])
   })
 
-  it('always prevents preset provider deletion in preset-only mode', async () => {
+  it('always prevents preset connection deletion in preset-only mode', async () => {
     vi.stubEnv('VITE_SHOW_PRESET_CONFIG_ONLY', 'true')
     const { createDefaultOpenAIProfile } = await import('./apiProfiles')
     const policy = await import('./presetConfig')
-    const provider = { id: 'preset-provider', name: 'Preset Provider', submit: { path: 'generate' } }
-    const profile = createDefaultOpenAIProfile({ id: 'preset-profile', provider: 'openai' })
-    policy.setPresetConfig({ customProviders: [provider], profiles: [profile] })
+    const connection = { id: 'preset-connection', name: 'Preset Connection', submit: { path: 'generate' } }
+    const profile = createDefaultOpenAIProfile({ id: 'preset-profile', connectionId: 'openai-images' })
+    policy.setPresetConfig({ customConnections: [connection], profiles: [profile] })
 
-    expect(policy.isPresetProviderDeletionPrevented(provider.id, [])).toBe(true)
+    expect(policy.isPresetConnectionDeletionPrevented(connection.id, [])).toBe(true)
   })
 
   it('locks preset parameters without restoring their deployment order', async () => {
@@ -182,7 +183,7 @@ describe('preset config policy', () => {
     const presetA = createDefaultOpenAIProfile({ id: 'preset-a', isDefault: true, model: 'preset-a-model' })
     const presetB = createDefaultOpenAIProfile({ id: 'preset-b', model: 'preset-b-model' })
     const user = createDefaultOpenAIProfile({ id: 'user-profile' })
-    policy.setPresetConfig({ customProviders: [], profiles: [presetA, presetB] })
+    policy.setPresetConfig({ customConnections: [], profiles: [presetA, presetB] })
 
     const enforced = policy.enforcePresetConfigPolicy(normalizeSettings({
       profiles: [presetA, user, { ...presetB, model: 'local-model' }],
@@ -193,87 +194,87 @@ describe('preset config policy', () => {
     expect(enforced.profiles[2].model).toBe('preset-b-model')
   })
 
-  it('restores a dismissed provider while a current locked preset profile references it', async () => {
+  it('restores a dismissed connection while a current locked preset profile references it', async () => {
     vi.stubEnv('VITE_LOCK_PRESET_CONFIG_PARAMS', 'true')
     const { createDefaultOpenAIProfile, normalizeSettings } = await import('./apiProfiles')
     const policy = await import('./presetConfig')
-    const provider = { id: 'preset-provider', name: 'Preset Provider', submit: { path: 'generate' } }
+    const connection = { id: 'preset-connection', name: 'Preset Connection', submit: { path: 'generate' } }
     const source = createDefaultOpenAIProfile({
       id: 'preset-profile',
-      provider: provider.id,
+      connectionId: connection.id,
       model: 'preset-model',
     })
-    policy.setPresetConfig({ customProviders: [provider], profiles: [source] })
+    policy.setPresetConfig({ customConnections: [connection], profiles: [source] })
     const deleted = normalizeSettings({
-      customProviders: [],
-      profiles: [{ ...source, provider: 'openai', model: 'local-openai-model' }],
+      customConnections: [],
+      profiles: [{ ...source, connectionId: 'openai-images', model: 'local-openai-model' }],
     })
 
-    expect(policy.isPresetProviderDeletionPrevented(provider.id, [source])).toBe(true)
+    expect(policy.isPresetConnectionDeletionPrevented(connection.id, [source])).toBe(true)
 
-    const enforced = policy.enforcePresetConfigPolicy(deleted, { dismissedPresetProviderIds: [] })
+    const enforced = policy.enforcePresetConfigPolicy(deleted, { dismissedPresetConnectionIds: [] })
 
-    expect(enforced.customProviders).toEqual([provider])
+    expect(enforced.customConnections).toEqual([connection])
     expect(enforced.profiles[0]).toMatchObject({
       id: source.id,
-      provider: provider.id,
+      connectionId: connection.id,
       model: 'preset-model',
     })
   })
 
-  it('allows a dismissed provider to stay deleted after its only preset profile is deleted', async () => {
+  it('allows a dismissed connection to stay deleted after its only preset profile is deleted', async () => {
     vi.stubEnv('VITE_LOCK_PRESET_CONFIG_PARAMS', 'true')
     const { createDefaultOpenAIProfile } = await import('./apiProfiles')
     const policy = await import('./presetConfig')
-    const provider = { id: 'preset-provider', name: 'Preset Provider', submit: { path: 'generate' } }
-    const source = createDefaultOpenAIProfile({ id: 'preset-profile', provider: provider.id })
+    const connection = { id: 'preset-connection', name: 'Preset Connection', submit: { path: 'generate' } }
+    const source = createDefaultOpenAIProfile({ id: 'preset-profile', connectionId: connection.id })
     const user = createDefaultOpenAIProfile({ id: 'user-profile' })
-    policy.setPresetConfig({ customProviders: [provider], profiles: [source] })
+    policy.setPresetConfig({ customConnections: [connection], profiles: [source] })
 
-    expect(policy.isPresetProviderDeletionPrevented(provider.id, [])).toBe(false)
+    expect(policy.isPresetConnectionDeletionPrevented(connection.id, [])).toBe(false)
 
     const merged = (await import('./apiProfiles')).mergePresetImportedSettings({
-      customProviders: [],
+      customConnections: [],
       profiles: [user],
       activeProfileId: user.id,
-    }, { customProviders: [provider], profiles: [source] }, {
+    }, { customConnections: [connection], profiles: [source] }, {
       lockPresetParams: true,
       dismissedPresetProfileIds: [source.id],
-      dismissedPresetProviderIds: [provider.id],
+      dismissedPresetConnectionIds: [connection.id],
     }).settings
     const reloaded = policy.enforcePresetConfigPolicy(merged, {
-      dismissedPresetProviderIds: [provider.id],
+      dismissedPresetConnectionIds: [connection.id],
     })
 
-    expect(reloaded.customProviders).toEqual([])
+    expect(reloaded.customConnections).toEqual([])
     expect(reloaded.profiles.map((profile) => profile.id)).toEqual([user.id])
   })
 
-  it('keeps a shared provider protected while another current locked preset profile references it', async () => {
+  it('keeps a shared connection protected while another current locked preset profile references it', async () => {
     vi.stubEnv('VITE_LOCK_PRESET_CONFIG_PARAMS', 'true')
     const { createDefaultOpenAIProfile } = await import('./apiProfiles')
     const policy = await import('./presetConfig')
-    const provider = { id: 'preset-provider', name: 'Preset Provider', submit: { path: 'generate' } }
+    const connection = { id: 'preset-connection', name: 'Preset Connection', submit: { path: 'generate' } }
     const profiles = [
-      createDefaultOpenAIProfile({ id: 'preset-a', provider: provider.id, isDefault: true }),
-      createDefaultOpenAIProfile({ id: 'preset-b', provider: provider.id }),
+      createDefaultOpenAIProfile({ id: 'preset-a', connectionId: connection.id, isDefault: true }),
+      createDefaultOpenAIProfile({ id: 'preset-b', connectionId: connection.id }),
     ]
-    policy.setPresetConfig({ customProviders: [provider], profiles })
+    policy.setPresetConfig({ customConnections: [connection], profiles })
 
-    expect(policy.isPresetProviderDeletionPrevented(provider.id, [profiles[1]])).toBe(true)
+    expect(policy.isPresetConnectionDeletionPrevented(connection.id, [profiles[1]])).toBe(true)
   })
 
   it('uses the default preset URL and leaves the fallback empty when no preset exists', async () => {
     const { createDefaultOpenAIProfile } = await import('./apiProfiles')
     const policy = await import('./presetConfig')
     policy.setPresetConfig({
-      customProviders: [],
+      customConnections: [],
       profiles: [createDefaultOpenAIProfile({ id: 'openai-preset', baseUrl: 'https://preset.example.com/v1' })],
     })
     expect(policy.getDefaultPresetBaseUrl()).toBe('https://preset.example.com/v1')
 
     policy.setPresetConfig({
-      customProviders: [],
+      customConnections: [],
       profiles: [],
     })
     expect(policy.getDefaultPresetBaseUrl()).toBe('')

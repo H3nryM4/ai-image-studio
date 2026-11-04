@@ -6,13 +6,13 @@ import { DEFAULT_SETTINGS } from './apiProfiles'
 import { buildExportZip, getExportImageEstimatedBytes, getExportZipPlan, readExportZip, readExportZipFileAsDataUrl, readExportZipManifest } from './exportZip'
 
 describe('exportZip', () => {
-  it.each([undefined, 1, 2, 3, 5])('rejects unsupported backup version %s in every reader', async (version) => {
+  it.each([undefined, 1, 2, 3, 4, 6])('rejects unsupported backup version %s in every reader', async (version) => {
     const bytes = zipSync({ 'manifest.json': strToU8(JSON.stringify({ version, exportedAt: '2026-11-03' })) })
     await expect(readExportZip(bytes)).rejects.toThrow('不支持此备份版本')
     await expect(readExportZipManifest(bytes)).rejects.toThrow('不支持此备份版本')
     await expect(readExportZipManifest(bytes, false)).rejects.toThrow('不支持此备份版本')
   })
-  it('omits empty customProviders in backup settings and retains non-empty providers', async () => {
+  it('omits empty customConnections in backup settings and retains non-empty connections', async () => {
     const opts = {
       options: { exportConfig: true },
       exportedAt: 1700000001000,
@@ -24,10 +24,10 @@ describe('exportZip', () => {
       defaultFavoriteCollectionId: null,
     }
     const empty = await buildExportZip(opts)
-    expect((await readExportZip(empty.bytes)).manifest.settings).not.toHaveProperty('customProviders')
-    const provider = { id: 'custom', name: 'Custom', submit: { path: 'generate' } }
-    const filled = await buildExportZip({ ...opts, settings: { ...DEFAULT_SETTINGS, customProviders: [provider] } })
-    expect((await readExportZip(filled.bytes)).manifest.settings?.customProviders).toEqual([provider])
+    expect((await readExportZip(empty.bytes)).manifest.settings).not.toHaveProperty('customConnections')
+    const connection = { id: 'custom', name: 'Custom', submit: { path: 'generate' } }
+    const filled = await buildExportZip({ ...opts, settings: { ...DEFAULT_SETTINGS, customConnections: [connection] } })
+    expect((await readExportZip(filled.bytes)).manifest.settings?.customConnections).toEqual([connection])
   })
 
   it('builds and reads backup zip entries without changing manifest shape', async () => {
@@ -78,7 +78,7 @@ describe('exportZip', () => {
     const parsed = await readExportZip(bytes)
 
     expect(parsed.manifest).toEqual(manifest)
-    expect(parsed.manifest.version).toBe(4)
+    expect(parsed.manifest.version).toBe(5)
     expect(parsed.manifest.exportedAt).toBe(new Date(1700000001000).toISOString())
     expect(parsed.manifest.imageFiles?.['img-1']).toEqual({
       path: 'images/task-task-1-input.png',

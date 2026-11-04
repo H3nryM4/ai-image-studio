@@ -6,7 +6,7 @@ export interface PersistedAppState {
   settings: AppSettings
   previousPresetConfig?: PresetConfig | null
   dismissedPresetProfileIds?: string[]
-  dismissedPresetProviderIds?: string[]
+  dismissedPresetConnectionIds?: string[]
   params: TaskParams
   prompt?: string
   inputImages?: InputImage[]
@@ -25,7 +25,7 @@ type PersistedStateSource = PersistedAppState & {
 }
 
 type PersistedStateFallback = Pick<PersistedAppState,
-  'settings' | 'params' | 'dismissedPresetProfileIds' | 'dismissedPresetProviderIds' | 'dismissedCodexCliPrompts' | 'favoriteCollections' | 'defaultFavoriteCollectionId'
+  'settings' | 'params' | 'dismissedPresetProfileIds' | 'dismissedPresetConnectionIds' | 'dismissedCodexCliPrompts' | 'favoriteCollections' | 'defaultFavoriteCollectionId'
 >
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -62,7 +62,7 @@ export function createPersistedState(state: PersistedStateSource): Partial<Persi
     settings,
     previousPresetConfig: state.previousPresetConfig ?? null,
     dismissedPresetProfileIds: state.dismissedPresetProfileIds ?? [],
-    dismissedPresetProviderIds: state.dismissedPresetProviderIds ?? [],
+    dismissedPresetConnectionIds: state.dismissedPresetConnectionIds ?? [],
     params: state.params,
     ...(settings.persistInputOnRestart ? {
       prompt: state.prompt,
@@ -83,7 +83,7 @@ export function normalizePersistedState(persistedState: unknown, fallback: Persi
     ? (() => {
         const normalized = normalizeSettings(persistedState.previousPresetConfig)
         return {
-          customProviders: normalized.customProviders,
+          customConnections: normalized.customConnections,
           profiles: persistedState.previousPresetConfig.profiles.length ? normalized.profiles : [],
         }
       })()
@@ -107,7 +107,7 @@ export function normalizePersistedState(persistedState: unknown, fallback: Persi
     settings,
     previousPresetConfig,
     dismissedPresetProfileIds: normalizeStringArray(persistedState.dismissedPresetProfileIds, fallback.dismissedPresetProfileIds ?? []),
-    dismissedPresetProviderIds: normalizeStringArray(persistedState.dismissedPresetProviderIds, fallback.dismissedPresetProviderIds ?? []),
+    dismissedPresetConnectionIds: normalizeStringArray(persistedState.dismissedPresetConnectionIds, fallback.dismissedPresetConnectionIds ?? []),
     params: normalizeParams(persistedState.params, fallback.params),
     dismissedCodexCliPrompts: normalizeStringArray(persistedState.dismissedCodexCliPrompts, fallback.dismissedCodexCliPrompts),
     favoriteCollections,

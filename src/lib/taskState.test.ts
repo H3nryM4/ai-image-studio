@@ -47,10 +47,10 @@ describe('task lifecycle patches', () => {
   it('marks legacy and OpenAI running tasks as interrupted', () => {
     const now = 10_000
     const legacyRunning = task({ id: 'legacy-running', status: 'running', createdAt: 1_000, finishedAt: null, elapsed: null })
-    const openAIRunning = task({ id: 'openai-running', apiProvider: 'openai', status: 'running', createdAt: 2_000, finishedAt: null, elapsed: null })
-    const customAsyncRunning = task({ id: 'custom-running', apiProvider: 'custom-provider', customTaskId: 'task-1', status: 'running', createdAt: 4_000, finishedAt: null, elapsed: null })
-    const customSyncRunning = task({ id: 'custom-sync-running', apiProvider: 'custom-provider', status: 'running', createdAt: 5_000, finishedAt: null, elapsed: null })
-    const doneTask = task({ id: 'done-task', apiProvider: 'openai', status: 'done' })
+    const openAIRunning = task({ id: 'openai-running', apiConnectionId: 'openai', status: 'running', createdAt: 2_000, finishedAt: null, elapsed: null })
+    const customAsyncRunning = task({ id: 'custom-running', apiConnectionId: 'custom-connection', customTaskId: 'task-1', status: 'running', createdAt: 4_000, finishedAt: null, elapsed: null })
+    const customSyncRunning = task({ id: 'custom-sync-running', apiConnectionId: 'custom-connection', status: 'running', createdAt: 5_000, finishedAt: null, elapsed: null })
+    const doneTask = task({ id: 'done-task', apiConnectionId: 'openai', status: 'done' })
 
     const result = markInterruptedRunningTasks([legacyRunning, openAIRunning, customAsyncRunning, customSyncRunning, doneTask], now)
 
@@ -92,7 +92,7 @@ describe('task actual params', () => {
     })
   })
 
-  it('keeps async custom params per image while deriving gallery totals for other providers', () => {
+  it('keeps async custom params per image while deriving gallery totals for other connections', () => {
     const paramsList: Array<Partial<TaskParams>> = [{ output_format: 'png', size: '1254x1254' }]
 
     expect(deriveGalleryActualParams(true, { n: 8 }, paramsList, 1)).toEqual(paramsList[0])

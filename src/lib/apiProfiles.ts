@@ -1,28 +1,28 @@
-import type { ApiMode, ApiProfile, ApiProvider, AppSettings, PresetConfig, CustomProviderContentType, CustomProviderDefinition, CustomProviderFileMapping, CustomProviderPollMapping, CustomProviderRequestMethod, CustomProviderResultMapping, CustomProviderSubmitMapping, CustomProviderTemplate, ReferenceImageEditAction, RetryMode } from '../types'
+import type { ApiProfile, ApiConnectionId, AppSettings, PresetConfig, CustomConnectionContentType, CustomConnectionDefinition, CustomConnectionFileMapping, CustomConnectionPollMapping, CustomConnectionRequestMethod, CustomConnectionResultMapping, CustomConnectionSubmitMapping, CustomConnectionTemplate, ReferenceImageEditAction, RetryMode } from '../types'
 import { DEFAULT_STREAM_PARTIAL_IMAGES, DEFAULT_ZIP_DOWNLOAD_ROUTES, ZIP_DOWNLOAD_ROUTE_VALUES } from '../types'
-import { customProviderSupportsNativeTransparentBackground } from './customProviderCapabilities'
+import { customConnectionSupportsNativeTransparentBackground } from './customConnectionCapabilities'
 import { shouldUseApiProxy } from './devProxy'
 import { normalizeReasoningEffort, normalizeStreamPartialImages, parseDefaultApiUrl } from './defaultApiUrl'
 import { readRuntimeEnv } from './runtimeEnv'
 import { isImportableConfigUrl } from './importableConfigUrl'
 import { DEFAULT_IMAGES_MODEL } from './imageModels'
-import { DEFAULT_BATCH_PROMPT_CONCURRENCY, normalizeBatchPromptConcurrency } from './batchPrompts'
+import { normalizeBatchPromptConcurrency } from './batchPrompts'
 
-const OPENAI_DEFAULT_BASE_URL = 'https://api.openai.com/v1'
+const OPENAI_DEFAULT_API_BASE_URL = 'https://api.openai.com/v1'
 const RAW_DEFAULT_API_URL = readRuntimeEnv(import.meta.env.VITE_DEFAULT_API_URL)
 const DEFAULT_OPENAI_API_PROXY = readRuntimeEnv(import.meta.env.VITE_API_PROXY_AVAILABLE) === 'true'
 const DOCKER_DEPLOYMENT = readRuntimeEnv(import.meta.env.VITE_DOCKER_DEPLOYMENT) === 'true'
 const DEFAULT_API_URL_PATCH = isImportableConfigUrl(RAW_DEFAULT_API_URL)
   ? null
-  : parseDefaultApiUrl(RAW_DEFAULT_API_URL || (DOCKER_DEPLOYMENT && DEFAULT_OPENAI_API_PROXY ? '' : OPENAI_DEFAULT_BASE_URL))
-const DEFAULT_BASE_URL = DEFAULT_API_URL_PATCH?.baseUrl ?? ''
+  : parseDefaultApiUrl(RAW_DEFAULT_API_URL || (DOCKER_DEPLOYMENT && DEFAULT_OPENAI_API_PROXY ? '' : OPENAI_DEFAULT_API_BASE_URL))
+export const DEFAULT_API_BASE_URL = DEFAULT_API_URL_PATCH?.baseUrl ?? ''
 export { DEFAULT_IMAGES_MODEL } from './imageModels'
 export const DEFAULT_RESPONSES_MODEL = 'gpt-6.1-sol'
 export const DEFAULT_OPENAI_PROFILE_ID = 'default-openai'
 export const DEFAULT_API_TIMEOUT = 600
 
-const BUILT_IN_PROVIDER_IDS = new Set<ApiProvider>(['openai'])
-const DEFAULT_CUSTOM_PROVIDER_PATHS = {
+const BUILT_IN_CONNECTION_IDS = new Set<ApiConnectionId>(['openai-images', 'openai-responses'])
+const DEFAULT_CUSTOM_CONNECTION_PATHS = {
   generationPath: 'images/generations',
   editPath: 'images/edits',
   taskPath: 'images/tasks/{task_id}',
@@ -39,19 +39,19 @@ const DEFAULT_GENERATE_BODY = {
   background: '$params.background',
 }
 const DEFAULT_EDIT_BODY = DEFAULT_GENERATE_BODY
-const DEFAULT_OPENAI_RESULT: CustomProviderResultMapping = {
+const DEFAULT_OPENAI_RESULT: CustomConnectionResultMapping = {
   imageUrlPaths: ['data.*.url'],
   b64JsonPaths: ['data.*.b64_json'],
 }
-const DEFAULT_EDIT_FILES: CustomProviderFileMapping[] = [
+const DEFAULT_EDIT_FILES: CustomConnectionFileMapping[] = [
   { field: 'image[]', source: 'inputImages', array: true },
   { field: 'mask', source: 'mask' },
 ]
 
-type ApiProfileProviderDraft = NonNullable<ApiProfile['providerDrafts']>[ApiProvider]
+type ApiProfileConnectionDraft = NonNullable<ApiProfile['connectionDrafts']>[ApiConnectionId]
 
-function getDefaultStreamImages(provider: ApiProvider, apiMode: ApiMode): boolean {
-  return provider === 'openai' && apiMode === 'responses'
+export function isOpenAIConnection(connectionId: ApiConnectionId): boolean {
+  return connectionId === 'openai-images' || connectionId === 'openai-responses'
 }
 
 export { normalizeReasoningEffort, normalizeStreamPartialImages } from './defaultApiUrl'
@@ -83,23 +83,23 @@ function normalizeZipDownloadRoutes(value: unknown) {
   return value.filter((item): item is typeof ZIP_DOWNLOAD_ROUTE_VALUES[number] => typeof item === 'string' && allowed.has(item))
 }
 
-function normalizeProviderOrder(value: unknown, customProviders: CustomProviderDefinition[]): string[] | undefined {
+function normalizeConnectionOrder(value: unknown, customConnections: CustomConnectionDefinition[]): string[] | undefined {
   if (!Array.isArray(value)) return undefined
 
-  const providerIds = ['openai', ...customProviders.map((provider) => provider.id)]
-  const knownIds = new Set(providerIds)
+  const connectionIds = ['openai-images', 'openai-responses', ...customConnections.map((connection) => connection.id)]
+  const knownIds = new Set(connectionIds)
   const ordered = value
     .map(String)
     .filter((id, idx, list) => knownIds.has(id) && list.indexOf(id) === idx)
 
-  return [...ordered, ...providerIds.filter((id) => !ordered.includes(id))]
+  return [...ordered, ...connectionIds.filter((id) => !ordered.includes(id))]
 }
 
-function isCustomProviderTemplate(value: unknown): value is CustomProviderTemplate {
+function isCustomConnectionTemplate(value: unknown): value is CustomConnectionTemplate {
   return value === 'http-image'
 }
 
-function normalizeProviderPath(value: unknown, fallback: string): string {
+function normalizeConnectionPath(value: unknown, fallback: string): string {
   return (typeof value === 'string' && value.trim() ? value : fallback).trim().replace(/^\/+/, '').replace(/^v1\//, '')
 }
 
@@ -125,11 +125,11 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
 }
 
-function normalizeRequestMethod(value: unknown, fallback: CustomProviderRequestMethod = 'POST'): CustomProviderRequestMethod {
+function normalizeRequestMethod(value: unknown, fallback: CustomConnectionRequestMethod = 'POST'): CustomConnectionRequestMethod {
   return value === 'GET' || value === 'POST' ? value : fallback
 }
 
-function normalizeContentType(value: unknown, fallback: CustomProviderContentType = 'json'): CustomProviderContentType {
+function normalizeContentType(value: unknown, fallback: CustomConnectionContentType = 'json'): CustomConnectionContentType {
   return value === 'multipart' ? 'multipart' : fallback
 }
 
@@ -137,10 +137,10 @@ function normalizeBodyTemplate(value: unknown, fallback: Record<string, unknown>
   return isRecord(value) ? value : fallback
 }
 
-function normalizeFileMappings(value: unknown, fallback: CustomProviderFileMapping[] = []): CustomProviderFileMapping[] {
+function normalizeFileMappings(value: unknown, fallback: CustomConnectionFileMapping[] = []): CustomConnectionFileMapping[] {
   if (!Array.isArray(value)) return fallback
   const files = value
-    .map((item): CustomProviderFileMapping | null => {
+    .map((item): CustomConnectionFileMapping | null => {
       if (!isRecord(item) || typeof item.field !== 'string' || !item.field.trim()) return null
       if (item.source !== 'inputImages' && item.source !== 'mask') return null
       return {
@@ -149,11 +149,11 @@ function normalizeFileMappings(value: unknown, fallback: CustomProviderFileMappi
         array: Boolean(item.array),
       }
     })
-    .filter((item): item is CustomProviderFileMapping => Boolean(item))
+    .filter((item): item is CustomConnectionFileMapping => Boolean(item))
   return files.length ? files : fallback
 }
 
-function normalizeResultMapping(value: unknown, fallback: CustomProviderResultMapping = DEFAULT_OPENAI_RESULT): CustomProviderResultMapping {
+function normalizeResultMapping(value: unknown, fallback: CustomConnectionResultMapping = DEFAULT_OPENAI_RESULT): CustomConnectionResultMapping {
   const record = isRecord(value) ? value : {}
   const imageUrlPaths = normalizeStringArray(record.imageUrlPaths, fallback.imageUrlPaths ?? [])
   const b64JsonPaths = normalizeStringArray(record.b64JsonPaths, fallback.b64JsonPaths ?? [])
@@ -163,11 +163,11 @@ function normalizeResultMapping(value: unknown, fallback: CustomProviderResultMa
   }
 }
 
-function normalizeSubmitMapping(value: unknown, fallback: CustomProviderSubmitMapping): CustomProviderSubmitMapping {
+function normalizeSubmitMapping(value: unknown, fallback: CustomConnectionSubmitMapping): CustomConnectionSubmitMapping {
   const record = isRecord(value) ? value : {}
   const contentType = normalizeContentType(record.contentType, fallback.contentType ?? 'json')
   return {
-    path: normalizeProviderPath(record.path, fallback.path),
+    path: normalizeConnectionPath(record.path, fallback.path),
     method: normalizeRequestMethod(record.method, fallback.method ?? 'POST'),
     contentType,
     query: normalizeStringRecord(record.query) ?? fallback.query,
@@ -178,10 +178,10 @@ function normalizeSubmitMapping(value: unknown, fallback: CustomProviderSubmitMa
   }
 }
 
-function normalizePollMapping(value: unknown, fallback?: CustomProviderPollMapping): CustomProviderPollMapping | undefined {
+function normalizePollMapping(value: unknown, fallback?: CustomConnectionPollMapping): CustomConnectionPollMapping | undefined {
   if (!isRecord(value) && !fallback) return undefined
   const record = isRecord(value) ? value : {}
-  const path = normalizeProviderPath(record.path, fallback?.path ?? DEFAULT_CUSTOM_PROVIDER_PATHS.taskPath)
+  const path = normalizeConnectionPath(record.path, fallback?.path ?? DEFAULT_CUSTOM_CONNECTION_PATHS.taskPath)
   const statusPath = typeof record.statusPath === 'string' && record.statusPath.trim() ? record.statusPath.trim() : fallback?.statusPath
   if (!statusPath) return undefined
 
@@ -200,54 +200,11 @@ function normalizePollMapping(value: unknown, fallback?: CustomProviderPollMappi
   }
 }
 
-function legacyCustomProviderToManifest(record: Record<string, unknown>): Record<string, unknown> | null {
-  if (record.template !== 'openai-compatible' && record.template !== 'openai-compatible-async') return null
-  const isAsync = record.template === 'openai-compatible-async'
-  const taskResultPath = typeof record.taskResultPath === 'string' && record.taskResultPath.trim() ? record.taskResultPath.trim() : 'data.data'
-  return {
-    id: record.id,
-    name: record.name,
-    template: 'http-image',
-    submit: {
-      path: record.generationPath ?? DEFAULT_CUSTOM_PROVIDER_PATHS.generationPath,
-      method: 'POST',
-      contentType: 'json',
-      query: isAsync ? normalizeStringRecord(record.submitQuery) ?? { async: 'true' } : undefined,
-      body: DEFAULT_GENERATE_BODY,
-      taskIdPath: isAsync ? (record.taskIdPath ?? 'data') : undefined,
-      result: DEFAULT_OPENAI_RESULT,
-    },
-    editSubmit: {
-      path: record.editPath ?? DEFAULT_CUSTOM_PROVIDER_PATHS.editPath,
-      method: 'POST',
-      contentType: 'multipart',
-      query: isAsync ? normalizeStringRecord(record.submitQuery) ?? { async: 'true' } : undefined,
-      body: DEFAULT_EDIT_BODY,
-      files: DEFAULT_EDIT_FILES,
-      taskIdPath: isAsync ? (record.taskIdPath ?? 'data') : undefined,
-      result: DEFAULT_OPENAI_RESULT,
-    },
-    poll: isAsync ? {
-      path: record.taskPath ?? DEFAULT_CUSTOM_PROVIDER_PATHS.taskPath,
-      method: 'GET',
-      statusPath: record.taskStatusPath ?? 'data.status',
-      successValues: normalizeStringArray(record.taskSuccessValues, ['SUCCESS', 'succeeded', 'completed', 'COMPLETED']),
-      failureValues: normalizeStringArray(record.taskFailureValues, ['FAILURE', 'failed', 'error', 'FAILED']),
-      errorPath: 'data.fail_reason',
-      intervalSeconds: typeof record.pollIntervalSeconds === 'number' ? record.pollIntervalSeconds : 5,
-      result: {
-        imageUrlPaths: [`${taskResultPath}.data.*.url`],
-        b64JsonPaths: [`${taskResultPath}.data.*.b64_json`],
-      },
-    } : undefined,
-  }
-}
-
-function createCustomProviderId(name: string, usedIds: Set<string>): string {
+function createCustomConnectionId(name: string, usedIds: Set<string>): string {
   const slug = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'custom'
   let id = `custom-${slug}`
   let index = 2
-  while (usedIds.has(id) || BUILT_IN_PROVIDER_IDS.has(id)) {
+  while (usedIds.has(id) || BUILT_IN_CONNECTION_IDS.has(id)) {
     id = `custom-${slug}-${index}`
     index += 1
   }
@@ -255,17 +212,16 @@ function createCustomProviderId(name: string, usedIds: Set<string>): string {
   return id
 }
 
-export function normalizeCustomProviderDefinition(input: unknown, usedIds = new Set<string>()): CustomProviderDefinition | null {
+export function normalizeCustomConnectionDefinition(input: unknown, usedIds = new Set<string>()): CustomConnectionDefinition | null {
   if (!input || typeof input !== 'object') return null
-  const rawRecord = input as Record<string, unknown>
-  const record = legacyCustomProviderToManifest(rawRecord) ?? rawRecord
-  const template = record.template == null ? 'http-image' : isCustomProviderTemplate(record.template) ? record.template : null
+  const record = input as Record<string, unknown>
+  const template = record.template == null ? 'http-image' : isCustomConnectionTemplate(record.template) ? record.template : null
   if (!template || !isRecord(record.submit)) return null
 
-  const rawName = typeof record.name === 'string' && record.name.trim() ? record.name.trim() : '自定义服务商'
-  const id = typeof record.id === 'string' && record.id.trim() && !BUILT_IN_PROVIDER_IDS.has(record.id.trim()) && !usedIds.has(record.id.trim())
+  const rawName = typeof record.name === 'string' && record.name.trim() ? record.name.trim() : '自定义 HTTP 接口'
+  const id = typeof record.id === 'string' && record.id.trim() && !BUILT_IN_CONNECTION_IDS.has(record.id.trim()) && !usedIds.has(record.id.trim())
     ? record.id.trim()
-    : createCustomProviderId(rawName, usedIds)
+    : createCustomConnectionId(rawName, usedIds)
   usedIds.add(id)
 
   return {
@@ -273,14 +229,14 @@ export function normalizeCustomProviderDefinition(input: unknown, usedIds = new 
     name: rawName,
     template,
     submit: normalizeSubmitMapping(record.submit, {
-      path: DEFAULT_CUSTOM_PROVIDER_PATHS.generationPath,
+      path: DEFAULT_CUSTOM_CONNECTION_PATHS.generationPath,
       method: 'POST',
       contentType: 'json',
       body: DEFAULT_GENERATE_BODY,
       result: DEFAULT_OPENAI_RESULT,
     }),
     editSubmit: isRecord(record.editSubmit) ? normalizeSubmitMapping(record.editSubmit, {
-      path: DEFAULT_CUSTOM_PROVIDER_PATHS.editPath,
+      path: DEFAULT_CUSTOM_CONNECTION_PATHS.editPath,
       method: 'POST',
       contentType: 'multipart',
       body: DEFAULT_EDIT_BODY,
@@ -291,25 +247,23 @@ export function normalizeCustomProviderDefinition(input: unknown, usedIds = new 
   }
 }
 
-export function normalizeCustomProviderDefinitions(input: unknown): CustomProviderDefinition[] {
+export function normalizeCustomConnectionDefinitions(input: unknown): CustomConnectionDefinition[] {
   const usedIds = new Set<string>()
   const list = Array.isArray(input) ? input : []
   return list
-    .map((item) => normalizeCustomProviderDefinition(item, usedIds))
-    .filter((item): item is CustomProviderDefinition => Boolean(item))
+    .map((item) => normalizeCustomConnectionDefinition(item, usedIds))
+    .filter((item): item is CustomConnectionDefinition => Boolean(item))
 }
 
 export function createDefaultOpenAIProfile(overrides: Partial<ApiProfile> = {}): ApiProfile {
-  const apiMode = overrides.apiMode ?? DEFAULT_API_URL_PATCH?.apiMode ?? 'images'
-  const streamImages = overrides.streamImages ?? DEFAULT_API_URL_PATCH?.streamImages ?? getDefaultStreamImages('openai', apiMode)
+  const connectionId = overrides.connectionId ?? DEFAULT_API_URL_PATCH?.connectionId ?? 'openai-images'
 
   return {
     id: DEFAULT_OPENAI_PROFILE_ID,
     name: DEFAULT_API_URL_PATCH?.name ?? '默认',
-    provider: 'openai',
-    baseUrl: DEFAULT_BASE_URL,
+    baseUrl: DEFAULT_API_BASE_URL,
     apiKey: DEFAULT_API_URL_PATCH?.apiKey ?? '',
-    model: DEFAULT_API_URL_PATCH?.model ?? (apiMode === 'responses' ? DEFAULT_RESPONSES_MODEL : DEFAULT_IMAGES_MODEL),
+    model: DEFAULT_API_URL_PATCH?.model ?? (connectionId === 'openai-responses' ? DEFAULT_RESPONSES_MODEL : DEFAULT_IMAGES_MODEL),
     imageGenerationModel: DEFAULT_API_URL_PATCH?.imageGenerationModel ?? DEFAULT_IMAGES_MODEL,
     timeout: DEFAULT_API_TIMEOUT,
     reasoningEffort: DEFAULT_API_URL_PATCH?.reasoningEffort,
@@ -318,19 +272,19 @@ export function createDefaultOpenAIProfile(overrides: Partial<ApiProfile> = {}):
     streamPartialImages: DEFAULT_API_URL_PATCH?.streamPartialImages ?? DEFAULT_STREAM_PARTIAL_IMAGES,
     transparentBackgroundMethod: DEFAULT_API_URL_PATCH?.transparentBackgroundMethod ?? 'api',
     ...overrides,
-    apiMode,
-    streamImages,
+    connectionId,
+    streamImages: overrides.streamImages ?? DEFAULT_API_URL_PATCH?.streamImages ?? connectionId === 'openai-responses',
   }
 }
 
-export function switchApiProfileProvider(profile: ApiProfile, provider: ApiProvider, customProvider?: CustomProviderDefinition): ApiProfile {
-  const providerDrafts = {
-    ...profile.providerDrafts,
-    [profile.provider]: {
+export function switchApiProfileConnection(profile: ApiProfile, connectionId: ApiConnectionId, customConnection?: CustomConnectionDefinition): ApiProfile {
+  if (profile.connectionId === connectionId) return profile
+  const connectionDrafts = {
+    ...profile.connectionDrafts,
+    [profile.connectionId]: {
       baseUrl: profile.baseUrl,
       model: profile.model,
       imageGenerationModel: profile.imageGenerationModel,
-      apiMode: profile.apiMode,
       reasoningEffort: profile.reasoningEffort,
       codexCli: profile.codexCli,
       apiProxy: profile.apiProxy,
@@ -340,76 +294,52 @@ export function switchApiProfileProvider(profile: ApiProfile, provider: ApiProvi
       transparentBackgroundMethod: profile.transparentBackgroundMethod,
     },
   }
-  const savedDraft = providerDrafts[provider]
-
-  if (customProvider) {
-    const supportsNativeTransparentBackground = customProviderSupportsNativeTransparentBackground(customProvider)
-    return {
-      ...profile,
-      provider: customProvider.id,
-      baseUrl: savedDraft?.baseUrl ?? (profile.baseUrl || DEFAULT_BASE_URL),
-      model: savedDraft?.model ?? (profile.model || DEFAULT_IMAGES_MODEL),
-      imageGenerationModel: savedDraft?.imageGenerationModel ?? profile.imageGenerationModel,
-      apiMode: 'images',
-      reasoningEffort: savedDraft?.reasoningEffort,
-      codexCli: savedDraft?.codexCli ?? false,
-      apiProxy: false,
-      responseFormatB64Json: savedDraft?.responseFormatB64Json,
-      streamImages: false,
-      streamPartialImages: savedDraft?.streamPartialImages ?? DEFAULT_STREAM_PARTIAL_IMAGES,
-      transparentBackgroundMethod: supportsNativeTransparentBackground ? savedDraft?.transparentBackgroundMethod ?? 'api' : 'local',
-      providerDrafts,
-    }
-  }
-
-  const nextApiMode = savedDraft?.apiMode ?? profile.apiMode
-  const nextStreamImages = savedDraft?.streamImages ?? (profile.provider === 'openai'
-    ? profile.streamImages
-    : getDefaultStreamImages(provider, nextApiMode))
-  const nextStreamPartialImages = savedDraft?.streamPartialImages ?? (profile.provider === 'openai'
-    ? profile.streamPartialImages
-    : DEFAULT_STREAM_PARTIAL_IMAGES)
+  const savedDraft = connectionDrafts[connectionId]
+  const openAI = isOpenAIConnection(connectionId)
+  const fromOpenAI = isOpenAIConnection(profile.connectionId)
+  const defaultModel = connectionId === 'openai-responses' ? DEFAULT_RESPONSES_MODEL : DEFAULT_IMAGES_MODEL
+  const previousDefaultModel = profile.connectionId === 'openai-responses' ? DEFAULT_RESPONSES_MODEL : DEFAULT_IMAGES_MODEL
+  const model = profile.model && profile.model !== previousDefaultModel ? profile.model : defaultModel
 
   return {
     ...profile,
-    provider,
-    baseUrl: savedDraft?.baseUrl ?? DEFAULT_BASE_URL,
-    model: savedDraft?.model ?? DEFAULT_IMAGES_MODEL,
+    connectionId,
+    baseUrl: savedDraft?.baseUrl ?? profile.baseUrl,
+    model: savedDraft?.model ?? model,
     imageGenerationModel: savedDraft?.imageGenerationModel ?? profile.imageGenerationModel,
-    apiMode: nextApiMode,
-    reasoningEffort: savedDraft?.reasoningEffort ?? profile.reasoningEffort,
-    codexCli: savedDraft?.codexCli ?? profile.codexCli,
-    apiProxy: savedDraft?.apiProxy ?? DEFAULT_OPENAI_API_PROXY,
+    reasoningEffort: savedDraft ? savedDraft.reasoningEffort : openAI && fromOpenAI ? profile.reasoningEffort : undefined,
+    codexCli: savedDraft?.codexCli ?? (openAI && fromOpenAI ? profile.codexCli : false),
+    apiProxy: savedDraft?.apiProxy ?? (openAI && (fromOpenAI ? profile.apiProxy : DEFAULT_OPENAI_API_PROXY)),
     responseFormatB64Json: savedDraft?.responseFormatB64Json,
-    streamImages: nextStreamImages,
-    streamPartialImages: nextStreamPartialImages,
-    transparentBackgroundMethod: savedDraft?.transparentBackgroundMethod ?? 'api',
-    providerDrafts,
+    streamImages: openAI ? savedDraft?.streamImages ?? connectionId === 'openai-responses' : false,
+    streamPartialImages: savedDraft?.streamPartialImages ?? (openAI && fromOpenAI ? profile.streamPartialImages : DEFAULT_STREAM_PARTIAL_IMAGES),
+    transparentBackgroundMethod: customConnection && !customConnectionSupportsNativeTransparentBackground(customConnection)
+      ? 'local'
+      : savedDraft?.transparentBackgroundMethod ?? 'api',
+    connectionDrafts,
   }
 }
 
-function normalizeProviderDraft(
+function normalizeConnectionDraft(
   input: unknown,
-  provider: ApiProvider,
-  customProviderIds: Set<string>,
-  nativeTransparentProviderIds: Set<string>,
-): ApiProfileProviderDraft {
+  connectionId: ApiConnectionId,
+  customConnectionIds: Set<string>,
+  nativeTransparentConnectionIds: Set<string>,
+): ApiProfileConnectionDraft {
   if (!isRecord(input)) return undefined
-  const nativeTransparentBackgroundUnavailable = customProviderIds.has(provider) && !nativeTransparentProviderIds.has(provider)
+  const nativeTransparentBackgroundUnavailable = customConnectionIds.has(connectionId) && !nativeTransparentConnectionIds.has(connectionId)
   const transparentBackgroundMethod = nativeTransparentBackgroundUnavailable ? 'local' : 'api'
-  const fallback = createDefaultOpenAIProfile({ transparentBackgroundMethod })
+  const fallback = createDefaultOpenAIProfile({ connectionId, transparentBackgroundMethod })
   const baseUrl = typeof input.baseUrl === 'string' ? input.baseUrl : undefined
   const model = (typeof input.model === 'string' && normalizeModelList(input.model)) || undefined
   const imageGenerationModel = typeof input.imageGenerationModel === 'string' ? input.imageGenerationModel.trim() : ''
-  const apiMode = input.apiMode === 'responses' ? 'responses' : input.apiMode === 'images' ? 'images' : undefined
-  const knownProvider = BUILT_IN_PROVIDER_IDS.has(provider) || customProviderIds.has(provider)
-  if (!knownProvider) return undefined
+  const knownConnection = BUILT_IN_CONNECTION_IDS.has(connectionId) || customConnectionIds.has(connectionId)
+  if (!knownConnection) return undefined
 
   return {
     baseUrl,
     model,
     imageGenerationModel,
-    apiMode,
     reasoningEffort: normalizeReasoningEffort(input.reasoningEffort),
     codexCli: typeof input.codexCli === 'boolean' ? input.codexCli : fallback.codexCli,
     apiProxy: typeof input.apiProxy === 'boolean' ? input.apiProxy : fallback.apiProxy,
@@ -422,15 +352,15 @@ function normalizeProviderDraft(
   }
 }
 
-function normalizeProviderDrafts(
+function normalizeConnectionDrafts(
   input: unknown,
-  customProviderIds: Set<string>,
-  nativeTransparentProviderIds: Set<string>,
-): ApiProfile['providerDrafts'] {
+  customConnectionIds: Set<string>,
+  nativeTransparentConnectionIds: Set<string>,
+): ApiProfile['connectionDrafts'] {
   if (!isRecord(input)) return undefined
   const entries = Object.entries(input)
-    .map(([provider, draft]) => [provider, normalizeProviderDraft(draft, provider, customProviderIds, nativeTransparentProviderIds)] as const)
-    .filter((entry): entry is [ApiProvider, NonNullable<ApiProfileProviderDraft>] => Boolean(entry[1]))
+    .map(([connectionId, draft]) => [connectionId, normalizeConnectionDraft(draft, connectionId, customConnectionIds, nativeTransparentConnectionIds)] as const)
+    .filter((entry): entry is [ApiConnectionId, NonNullable<ApiProfileConnectionDraft>] => Boolean(entry[1]))
 
   return entries.length ? Object.fromEntries(entries) : undefined
 }
@@ -438,23 +368,22 @@ function normalizeProviderDrafts(
 export function normalizeApiProfile(
   input: unknown,
   fallback?: Partial<ApiProfile>,
-  customProviderIds = new Set<string>(),
-  nativeTransparentProviderIds = new Set<string>(),
+  customConnectionIds = new Set<string>(),
+  nativeTransparentConnectionIds = new Set<string>(),
 ): ApiProfile {
   const record = input && typeof input === 'object' ? input as Record<string, unknown> : {}
-  const rawProvider = typeof record.provider === 'string' ? record.provider : ''
-  // 保留失效接入的连接信息，避免恢复旧配置时静默改用其他协议。
-  const provider: ApiProvider = rawProvider || 'openai'
-  const apiMode: ApiMode = provider === 'openai' && record.apiMode === 'responses' ? 'responses' : 'images'
-  const providerFallback = customProviderIds.has(provider)
+  const rawConnection = typeof record.connectionId === 'string' ? record.connectionId : ''
+  // 缺失接口定义时保留标识，禁止静默切换协议。
+  const connectionId: ApiConnectionId = rawConnection.trim() || fallback?.connectionId || ''
+  const connectionFallback = customConnectionIds.has(connectionId)
     ? { transparentBackgroundMethod: 'local' as const, ...fallback }
     : fallback
-  const defaults = createDefaultOpenAIProfile({ ...providerFallback, apiMode })
+  const defaults = createDefaultOpenAIProfile({ ...connectionFallback, connectionId })
   const rawBaseUrl = typeof record.baseUrl === 'string' ? record.baseUrl : defaults.baseUrl
-  const streamImages = provider === 'openai'
+  const streamImages = isOpenAIConnection(connectionId)
     ? typeof record.streamImages === 'boolean' ? record.streamImages : defaults.streamImages
     : false
-  const nativeTransparentBackgroundUnavailable = customProviderIds.has(provider) && !nativeTransparentProviderIds.has(provider)
+  const nativeTransparentBackgroundUnavailable = customConnectionIds.has(connectionId) && !nativeTransparentConnectionIds.has(connectionId)
 
   return {
     ...defaults,
@@ -462,7 +391,7 @@ export function normalizeApiProfile(
     isDefault: typeof record.isDefault === 'boolean' ? record.isDefault : undefined,
     name: typeof record.name === 'string' && record.name.trim() ? record.name : defaults.name,
     description: typeof record.description === 'string' && record.description.trim() ? record.description : undefined,
-    provider,
+    connectionId,
     baseUrl: rawBaseUrl,
     apiKey: typeof record.apiKey === 'string' ? record.apiKey : defaults.apiKey,
     model: (typeof record.model === 'string' && normalizeModelList(record.model)) || defaults.model,
@@ -471,7 +400,6 @@ export function normalizeApiProfile(
       ? record.imageGenerationModel.trim()
       : '',
     timeout: typeof record.timeout === 'number' && Number.isFinite(record.timeout) ? record.timeout : defaults.timeout,
-    apiMode,
     reasoningEffort: normalizeReasoningEffort(record.reasoningEffort, defaults.reasoningEffort),
     codexCli: Boolean(record.codexCli),
     apiProxy: typeof record.apiProxy === 'boolean' ? record.apiProxy : defaults.apiProxy,
@@ -481,7 +409,7 @@ export function normalizeApiProfile(
     transparentBackgroundMethod: !nativeTransparentBackgroundUnavailable && (record.transparentBackgroundMethod === 'api' || record.transparentBackgroundMethod === 'local')
       ? record.transparentBackgroundMethod
       : defaults.transparentBackgroundMethod,
-    providerDrafts: normalizeProviderDrafts(record.providerDrafts, customProviderIds, nativeTransparentProviderIds),
+    connectionDrafts: normalizeConnectionDrafts(record.connectionDrafts, customConnectionIds, nativeTransparentConnectionIds),
   }
 }
 
@@ -493,34 +421,38 @@ function validateImportedProfileRecord(input: unknown) {
     throw new Error('JSON 包含 Markdown 链接，请粘贴纯文本')
   }
 
-  if (typeof input.apiMode === 'string' && input.apiMode !== 'images' && input.apiMode !== 'responses') {
-    throw new Error('apiMode 格式无效，应为 images 或 responses')
+  if (typeof input.connectionId !== 'string' || !input.connectionId.trim()) {
+    throw new Error('API 配置缺少有效的 connectionId')
   }
 }
 
-function validateDeploymentProviderIds(input: unknown) {
+function validateImportedConnectionIds(input: unknown, deploymentConfig = false) {
   if (!Array.isArray(input)) return
   const usedIds = new Set<string>()
 
   for (const item of input) {
-    if (!isRecord(item)) throw new Error('部署文件中的服务商配置必须是对象')
+    if (!isRecord(item)) {
+      if (deploymentConfig) throw new Error('部署文件中的服务商配置必须是对象')
+      continue
+    }
     const name = typeof item.name === 'string' ? item.name.trim() : ''
     const label = name ? `「${name}」` : ''
     const id = typeof item.id === 'string' ? item.id.trim() : ''
+    if (BUILT_IN_CONNECTION_IDS.has(id)) throw new Error(`自定义接入${label}的 id「${id}」与内置接入冲突`)
+    if (!deploymentConfig) continue
     if (!id) throw new Error(`部署服务商${label}缺少 id`)
-    if (BUILT_IN_PROVIDER_IDS.has(id)) throw new Error(`部署服务商${label}的 id「${id}」与内置服务商冲突`)
     if (usedIds.has(id)) throw new Error(`部署服务商${label}的 id「${id}」重复`)
-    if (!normalizeCustomProviderDefinition(item)) throw new Error(`部署服务商${label}的 Manifest 无效`)
+    if (!normalizeCustomConnectionDefinition(item)) throw new Error(`部署服务商${label}的 Manifest 无效`)
     usedIds.add(id)
   }
 }
 
-function normalizeDeploymentProfileEntries(input: unknown, customProviderIds: Set<string>, nativeTransparentProviderIds = new Set<string>(), deploymentConfig = false) {
+function normalizeDeploymentProfileEntries(input: unknown, customConnectionIds: Set<string>, nativeTransparentConnectionIds = new Set<string>(), deploymentConfig = false) {
   const records = Array.isArray(input)
     ? input.flatMap((item) => {
         validateImportedProfileRecord(item)
         if (!isRecord(item)) throw new Error('API 配置必须是对象')
-        if (typeof item.provider !== 'string' || (!BUILT_IN_PROVIDER_IDS.has(item.provider) && !customProviderIds.has(item.provider))) {
+        if (typeof item.connectionId !== 'string' || (!BUILT_IN_CONNECTION_IDS.has(item.connectionId) && !customConnectionIds.has(item.connectionId))) {
           const name = typeof item.name === 'string' ? item.name.trim() : ''
           const id = typeof item.id === 'string' ? item.id.trim() : ''
           const label = name || id ? `「${name || id}」` : ''
@@ -550,43 +482,29 @@ function normalizeDeploymentProfileEntries(input: unknown, customProviderIds: Se
 
   return records.map((record) => {
     const rawId = typeof record.id === 'string' ? record.id.trim() : ''
-    const fallback = nativeTransparentProviderIds.has(record.provider as string) ? { transparentBackgroundMethod: 'api' as const } : undefined
-    if (rawId) return { source: record, profile: normalizeApiProfile({ ...record, id: rawId }, fallback, customProviderIds, nativeTransparentProviderIds) }
+    const fallback = nativeTransparentConnectionIds.has(record.connectionId as string) ? { transparentBackgroundMethod: 'api' as const } : undefined
+    if (rawId) return { source: record, profile: normalizeApiProfile({ ...record, id: rawId }, fallback, customConnectionIds, nativeTransparentConnectionIds) }
 
-    const provider = record.provider as string
+    const connection = record.connectionId as string
     const id = deploymentConfig
-      ? createPresetProfileId(provider, record, usedIds)
-      : createImportedProfileId(provider, usedIds)
-    return { source: record, profile: normalizeApiProfile({ ...record, id }, fallback, customProviderIds, nativeTransparentProviderIds) }
+      ? createPresetProfileId(connection, record, usedIds)
+      : createImportedProfileId(connection, usedIds)
+    return { source: record, profile: normalizeApiProfile({ ...record, id }, fallback, customConnectionIds, nativeTransparentConnectionIds) }
   })
 }
 
 export function normalizeSettings(input: Partial<AppSettings> | unknown): AppSettings {
   const record = input && typeof input === 'object' ? input as Record<string, unknown> : {}
-  const customProviders = normalizeCustomProviderDefinitions(record.customProviders)
-  const customProviderIds = new Set(customProviders.map((provider) => provider.id))
-  const nativeTransparentProviderIds = new Set(customProviders.filter(customProviderSupportsNativeTransparentBackground).map((provider) => provider.id))
-  const legacyApiMode: ApiMode = record.apiMode === 'responses' ? 'responses' : 'images'
-  const legacyProfile = normalizeApiProfile({
-    baseUrl: typeof record.baseUrl === 'string' ? record.baseUrl : DEFAULT_BASE_URL,
-    apiKey: typeof record.apiKey === 'string' ? record.apiKey : '',
-    model: record.model,
-    imageGenerationModel: record.imageGenerationModel,
-    timeout: typeof record.timeout === 'number' && Number.isFinite(record.timeout) ? record.timeout : DEFAULT_API_TIMEOUT,
-    apiMode: legacyApiMode,
-    codexCli: Boolean(record.codexCli),
-    apiProxy: typeof record.apiProxy === 'boolean' ? record.apiProxy : DEFAULT_OPENAI_API_PROXY,
-    responseFormatB64Json: record.responseFormatB64Json === true ? true : undefined,
-    streamImages: typeof record.streamImages === 'boolean' ? record.streamImages : undefined,
-    streamPartialImages: normalizeStreamPartialImages(record.streamPartialImages),
-  })
+  const customConnections = normalizeCustomConnectionDefinitions(record.customConnections)
+  const customConnectionIds = new Set(customConnections.map((connection) => connection.id))
+  const nativeTransparentConnectionIds = new Set(customConnections.filter(customConnectionSupportsNativeTransparentBackground).map((connection) => connection.id))
   const normalizedProfiles = Array.isArray(record.profiles) && record.profiles.length
     ? record.profiles.map((profile) => {
-        const provider = isRecord(profile) && typeof profile.provider === 'string' ? profile.provider : ''
-        const fallback = nativeTransparentProviderIds.has(provider) ? { transparentBackgroundMethod: 'api' as const } : undefined
-        return normalizeApiProfile(profile, fallback, customProviderIds, nativeTransparentProviderIds)
+        const connectionId = isRecord(profile) && typeof profile.connectionId === 'string' ? profile.connectionId : ''
+        const fallback = nativeTransparentConnectionIds.has(connectionId) ? { transparentBackgroundMethod: 'api' as const } : undefined
+        return normalizeApiProfile(profile, fallback, customConnectionIds, nativeTransparentConnectionIds)
       })
-    : [legacyProfile]
+    : [createDefaultOpenAIProfile()]
   const defaultProfileId = getDefaultApiProfileId({ profiles: normalizedProfiles })
   const profiles = normalizedProfiles.map((profile) => ({
     ...profile,
@@ -595,20 +513,10 @@ export function normalizeSettings(input: Partial<AppSettings> | unknown): AppSet
   const activeProfileId = typeof record.activeProfileId === 'string' && profiles.some((p) => p.id === record.activeProfileId)
     ? record.activeProfileId
     : profiles[0].id
-  const active = profiles.find((p) => p.id === activeProfileId) ?? profiles[0]
 
   return {
-    baseUrl: active.baseUrl,
-    apiKey: active.apiKey,
-    model: active.model,
-    timeout: active.timeout,
-    apiMode: active.apiMode,
-    codexCli: active.codexCli,
-    apiProxy: active.apiProxy,
-    streamImages: active.streamImages,
-    streamPartialImages: active.streamPartialImages,
-    customProviders,
-    providerOrder: normalizeProviderOrder(record.providerOrder, customProviders),
+    customConnections,
+    connectionOrder: normalizeConnectionOrder(record.connectionOrder, customConnections),
     clearInputAfterSubmit: typeof record.clearInputAfterSubmit === 'boolean' ? record.clearInputAfterSubmit : false,
     persistInputOnRestart: typeof record.persistInputOnRestart === 'boolean' ? record.persistInputOnRestart : true,
     reuseTaskApiProfileTemporarily: typeof record.reuseTaskApiProfileTemporarily === 'boolean' ? record.reuseTaskApiProfileTemporarily : false,
@@ -629,27 +537,28 @@ export function normalizeSettings(input: Partial<AppSettings> | unknown): AppSet
   }
 }
 
-export function getCustomProviderDefinition(settings: Partial<AppSettings> | unknown, provider: ApiProvider): CustomProviderDefinition | null {
+export function getCustomConnectionDefinition(settings: Partial<AppSettings> | unknown, connectionId: ApiConnectionId): CustomConnectionDefinition | null {
   const normalized = normalizeSettings(settings)
-  return normalized.customProviders.find((item) => item.id === provider) ?? null
+  return normalized.customConnections.find((item) => item.id === connectionId) ?? null
 }
 
-export function getApiProviderLabel(settings: Partial<AppSettings> | unknown, provider: ApiProvider): string {
-  if (provider === 'openai') return 'OpenAI'
-  return getCustomProviderDefinition(settings, provider)?.name ?? '接入已失效'
+export function getApiConnectionLabel(settings: Partial<AppSettings> | unknown, connectionId: ApiConnectionId): string {
+  if (connectionId === 'openai-images') return 'OpenAI Images API'
+  if (connectionId === 'openai-responses') return 'OpenAI Responses API'
+  return getCustomConnectionDefinition(settings, connectionId)?.name ?? '接入已失效'
 }
 
-export function isOpenAICompatibleProvider(settings: Partial<AppSettings> | unknown, provider: ApiProvider): boolean {
-  return provider === 'openai' || Boolean(getCustomProviderDefinition(settings, provider))
+export function isApiConnectionAvailable(settings: Partial<AppSettings> | unknown, connectionId: ApiConnectionId): boolean {
+  return BUILT_IN_CONNECTION_IDS.has(connectionId) || Boolean(getCustomConnectionDefinition(settings, connectionId))
 }
 
-export interface ImportedProviderSettings extends PresetConfig {
+export interface ImportedConnectionSettings extends PresetConfig {
   presetProfileFields?: Record<string, string[]>
 }
 
-function validateCustomProviderTaskMappings(providers: CustomProviderDefinition[]) {
-  const invalid = providers.find((provider) =>
-    (provider.submit.taskIdPath || provider.editSubmit?.taskIdPath) && !provider.poll,
+function validateCustomConnectionTaskMappings(connections: CustomConnectionDefinition[]) {
+  const invalid = connections.find((connection) =>
+    (connection.submit.taskIdPath || connection.editSubmit?.taskIdPath) && !connection.poll,
   )
   if (invalid) throw new Error(`自定义服务商「${invalid.name}」配置了 taskIdPath，但缺少 poll`)
 }
@@ -660,11 +569,11 @@ function stripMarkdownCodeFence(text: string): string {
   return match ? match[1].trim() : trimmed
 }
 
-export function importCustomProviderSettingsFromJson(
+export function importCustomConnectionSettingsFromJson(
   jsonText: string,
-  existingProviders: CustomProviderDefinition[] = [],
+  existingConnections: CustomConnectionDefinition[] = [],
   options: { deploymentConfig?: boolean } = {},
-): ImportedProviderSettings {
+): ImportedConnectionSettings {
   let parsed: unknown
   try {
     parsed = JSON.parse(stripMarkdownCodeFence(jsonText))
@@ -679,20 +588,20 @@ export function importCustomProviderSettingsFromJson(
   const record = parsed as Record<string, unknown>
 
   // 包裹结构：profiles 可独立于自定义服务商配置导入。
-  if (Array.isArray(record.profiles) || Array.isArray(record.customProviders)) {
-    if (options.deploymentConfig) validateDeploymentProviderIds(record.customProviders)
-    const customProviders = normalizeCustomProviderDefinitions(record.customProviders)
-    if (!options.deploymentConfig && Array.isArray(record.customProviders) && record.customProviders.length > 0 && !customProviders.length) {
-      throw new Error('customProviders 数组中没有有效的服务商配置')
+  if (Array.isArray(record.profiles) || Array.isArray(record.customConnections)) {
+    validateImportedConnectionIds(record.customConnections, options.deploymentConfig)
+    const customConnections = normalizeCustomConnectionDefinitions(record.customConnections)
+    if (!options.deploymentConfig && Array.isArray(record.customConnections) && record.customConnections.length > 0 && !customConnections.length) {
+      throw new Error('customConnections 数组中没有有效的服务商配置')
     }
-    validateCustomProviderTaskMappings(customProviders)
-    const customProviderIds = new Set(customProviders.map((provider) => provider.id))
-    const nativeTransparentProviderIds = new Set(customProviders.filter(customProviderSupportsNativeTransparentBackground).map((provider) => provider.id))
-    const profileEntries = normalizeDeploymentProfileEntries(record.profiles, customProviderIds, nativeTransparentProviderIds, options.deploymentConfig)
+    validateCustomConnectionTaskMappings(customConnections)
+    const customConnectionIds = new Set(customConnections.map((connection) => connection.id))
+    const nativeTransparentConnectionIds = new Set(customConnections.filter(customConnectionSupportsNativeTransparentBackground).map((connection) => connection.id))
+    const profileEntries = normalizeDeploymentProfileEntries(record.profiles, customConnectionIds, nativeTransparentConnectionIds, options.deploymentConfig)
     const profiles = profileEntries.map((entry) => entry.profile)
-    if (!options.deploymentConfig) return { customProviders, profiles }
+    if (!options.deploymentConfig) return { customConnections, profiles }
     return {
-      customProviders,
+      customConnections,
       profiles,
       ...(profileEntries.length
         ? { presetProfileFields: Object.fromEntries(profileEntries.map((entry) => [entry.profile.id, Object.keys(entry.source)])) }
@@ -701,20 +610,20 @@ export function importCustomProviderSettingsFromJson(
   }
 
   // 单个 Manifest 对象：{name, submit, ...}
-  if (options.deploymentConfig) validateDeploymentProviderIds([parsed])
-  const usedIds = new Set(existingProviders.map((provider) => provider.id))
-  const direct = normalizeCustomProviderDefinition(parsed, usedIds)
+  validateImportedConnectionIds([parsed], options.deploymentConfig)
+  const usedIds = new Set(existingConnections.map((connection) => connection.id))
+  const direct = normalizeCustomConnectionDefinition(parsed, usedIds)
   if (direct) {
-    validateCustomProviderTaskMappings([direct])
-    return { customProviders: [direct], profiles: [] }
+    validateCustomConnectionTaskMappings([direct])
+    return { customConnections: [direct], profiles: [] }
   }
 
   throw new Error('无法识别该 JSON。请粘贴自定义服务商配置。')
 }
 
-export function importCustomProviderDefinitionFromJson(jsonText: string, existingProviders: CustomProviderDefinition[] = []): CustomProviderDefinition {
-  const result = importCustomProviderSettingsFromJson(jsonText, existingProviders)
-  return result.customProviders[0]
+export function importCustomConnectionDefinitionFromJson(jsonText: string, existingConnections: CustomConnectionDefinition[] = []): CustomConnectionDefinition {
+  const result = importCustomConnectionSettingsFromJson(jsonText, existingConnections)
+  return result.customConnections[0]
 }
 
 /** 拆分模型列表，兼容中英文逗号并去重 */
@@ -734,29 +643,13 @@ export function resolveApiProfileModel(profile: ApiProfile, preferred?: string):
 }
 
 export function getActiveApiProfile(settings: Partial<AppSettings> | unknown): ApiProfile {
-  const record = settings && typeof settings === 'object' ? settings as Record<string, unknown> : {}
   const normalized = normalizeSettings(settings)
-  const profile = normalized.profiles.find((p) => p.id === normalized.activeProfileId) ?? normalized.profiles[0] ?? createDefaultOpenAIProfile()
-  const apiMode = profile.provider === 'openai' && (record.apiMode === 'images' || record.apiMode === 'responses')
-    ? record.apiMode
-    : profile.apiMode
-
-  return resolveApiProfileModel({
-    ...profile,
-    baseUrl: typeof record.baseUrl === 'string' ? record.baseUrl : profile.baseUrl,
-    apiKey: typeof record.apiKey === 'string' ? record.apiKey : profile.apiKey,
-    model: typeof record.model === 'string' && record.model.trim() ? record.model : profile.model,
-    timeout: typeof record.timeout === 'number' && Number.isFinite(record.timeout) ? record.timeout : profile.timeout,
-    apiMode,
-    codexCli: typeof record.codexCli === 'boolean' ? record.codexCli : profile.codexCli,
-    apiProxy: typeof record.apiProxy === 'boolean' ? record.apiProxy : profile.apiProxy,
-    streamImages: profile.provider === 'openai' && typeof record.streamImages === 'boolean' ? record.streamImages : profile.streamImages,
-    streamPartialImages: normalizeStreamPartialImages(record.streamPartialImages, profile.streamPartialImages),
-  })
+  const profile = normalized.profiles.find((p) => p.id === normalized.activeProfileId) ?? normalized.profiles[0]
+  return resolveApiProfileModel(profile)
 }
 
 export function validateApiProfile(profile: ApiProfile, settings?: Partial<AppSettings> | unknown): string | null {
-  if (!isOpenAICompatibleProvider(settings, profile.provider)) return '接入方式已不可用，请重新选择'
+  if (!isApiConnectionAvailable(settings, profile.connectionId)) return '接入方式已不可用，请重新选择'
   if (!profile.name.trim()) return '缺少名称'
   if (!profile.baseUrl.trim() && !shouldUseApiProxy(profile.apiProxy)) return '缺少 API URL'
   if (!profile.apiKey.trim()) return '缺少 API Key'
@@ -767,13 +660,12 @@ export function validateApiProfile(profile: ApiProfile, settings?: Partial<AppSe
 function isDefaultOpenAIProfile(profile: ApiProfile): boolean {
   return profile.id === DEFAULT_OPENAI_PROFILE_ID &&
     profile.name === '默认' &&
-    profile.provider === 'openai' &&
-    profile.baseUrl === DEFAULT_BASE_URL &&
+    profile.baseUrl === DEFAULT_API_BASE_URL &&
     profile.apiKey === '' &&
     profile.model === DEFAULT_IMAGES_MODEL &&
     profile.imageGenerationModel === DEFAULT_IMAGES_MODEL &&
     profile.timeout === DEFAULT_API_TIMEOUT &&
-    profile.apiMode === 'images' &&
+    profile.connectionId === 'openai-images' &&
     profile.reasoningEffort === undefined &&
     profile.codexCli === false &&
     profile.apiProxy === DEFAULT_OPENAI_API_PROXY &&
@@ -783,22 +675,22 @@ function isDefaultOpenAIProfile(profile: ApiProfile): boolean {
 }
 
 function hasOnlyDefaultProfiles(settings: AppSettings): boolean {
-  return settings.customProviders.length === 0 &&
+  return settings.customConnections.length === 0 &&
     settings.profiles.length === 1 &&
     settings.activeProfileId === DEFAULT_OPENAI_PROFILE_ID &&
     isDefaultOpenAIProfile(settings.profiles[0])
 }
 
-function createImportedProfileId(provider: ApiProvider, usedIds: Set<string>): string {
-  let id = `${provider}-imported-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`
+function createImportedProfileId(connection: ApiConnectionId, usedIds: Set<string>): string {
+  let id = `${connection}-imported-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`
   while (usedIds.has(id)) {
-    id = `${provider}-imported-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`
+    id = `${connection}-imported-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`
   }
   usedIds.add(id)
   return id
 }
 
-function createPresetProfileId(provider: ApiProvider, record: Record<string, unknown>, usedIds: Set<string>): string {
+function createPresetProfileId(connection: ApiConnectionId, record: Record<string, unknown>, usedIds: Set<string>): string {
   const text = JSON.stringify(record)
   let hash = 2166136261
   for (let idx = 0; idx < text.length; idx += 1) {
@@ -806,7 +698,7 @@ function createPresetProfileId(provider: ApiProvider, record: Record<string, unk
     hash = Math.imul(hash, 16777619)
   }
 
-  const base = `${provider}-preset-${(hash >>> 0).toString(36)}`
+  const base = `${connection}-preset-${(hash >>> 0).toString(36)}`
   let id = base
   let suffix = 2
   while (usedIds.has(id)) {
@@ -819,70 +711,68 @@ function createPresetProfileId(provider: ApiProvider, record: Record<string, unk
 
 function getApiProfileDedupKey(profile: ApiProfile): string {
   return JSON.stringify([
-    profile.provider,
+    profile.connectionId,
     profile.baseUrl.trim().toLowerCase(),
     profile.apiKey.trim(),
     profile.model.trim(),
     profile.imageGenerationModel?.trim(),
-    profile.apiMode,
     profile.reasoningEffort,
   ])
 }
 
 function getApiProfileConnectionKey(profile: ApiProfile): string {
   return JSON.stringify([
-    profile.provider,
+    profile.connectionId,
     profile.baseUrl.trim().toLowerCase(),
     profile.model.trim(),
     profile.imageGenerationModel?.trim(),
-    profile.apiMode,
     profile.reasoningEffort,
   ])
 }
 
-function getCustomProviderDedupKey(provider: CustomProviderDefinition): string {
+function getCustomConnectionDedupKey(connection: CustomConnectionDefinition): string {
   return JSON.stringify([
-    provider.name,
-    provider.template ?? 'http-image',
-    provider.submit,
-    provider.editSubmit ?? null,
-    provider.poll ?? null,
+    connection.name,
+    connection.template ?? 'http-image',
+    connection.submit,
+    connection.editSubmit ?? null,
+    connection.poll ?? null,
   ])
 }
 
-function mergeImportedCustomProviders(currentProviders: CustomProviderDefinition[], importedProviders: CustomProviderDefinition[]) {
-  const providers = [...currentProviders]
-  const providerIdMap = new Map<string, string>()
-  const usedIds = new Set(providers.map((provider) => provider.id))
+function mergeImportedCustomConnections(currentConnections: CustomConnectionDefinition[], importedConnections: CustomConnectionDefinition[]) {
+  const connections = [...currentConnections]
+  const connectionIdMap = new Map<string, string>()
+  const usedIds = new Set(connections.map((connection) => connection.id))
 
-  for (const provider of importedProviders) {
-    const sameIdIdx = providers.findIndex((item) => item.id === provider.id)
+  for (const connection of importedConnections) {
+    const sameIdIdx = connections.findIndex((item) => item.id === connection.id)
     if (sameIdIdx >= 0) {
-      providers[sameIdIdx] = provider
-      providerIdMap.set(provider.id, provider.id)
+      connections[sameIdIdx] = connection
+      connectionIdMap.set(connection.id, connection.id)
       continue
     }
 
-    const normalized = normalizeCustomProviderDefinition(provider, usedIds)
+    const normalized = normalizeCustomConnectionDefinition(connection, usedIds)
     if (!normalized) continue
-    providerIdMap.set(provider.id, normalized.id)
-    providers.push(normalized)
+    connectionIdMap.set(connection.id, normalized.id)
+    connections.push(normalized)
   }
 
-  return { providers, providerIdMap }
+  return { connections, connectionIdMap }
 }
 
 export function findEquivalentApiProfile(
   settings: Partial<AppSettings> | unknown,
   importedProfile: ApiProfile,
-  importedProviders: CustomProviderDefinition[] = [],
+  importedConnections: CustomConnectionDefinition[] = [],
 ): ApiProfile | null {
   const normalized = normalizeSettings(settings)
-  const importedProvider = importedProviders.find((provider) => provider.id === importedProfile.provider)
-  const provider = importedProvider
-    ? normalized.customProviders.find((provider) => getCustomProviderDedupKey(provider) === getCustomProviderDedupKey(importedProvider))?.id ?? importedProfile.provider
-    : importedProfile.provider
-  const profile = { ...importedProfile, provider }
+  const importedConnection = importedConnections.find((connection) => connection.id === importedProfile.connectionId)
+  const connection = importedConnection
+    ? normalized.customConnections.find((connection) => getCustomConnectionDedupKey(connection) === getCustomConnectionDedupKey(importedConnection))?.id ?? importedProfile.connectionId
+    : importedProfile.connectionId
+  const profile = { ...importedProfile, connection }
   const byId = normalized.profiles.find((item) => item.id === profile.id)
   if (byId) return byId
   const dedupKey = getApiProfileDedupKey(profile)
@@ -903,7 +793,7 @@ export function mergeImportedSettings(
   const normalizedImported = normalizeSettings(importedSettings)
   const imported = normalizeSettings({
     ...normalizedImported,
-    customProviders: normalizedImported.customProviders,
+    customConnections: normalizedImported.customConnections,
     profiles: normalizedImported.profiles.map((profile) => ({
       ...profile,
       isDefault: undefined,
@@ -913,11 +803,11 @@ export function mergeImportedSettings(
   if (options.preserveInternalIds) {
     if (hasOnlyDefaultProfiles(current)) return imported
 
-    const customProviders = [...current.customProviders]
-    for (const provider of imported.customProviders) {
-      const idx = customProviders.findIndex((item) => item.id === provider.id)
-      if (idx >= 0) customProviders[idx] = provider
-      else customProviders.push(provider)
+    const customConnections = [...current.customConnections]
+    for (const connection of imported.customConnections) {
+      const idx = customConnections.findIndex((item) => item.id === connection.id)
+      if (idx >= 0) customConnections[idx] = connection
+      else customConnections.push(connection)
     }
     const profiles = [...current.profiles]
     for (const profile of imported.profiles) {
@@ -925,23 +815,19 @@ export function mergeImportedSettings(
       if (idx >= 0) profiles[idx] = profile
       else profiles.push(profile)
     }
-    return normalizeSettings({ ...current, customProviders, profiles, activeProfileId: current.activeProfileId })
+    return normalizeSettings({ ...current, customConnections, profiles, activeProfileId: current.activeProfileId })
   }
 
   if (hasOnlyDefaultProfiles(current)) {
     return imported
   }
 
-  const { providers: customProviders, providerIdMap } = mergeImportedCustomProviders(current.customProviders, imported.customProviders)
+  const { connections: customConnections, connectionIdMap } = mergeImportedCustomConnections(current.customConnections, imported.customConnections)
   const profiles = [...current.profiles]
-  const hasProfileArray = isRecord(importedSettings) && Array.isArray(importedSettings.profiles)
   for (const importedProfile of imported.profiles) {
-    const mappedProfile = providerIdMap.has(importedProfile.provider)
-      ? { ...importedProfile, provider: providerIdMap.get(importedProfile.provider) ?? importedProfile.provider }
+    const profile = connectionIdMap.has(importedProfile.connectionId)
+      ? { ...importedProfile, connectionId: connectionIdMap.get(importedProfile.connectionId) ?? importedProfile.connectionId }
       : importedProfile
-    const profile = hasProfileArray
-      ? mappedProfile
-      : { ...mappedProfile, id: createImportedProfileId(mappedProfile.provider, new Set(profiles.map((item) => item.id))) }
     const sameIdIdx = profiles.findIndex((item) => item.id === profile.id)
     if (sameIdIdx >= 0) {
       profiles[sameIdIdx] = profile
@@ -952,7 +838,7 @@ export function mergeImportedSettings(
 
   return normalizeSettings({
     ...current,
-    customProviders,
+    customConnections,
     profiles,
     activeProfileId: current.activeProfileId,
   })
@@ -961,12 +847,11 @@ export function mergeImportedSettings(
 const PRESET_PROFILE_DEPLOYMENT_KEYS = [
   'name',
   'description',
-  'provider',
+  'connectionId',
   'baseUrl',
   'model',
   'imageGenerationModel',
   'timeout',
-  'apiMode',
   'reasoningEffort',
   'codexCli',
   'apiProxy',
@@ -974,7 +859,7 @@ const PRESET_PROFILE_DEPLOYMENT_KEYS = [
   'streamImages',
   'streamPartialImages',
   'transparentBackgroundMethod',
-  'providerDrafts',
+  'connectionDrafts',
 ] as const
 
 function getPresetDeploymentFields(input: unknown, id: string, source: object) {
@@ -983,7 +868,7 @@ function getPresetDeploymentFields(input: unknown, id: string, source: object) {
 }
 
 function mergePresetProfileSnapshot(previous: ApiProfile, imported: ApiProfile, fields: Set<string>) {
-  if (previous.provider !== imported.provider) return imported
+  if (previous.connectionId !== imported.connectionId) return imported
 
   const patch: Partial<ApiProfile> = {}
   for (const key of PRESET_PROFILE_DEPLOYMENT_KEYS) {
@@ -998,24 +883,24 @@ export function mergePresetImportedSettings(
   options: {
     lockPresetParams?: boolean
     dismissedPresetProfileIds?: string[]
-    dismissedPresetProviderIds?: string[]
+    dismissedPresetConnectionIds?: string[]
     previousPresetConfig?: PresetConfig | null
     usedPresetProfileIds?: string[]
   } = {},
 ): { settings: AppSettings; presetConfig: PresetConfig } {
   const importedRecord = isRecord(importedSettings) ? importedSettings : {}
-  validateDeploymentProviderIds(importedRecord.customProviders)
+  validateImportedConnectionIds(importedRecord.customConnections, true)
   const normalizedImported = normalizeSettings(importedSettings)
   const current = normalizeSettings(currentSettings)
-  const customProviderIds = new Set(normalizedImported.customProviders.map((provider) => provider.id))
-  const nativeTransparentProviderIds = new Set(normalizedImported.customProviders.filter(customProviderSupportsNativeTransparentBackground).map((provider) => provider.id))
-  const allSourceProfileEntries = normalizeDeploymentProfileEntries(importedRecord.profiles, customProviderIds, nativeTransparentProviderIds, true).map((entry) => ({
+  const customConnectionIds = new Set(normalizedImported.customConnections.map((connection) => connection.id))
+  const nativeTransparentConnectionIds = new Set(normalizedImported.customConnections.filter(customConnectionSupportsNativeTransparentBackground).map((connection) => connection.id))
+  const allSourceProfileEntries = normalizeDeploymentProfileEntries(importedRecord.profiles, customConnectionIds, nativeTransparentConnectionIds, true).map((entry) => ({
     profile: entry.profile,
     source: entry.source,
     isDefault: entry.source.isDefault === true,
   }))
   const dismissedIds = new Set(options.dismissedPresetProfileIds ?? [])
-  const dismissedProviderIds = new Set(options.dismissedPresetProviderIds ?? [])
+  const dismissedConnectionIds = new Set(options.dismissedPresetConnectionIds ?? [])
   const sourceProfileEntries = allSourceProfileEntries.filter((entry) => !dismissedIds.has(entry.profile.id))
   const sourceProfiles = sourceProfileEntries.map((entry) => entry.profile)
   const sourceProfileIds = new Set(allSourceProfileEntries.map((entry) => entry.profile.id))
@@ -1023,28 +908,28 @@ export function mergePresetImportedSettings(
     ? allSourceProfileEntries[0].profile.id
     : allSourceProfileEntries.find((entry) => entry.isDefault)?.profile.id ?? null
   const replacingPristineDefault = sourceProfiles.length > 0 && hasOnlyDefaultProfiles(current)
-  const currentProvidersById = new Map(current.customProviders.map((provider) => [provider.id, provider]))
+  const currentConnectionsById = new Map(current.customConnections.map((connection) => [connection.id, connection]))
   const previousProfilesById = new Map(options.previousPresetConfig?.profiles.map((profile) => [profile.id, profile]) ?? [])
-  const previousProvidersById = new Map(options.previousPresetConfig?.customProviders.map((provider) => [provider.id, provider]) ?? [])
-  const nextProviders = normalizedImported.customProviders.filter((provider) => !dismissedProviderIds.has(provider.id)).map((provider) => {
-    const matched = currentProvidersById.get(provider.id)
-    const previous = previousProvidersById.get(provider.id)
-    if (!matched || options.lockPresetParams) return provider
-    if (!previous || JSON.stringify(provider) === JSON.stringify(previous)) return matched
-    return provider
+  const previousConnectionsById = new Map(options.previousPresetConfig?.customConnections.map((connection) => [connection.id, connection]) ?? [])
+  const nextConnections = normalizedImported.customConnections.filter((connection) => !dismissedConnectionIds.has(connection.id)).map((connection) => {
+    const matched = currentConnectionsById.get(connection.id)
+    const previous = previousConnectionsById.get(connection.id)
+    if (!matched || options.lockPresetParams) return connection
+    if (!previous || JSON.stringify(connection) === JSON.stringify(previous)) return matched
+    return connection
   })
-  const sourceProviderIds = new Set(normalizedImported.customProviders.map((provider) => provider.id))
+  const sourceConnectionIds = new Set(normalizedImported.customConnections.map((connection) => connection.id))
   const usedPresetProfileIds = new Set(options.usedPresetProfileIds ?? [])
-  const modifiedProviderIds = new Set(current.customProviders
-    .filter((provider) => {
-      const previous = previousProvidersById.get(provider.id)
-      return previous && JSON.stringify(provider) !== JSON.stringify(previous)
+  const modifiedConnectionIds = new Set(current.customConnections
+    .filter((connection) => {
+      const previous = previousConnectionsById.get(connection.id)
+      return previous && JSON.stringify(connection) !== JSON.stringify(previous)
     })
-    .map((provider) => provider.id))
+    .map((connection) => connection.id))
   const removableProfileIds = new Set(current.profiles
     .filter((profile) => {
       const previous = previousProfilesById.get(profile.id)
-      if (!previous || sourceProfileIds.has(profile.id) || usedPresetProfileIds.has(profile.id) || modifiedProviderIds.has(profile.provider)) return false
+      if (!previous || sourceProfileIds.has(profile.id) || usedPresetProfileIds.has(profile.id) || modifiedConnectionIds.has(profile.connectionId)) return false
       return JSON.stringify({ ...profile, isDefault: undefined }) === JSON.stringify({ ...previous, isDefault: undefined })
     })
     .map((profile) => profile.id))
@@ -1082,17 +967,17 @@ export function mergePresetImportedSettings(
           .map((profile) => nextProfilesById.get(profile.id) ?? (profile.isDefault ? { ...profile, isDefault: undefined } : profile)),
         ...nextProfiles.filter((profile) => !currentProfilesById.has(profile.id)),
       ]
-  const retainedProviders = current.customProviders
-    .filter((provider) => !sourceProviderIds.has(provider.id))
-    .filter((provider) => {
-      const previous = previousProvidersById.get(provider.id)
-      const unchangedRemovedPreset = previous && JSON.stringify(provider) === JSON.stringify(previous)
-      return !unchangedRemovedPreset || profiles.some((profile) => profile.provider === provider.id)
+  const retainedConnections = current.customConnections
+    .filter((connection) => !sourceConnectionIds.has(connection.id))
+    .filter((connection) => {
+      const previous = previousConnectionsById.get(connection.id)
+      const unchangedRemovedPreset = previous && JSON.stringify(connection) === JSON.stringify(previous)
+      return !unchangedRemovedPreset || profiles.some((profile) => profile.connectionId === connection.id)
     })
-  const customProviders = [...nextProviders, ...retainedProviders]
-  const presetProviders = [...normalizedImported.customProviders]
-  for (const provider of options.previousPresetConfig?.customProviders ?? []) {
-    if (!sourceProviderIds.has(provider.id) && customProviders.some((item) => item.id === provider.id)) presetProviders.push(provider)
+  const customConnections = [...nextConnections, ...retainedConnections]
+  const presetConnections = [...normalizedImported.customConnections]
+  for (const connection of options.previousPresetConfig?.customConnections ?? []) {
+    if (!sourceConnectionIds.has(connection.id) && customConnections.some((item) => item.id === connection.id)) presetConnections.push(connection)
   }
   const presetProfiles: ApiProfile[] = allSourceProfileEntries.map((entry) => {
     const normalizedProfile = {
@@ -1111,12 +996,12 @@ export function mergePresetImportedSettings(
   return {
     settings: normalizeSettings({
       ...current,
-      customProviders,
+      customConnections,
       profiles,
       activeProfileId: replacingPristineDefault ? sourceDefaultProfileId ?? nextProfiles[0].id : current.activeProfileId,
     }),
     presetConfig: {
-      customProviders: presetProviders,
+      customConnections: presetConnections,
       profiles: presetProfiles,
     },
   }
@@ -1124,29 +1009,4 @@ export function mergePresetImportedSettings(
 
 export const DEFAULT_SETTINGS: AppSettings = normalizeSettings({
   profiles: [createDefaultOpenAIProfile()],
-  baseUrl: DEFAULT_BASE_URL,
-  apiKey: DEFAULT_API_URL_PATCH?.apiKey ?? '',
-  model: DEFAULT_API_URL_PATCH?.model ?? (DEFAULT_API_URL_PATCH?.apiMode === 'responses' ? DEFAULT_RESPONSES_MODEL : DEFAULT_IMAGES_MODEL),
-  timeout: DEFAULT_API_TIMEOUT,
-  apiMode: DEFAULT_API_URL_PATCH?.apiMode ?? 'images',
-  codexCli: DEFAULT_API_URL_PATCH?.codexCli ?? false,
-  apiProxy: DEFAULT_OPENAI_API_PROXY,
-  streamImages: DEFAULT_API_URL_PATCH?.streamImages ?? getDefaultStreamImages('openai', DEFAULT_API_URL_PATCH?.apiMode ?? 'images'),
-  streamPartialImages: DEFAULT_API_URL_PATCH?.streamPartialImages ?? DEFAULT_STREAM_PARTIAL_IMAGES,
-  customProviders: [],
-  clearInputAfterSubmit: false,
-  persistInputOnRestart: true,
-  reuseTaskApiProfileTemporarily: false,
-  alwaysShowRetryButton: false,
-  retryMode: 'new',
-  allowPromptRewrite: false,
-  taskCompletionNotification: false,
-  enterSubmit: false,
-  showBatchPrompt: false,
-  batchPromptEnabled: false,
-  batchPromptMode: 'queue',
-  batchPromptConcurrencyLimited: true,
-  batchPromptConcurrency: DEFAULT_BATCH_PROMPT_CONCURRENCY,
-  referenceImageEditAction: 'ask',
-  zipDownloadRoutes: DEFAULT_ZIP_DOWNLOAD_ROUTES,
 })

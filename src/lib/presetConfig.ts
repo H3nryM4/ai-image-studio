@@ -1,4 +1,4 @@
-import type { ApiProfile, AppSettings, CustomProviderDefinition, PresetConfig } from '../types'
+import type { ApiProfile, AppSettings, CustomConnectionDefinition, PresetConfig } from '../types'
 import { readRuntimeEnv } from './runtimeEnv'
 
 const RAW_SHOW_PRESET_CONFIG_ONLY = readRuntimeEnv(import.meta.env.VITE_SHOW_PRESET_CONFIG_ONLY)
@@ -7,7 +7,7 @@ const LOCK_PRESET_CONFIG_PARAMS = readRuntimeEnv(import.meta.env.VITE_LOCK_PRESE
 const PREVENT_PRESET_CONFIG_DELETION = readRuntimeEnv(import.meta.env.VITE_PREVENT_PRESET_CONFIG_DELETION) === 'true'
 
 let presetProfiles: ApiProfile[] = []
-let presetProviders: CustomProviderDefinition[] = []
+let presetConnections: CustomConnectionDefinition[] = []
 let presetProfileFields: Record<string, string[]> | undefined
 let defaultPresetProfileId: string | null = null
 
@@ -15,7 +15,7 @@ export function setPresetConfig(settings: PresetConfig & {
   presetProfileFields?: Record<string, string[]>
 } | null) {
   presetProfiles = settings?.profiles.map((profile) => ({ ...profile })) ?? []
-  presetProviders = settings?.customProviders.map((provider) => ({ ...provider })) ?? []
+  presetConnections = settings?.customConnections.map((connection) => ({ ...connection })) ?? []
   presetProfileFields = settings?.presetProfileFields
   defaultPresetProfileId = presetProfiles.length === 1
     ? presetProfiles[0].id
@@ -30,14 +30,14 @@ export function getPresetProfileDescription(id: string) {
   return presetProfiles.find((profile) => profile.id === id)?.description
 }
 
-export function getPresetProviderIds() {
-  return new Set(presetProviders.map((provider) => provider.id))
+export function getPresetConnectionIds() {
+  return new Set(presetConnections.map((connection) => connection.id))
 }
 
 export function getPresetConfig() {
-  if (presetProfiles.length === 0 && presetProviders.length === 0) return null
+  if (presetProfiles.length === 0 && presetConnections.length === 0) return null
   return {
-    customProviders: presetProviders.map((provider) => ({ ...provider })),
+    customConnections: presetConnections.map((connection) => ({ ...connection })),
     profiles: presetProfiles.map((profile) => ({ ...profile })),
     presetProfileFields,
   }
@@ -57,8 +57,8 @@ export function isPresetProfile(id: string) {
   return presetProfiles.some((profile) => profile.id === id)
 }
 
-export function isPresetProvider(id: string) {
-  return presetProviders.some((provider) => provider.id === id)
+export function isPresetConnection(id: string) {
+  return presetConnections.some((connection) => connection.id === id)
 }
 
 export function isPresetConfigOnlyEnabled() {
@@ -77,28 +77,28 @@ export function isPresetProfileLocked(id: string) {
   return isPresetConfigParamsLocked() && isPresetProfile(id)
 }
 
-export function isPresetProviderLocked(id: string) {
-  return isPresetConfigParamsLocked() && isPresetProvider(id)
+export function isPresetConnectionLocked(id: string) {
+  return isPresetConfigParamsLocked() && isPresetConnection(id)
 }
 
-export function isPresetProviderDeletionPrevented(id: string, profiles: ApiProfile[]) {
-  if (!isPresetProvider(id)) return false
+export function isPresetConnectionDeletionPrevented(id: string, profiles: ApiProfile[]) {
+  if (!isPresetConnection(id)) return false
   if (isPresetConfigDeletionPrevented()) return true
-  return profiles.some((profile) => profile.provider === id && isPresetProfileLocked(profile.id))
+  return profiles.some((profile) => profile.connectionId === id && isPresetProfileLocked(profile.id))
 }
 
 export function enforcePresetConfigPolicy(
   settings: AppSettings,
-  options: { dismissedPresetProviderIds?: string[] } = {},
+  options: { dismissedPresetConnectionIds?: string[] } = {},
 ): AppSettings {
   const presetConfigOnly = isPresetConfigOnlyEnabled()
   const paramsLocked = isPresetConfigParamsLocked()
   if (presetProfiles.length === 0) return settings
 
-  const dismissedProviderIds = new Set(options.dismissedPresetProviderIds ?? [])
+  const dismissedConnectionIds = new Set(options.dismissedPresetConnectionIds ?? [])
   const profileIds = getPresetProfileIds()
   const presetProfilesById = new Map(presetProfiles.map((profile) => [profile.id, profile]))
-  const presetProvidersById = new Map(presetProviders.map((provider) => [provider.id, provider]))
+  const presetConnectionsById = new Map(presetConnections.map((connection) => [connection.id, connection]))
   const profiles = settings.profiles.map((profile) => {
     const preset = presetProfilesById.get(profile.id)
     if (!preset) return profile.isDefault ? { ...profile, isDefault: undefined } : profile
@@ -106,7 +106,7 @@ export function enforcePresetConfigPolicy(
       ...(paramsLocked ? preset : profile),
       apiKey: profile.apiKey,
       selectedModel: profile.selectedModel,
-      provider: paramsLocked || presetConfigOnly ? preset.provider : profile.provider,
+      connectionId: paramsLocked || presetConfigOnly ? preset.connectionId : profile.connectionId,
       isDefault: profile.id === defaultPresetProfileId ? true : undefined,
     }
   })
@@ -115,13 +115,13 @@ export function enforcePresetConfigPolicy(
       if (!profiles.some((item) => item.id === profile.id)) profiles.push({ ...profile, isDefault: profile.id === defaultPresetProfileId ? true : undefined })
     }
   }
-  const customProviders = settings.customProviders.filter((provider) => !dismissedProviderIds.has(provider.id)).map((provider) => {
-    const preset = presetProvidersById.get(provider.id)
-    return preset && paramsLocked ? preset : provider
+  const customConnections = settings.customConnections.filter((connection) => !dismissedConnectionIds.has(connection.id)).map((connection) => {
+    const preset = presetConnectionsById.get(connection.id)
+    return preset && paramsLocked ? preset : connection
   })
-  for (const provider of presetProviders) {
-    if (dismissedProviderIds.has(provider.id)) continue
-    if (!customProviders.some((item) => item.id === provider.id)) customProviders.push(provider)
+  for (const connection of presetConnections) {
+    if (dismissedConnectionIds.has(connection.id)) continue
+    if (!customConnections.some((item) => item.id === connection.id)) customConnections.push(connection)
   }
   const activeProfileId = presetConfigOnly && !profileIds.has(settings.activeProfileId)
     ? defaultPresetProfileId ?? presetProfiles[0]?.id ?? settings.activeProfileId
@@ -129,7 +129,7 @@ export function enforcePresetConfigPolicy(
 
   return {
     ...settings,
-    customProviders,
+    customConnections,
     profiles,
     activeProfileId,
   }

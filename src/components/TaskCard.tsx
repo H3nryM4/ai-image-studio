@@ -521,7 +521,7 @@ export default function TaskCard({
           </div>
           <div className="mt-auto flex flex-col gap-1.5">
             {/* 参数与信息：横向滚动 */}
-            <div 
+            <div
               data-tag-scroll-area
               className="flex overflow-x-auto hide-scrollbar pt-0.5 gap-1.5 whitespace-nowrap mask-edge-r min-w-0 pr-2"
               onTouchStart={(e) => e.stopPropagation()}
@@ -530,20 +530,20 @@ export default function TaskCard({
               onTouchCancel={(e) => e.stopPropagation()}
             >
               {/* API Name */}
-              {(task.apiProfileName || task.apiProvider) && (
-                <span 
+              {(task.apiProfileName || task.apiConnectionId) && (
+                <span
                   className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-gray-100 dark:bg-white/[0.04] text-gray-600 dark:text-gray-300 text-xs flex-shrink-0"
-                  title={task.apiProfileName || task.apiProvider}
+                  title={task.apiProfileName || task.apiConnectionId}
                 >
                   <CodeIcon className="w-3 h-3 flex-shrink-0 text-gray-400" />
                   <span className="truncate max-w-[8rem]">
-                    {task.apiProfileName || task.apiProvider}
+                    {task.apiProfileName || task.apiConnectionId}
                   </span>
                 </span>
               )}
               {/* Model */}
               {showModel && (
-                <span 
+                <span
                   className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-gray-100 dark:bg-white/[0.04] text-gray-600 dark:text-gray-300 text-xs flex-shrink-0"
                   title={task.apiModel}
                 >

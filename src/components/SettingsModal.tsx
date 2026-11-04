@@ -4,7 +4,7 @@ import { normalizeBaseUrl } from '../lib/api'
 import { hasActiveDataOperations } from '../lib/dataOperations'
 import { isApiProxyAvailable, isApiProxyLocked, readClientDevProxyConfig } from '../lib/devProxy'
 import { useStore, exportData, importData, clearData, type SettingsTab } from '../store'
-import { createDefaultOpenAIProfile, DEFAULT_IMAGES_MODEL, DEFAULT_RESPONSES_MODEL, DEFAULT_SETTINGS, getApiProviderLabel, getActiveApiProfile, getCustomProviderDefinition, importCustomProviderSettingsFromJson, getDefaultApiProfileId, isOpenAICompatibleProvider, normalizeCustomProviderDefinition, normalizeSettings, normalizeStreamPartialImages, switchApiProfileProvider } from '../lib/apiProfiles'
+import { createDefaultOpenAIProfile, DEFAULT_IMAGES_MODEL, DEFAULT_RESPONSES_MODEL, DEFAULT_SETTINGS, getApiConnectionLabel, getActiveApiProfile, isOpenAIConnection, DEFAULT_API_BASE_URL, DEFAULT_API_TIMEOUT, getCustomConnectionDefinition, importCustomConnectionSettingsFromJson, getDefaultApiProfileId, isApiConnectionAvailable, normalizeCustomConnectionDefinition, normalizeSettings, normalizeStreamPartialImages, switchApiProfileConnection } from '../lib/apiProfiles'
 import {
   getDefaultPresetBaseUrl,
   getDefaultPresetProfileId,
@@ -12,20 +12,20 @@ import {
   getPresetProfileIds,
   isPresetConfigDeletionPrevented,
   isPresetConfigOnlyEnabled,
-  isPresetProvider,
-  isPresetProviderDeletionPrevented,
+  isPresetConnection,
+  isPresetConnectionDeletionPrevented,
   isPresetProfileLocked,
-  isPresetProviderLocked,
+  isPresetConnectionLocked,
 } from '../lib/presetConfig'
 import { copyTextToClipboard, getClipboardFailureMessage } from '../lib/clipboard'
 import { createCustomProfileImportUrl } from '../lib/profileImportUrl'
 import { createProfileShareJson, createProfileShareUrl } from '../lib/profileSharing'
 import { requestBrowserNotificationPermission, type BrowserNotificationPermissionResult } from '../lib/browserNotification'
-import { DEFAULT_STREAM_PARTIAL_IMAGES, type ApiProfile, type AppSettings, type CustomProviderDefinition, type ZipDownloadRoute } from '../types'
+import { DEFAULT_STREAM_PARTIAL_IMAGES, type ApiProfile, type AppSettings, type CustomConnectionDefinition, type ZipDownloadRoute } from '../types'
 import {
-  CUSTOM_PROVIDER_LLM_PROMPT,
-  DEFAULT_CUSTOM_PROVIDER_JSON,
-} from '../lib/settingsCustomProvider'
+  CUSTOM_CONNECTION_LLM_PROMPT,
+  DEFAULT_CUSTOM_CONNECTION_JSON,
+} from '../lib/settingsCustomConnection'
 import { useCloseOnEscape } from '../hooks/useCloseOnEscape'
 import { usePreventBackgroundScroll } from '../hooks/usePreventBackgroundScroll'
 import { DEFAULT_DROPDOWN_MAX_HEIGHT, getDropdownMaxHeight } from '../lib/dropdown'
@@ -33,7 +33,7 @@ import { Checkbox } from './Checkbox'
 import { ChevronDownIcon, CloseIcon, CopyIcon, PlusIcon, TrashIcon, GithubIcon, ExportIcon, ImportIcon, DragHandleIcon, LinkIcon } from './icons'
 import GeneralSettingsTab from './settings/GeneralSettingsTab'
 import ApiProfileEditor from './settings/ApiProfileEditor'
-import CustomProviderModal from './settings/CustomProviderModal'
+import CustomConnectionModal from './settings/CustomConnectionModal'
 import ProfileImportUrlModal, { type CopyImportUrlOptions } from './settings/ProfileImportUrlModal'
 import ZipDownloadRouteModal, { ZIP_DOWNLOAD_ROUTE_OPTIONS } from './settings/ZipDownloadRouteModal'
 import MarkdownRenderer from './MarkdownRenderer'
@@ -43,7 +43,7 @@ function newId(prefix: string) {
 }
 
 const PROFILE_MENU_ITEM_CLASS_NAME = 'flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs transition-colors'
-const ADD_CUSTOM_PROVIDER_VALUE = '__add_custom_provider__'
+const ADD_CUSTOM_CONNECTION_VALUE = '__add_custom_connection__'
 const COPY_IMPORT_URL_OPTIONS_STORAGE_KEY = 'ai-image-studio.copy-import-url-options'
 
 const DEFAULT_COPY_IMPORT_URL_OPTIONS = {
@@ -88,14 +88,14 @@ function saveCopyImportUrlOptions(options: CopyImportUrlOptions) {
   }
 }
 
-function isAsyncCustomProvider(provider: CustomProviderDefinition | null | undefined) {
-  return Boolean(provider?.poll || provider?.submit.taskIdPath || provider?.editSubmit?.taskIdPath)
+function isAsyncCustomConnection(connection: CustomConnectionDefinition | null | undefined) {
+  return Boolean(connection?.poll || connection?.submit.taskIdPath || connection?.editSubmit?.taskIdPath)
 }
 
 function isProfileApiProxyEligible(settings: AppSettings, profile: ApiProfile) {
-  if (!isOpenAICompatibleProvider(settings, profile.provider)) return false
-  const customProvider = getCustomProviderDefinition(settings, profile.provider)
-  return !isAsyncCustomProvider(customProvider)
+  if (!isApiConnectionAvailable(settings, profile.connectionId)) return false
+  const customConnection = getCustomConnectionDefinition(settings, profile.connectionId)
+  return !isAsyncCustomConnection(customConnection)
 }
 
 export default function SettingsModal({ onImportProfile }: { onImportProfile: (source?: string) => void }) {
@@ -105,8 +105,8 @@ export default function SettingsModal({ onImportProfile }: { onImportProfile: (s
   const settings = useStore((s) => s.settings)
   const setSettings = useStore((s) => s.setSettings)
   const dismissPresetProfile = useStore((s) => s.dismissPresetProfile)
-  const dismissPresetProvider = useStore((s) => s.dismissPresetProvider)
-  const restorePresetProvider = useStore((s) => s.restorePresetProvider)
+  const dismissPresetConnection = useStore((s) => s.dismissPresetConnection)
+  const restorePresetConnection = useStore((s) => s.restorePresetConnection)
   const reusedTaskApiProfileId = useStore((s) => s.reusedTaskApiProfileId)
   const setReusedTaskApiProfile = useStore((s) => s.setReusedTaskApiProfile)
   const setConfirmDialog = useStore((s) => s.setConfirmDialog)
@@ -123,7 +123,7 @@ export default function SettingsModal({ onImportProfile }: { onImportProfile: (s
   const profileShareScrollBoundaryRef = useRef<HTMLDivElement>(null)
   const settingsScrollBoundaryRef = useRef<HTMLDivElement>(null)
   const settingsNavRef = useRef<HTMLElement>(null)
-  const customProviderScrollBoundaryRef = useRef<HTMLDivElement>(null)
+  const customConnectionScrollBoundaryRef = useRef<HTMLDivElement>(null)
   const zipDownloadRouteScrollBoundaryRef = useRef<HTMLDivElement>(null)
 
   const [draft, setDraft] = useState<AppSettings>(normalizeSettings(settings))
@@ -131,11 +131,11 @@ export default function SettingsModal({ onImportProfile }: { onImportProfile: (s
   const [profileMenu, setProfileMenu] = useState<'select' | 'add' | null>(null)
   const showProfileMenu = profileMenu === 'select'
   const [profileMenuMaxHeight, setProfileMenuMaxHeight] = useState(DEFAULT_DROPDOWN_MAX_HEIGHT)
-  const [showCustomProviderImport, setShowCustomProviderImport] = useState(false)
+  const [showCustomConnectionImport, setShowCustomConnectionImport] = useState(false)
   const [showZipDownloadRouteManager, setShowZipDownloadRouteManager] = useState(false)
-  const [editingCustomProviderId, setEditingCustomProviderId] = useState<string | null>(null)
-  const [customProviderJson, setCustomProviderJson] = useState(DEFAULT_CUSTOM_PROVIDER_JSON)
-  const [customProviderImportError, setCustomProviderImportError] = useState<string | null>(null)
+  const [editingCustomConnectionId, setEditingCustomConnectionId] = useState<string | null>(null)
+  const [customConnectionJson, setCustomConnectionJson] = useState(DEFAULT_CUSTOM_CONNECTION_JSON)
+  const [customConnectionImportError, setCustomConnectionImportError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<SettingsTab>('api')
   const [exportConfig, setExportConfig] = useState(true)
   const [exportTasks, setExportTasks] = useState(true)
@@ -151,7 +151,7 @@ export default function SettingsModal({ onImportProfile }: { onImportProfile: (s
   const [dragDropPosition, setDragDropPosition] = useState<'before' | 'after' | null>(null)
   const [profileTouchDragPreview, setProfileTouchDragPreview] = useState<{
     label: string
-    providerLabel: string
+    connectionLabel: string
     x: number
     y: number
     width: number
@@ -177,13 +177,13 @@ export default function SettingsModal({ onImportProfile }: { onImportProfile: (s
   const activeProfile = draft.profiles.find((profile) => profile.id === draft.activeProfileId) ?? draft.profiles[0] ?? getActiveApiProfile(draft)
   const activePresetDescription = getPresetProfileDescription(activeProfile.id)
   const activeProfileLocked = isPresetProfileLocked(activeProfile.id)
-  const activeProviderIsOpenAICompatible = isOpenAICompatibleProvider(draft, activeProfile.provider)
-  const activeCustomProvider = getCustomProviderDefinition(draft, activeProfile.provider)
+  const activeConnectionAvailable = isApiConnectionAvailable(draft, activeProfile.connectionId)
+  const activeCustomConnection = getCustomConnectionDefinition(draft, activeProfile.connectionId)
   const activeProfileApiProxyEligible = isProfileApiProxyEligible(draft, activeProfile)
   const apiProxyChecked = activeProfileApiProxyEligible && (apiProxyLocked || activeProfile.apiProxy)
   const apiProxyEnabled = apiProxyAvailable && activeProfileApiProxyEligible && apiProxyChecked
-  const defaultProviderOrder = ['openai', ...draft.customProviders.map(p => p.id)]
-  const providerOrder = draft.providerOrder || defaultProviderOrder
+  const defaultConnectionOrder = ['openai-images', 'openai-responses', ...draft.customConnections.map((p) => p.id)]
+  const connectionOrder = draft.connectionOrder || defaultConnectionOrder
 
   useEffect(() => {
     if (!focusProfileNameRef.current) return
@@ -192,41 +192,42 @@ export default function SettingsModal({ onImportProfile }: { onImportProfile: (s
     profileNameInputRef.current?.select()
   }, [activeProfile.id])
 
-  const unorderedProviderOptions = [
-    { label: 'OpenAI 兼容接口', value: 'openai', draggable: true },
-    ...draft.customProviders.map((provider) => {
+  const unorderedConnectionOptions = [
+    { label: 'OpenAI Images API', value: 'openai-images', draggable: true },
+    { label: 'OpenAI Responses API', value: 'openai-responses', draggable: true },
+    ...draft.customConnections.map((connection) => {
       const actions = [
-        ...(!presetConfigOnly && !isPresetProviderLocked(provider.id) ? [{ label: '编辑', onClick: () => openEditCustomProvider(provider) }] : []),
-        ...(!presetConfigOnly && !isPresetProviderDeletionPrevented(provider.id, draft.profiles) ? [{
+        ...(!presetConfigOnly && !isPresetConnectionLocked(connection.id) ? [{ label: '编辑', onClick: () => openEditCustomConnection(connection) }] : []),
+        ...(!presetConfigOnly && !isPresetConnectionDeletionPrevented(connection.id, draft.profiles) ? [{
           label: '删除',
           variant: 'danger' as const,
-          onClick: () => confirmDeleteCustomProvider(provider),
+          onClick: () => confirmDeleteCustomConnection(connection),
         }] : []),
       ]
       return {
-        label: provider.name,
-        value: provider.id,
+        label: connection.name,
+        value: connection.id,
         draggable: true,
         actions: actions.length ? actions : undefined,
       }
     }),
   ]
 
-  const providerOptions = [
+  const connectionOptions = [
     ...(!presetConfigOnly && !activeProfileLocked
-      ? [{ label: '创建自定义服务商', value: ADD_CUSTOM_PROVIDER_VALUE, variant: 'action' as const }]
+      ? [{ label: '创建自定义 HTTP 接口', value: ADD_CUSTOM_CONNECTION_VALUE, variant: 'action' as const }]
       : []),
-    ...unorderedProviderOptions.sort((a, b) => {
-      const aIndex = providerOrder.indexOf(String(a.value))
-      const bIndex = providerOrder.indexOf(String(b.value))
-      const validA = aIndex !== -1 ? aIndex : defaultProviderOrder.indexOf(String(a.value))
-      const validB = bIndex !== -1 ? bIndex : defaultProviderOrder.indexOf(String(b.value))
+    ...unorderedConnectionOptions.sort((a, b) => {
+      const aIndex = connectionOrder.indexOf(String(a.value))
+      const bIndex = connectionOrder.indexOf(String(b.value))
+      const validA = aIndex !== -1 ? aIndex : defaultConnectionOrder.indexOf(String(a.value))
+      const validB = bIndex !== -1 ? bIndex : defaultConnectionOrder.indexOf(String(b.value))
       return validA - validB
     })
   ]
 
-  const getDefaultModelForMode = (apiMode: AppSettings['apiMode']) =>
-    apiMode === 'responses' ? DEFAULT_RESPONSES_MODEL : DEFAULT_IMAGES_MODEL
+  const getDefaultModelForConnection = (connectionId: ApiProfile['connectionId']) =>
+    connectionId === 'openai-responses' ? DEFAULT_RESPONSES_MODEL : DEFAULT_IMAGES_MODEL
 
   const enabledZipDownloadRouteCount = ZIP_DOWNLOAD_ROUTE_OPTIONS
     .filter((option) => draft.zipDownloadRoutes.includes(option.route))
@@ -243,7 +244,7 @@ export default function SettingsModal({ onImportProfile }: { onImportProfile: (s
       wasSettingsOpenRef.current = false
       setProfileMenu(null)
       setCopyImportUrlProfile(null)
-      setShowCustomProviderImport(false)
+      setShowCustomConnectionImport(false)
       setShowZipDownloadRouteManager(false)
       return
     }
@@ -336,19 +337,19 @@ export default function SettingsModal({ onImportProfile }: { onImportProfile: (s
       const shouldKeepEmptyBaseUrl = nextApiProxy && !profile.baseUrl.trim()
       const emptyBaseUrlFallback = profile.id === defaultProfileId
         ? getDefaultPresetBaseUrl()
-        : DEFAULT_SETTINGS.baseUrl
+        : DEFAULT_API_BASE_URL
       const normalizedBaseUrl = shouldKeepEmptyBaseUrl ? '' : normalizeBaseUrl(profile.baseUrl.trim() || emptyBaseUrlFallback)
-      const defaultModel = getDefaultModelForMode(profile.apiMode)
+      const defaultModel = getDefaultModelForConnection(profile.connectionId)
       return {
         ...profile,
         name: profile.name.trim() || (profile.id === defaultProfileId ? '默认' : '新配置'),
         baseUrl: normalizedBaseUrl,
         model: profile.model.trim() || defaultModel,
-        timeout: Number(profile.timeout) || DEFAULT_SETTINGS.timeout,
+        timeout: Number(profile.timeout) || DEFAULT_API_TIMEOUT,
         apiProxy: nextApiProxy,
-        codexCli: isOpenAICompatibleProvider(nextDraft, profile.provider) ? profile.codexCli : false,
-        streamImages: profile.provider === 'openai' ? profile.streamImages : false,
-        streamPartialImages: profile.provider === 'openai' ? normalizeStreamPartialImages(profile.streamPartialImages) : DEFAULT_STREAM_PARTIAL_IMAGES,
+        codexCli: isApiConnectionAvailable(nextDraft, profile.connectionId) ? profile.codexCli : false,
+        streamImages: isOpenAIConnection(profile.connectionId) ? profile.streamImages : false,
+        streamPartialImages: isOpenAIConnection(profile.connectionId) ? normalizeStreamPartialImages(profile.streamPartialImages) : DEFAULT_STREAM_PARTIAL_IMAGES,
       }
     })
     const fallbackProfile = createDefaultOpenAIProfile({ id: newId('openai') })
@@ -383,22 +384,22 @@ export default function SettingsModal({ onImportProfile }: { onImportProfile: (s
     url.search = ''
     url.hash = ''
 
-    if (profile.provider === 'openai') {
-      const baseUrl = profile.baseUrl.trim() || DEFAULT_SETTINGS.baseUrl
+    if (isOpenAIConnection(profile.connectionId)) {
+      const baseUrl = profile.baseUrl.trim() || DEFAULT_API_BASE_URL
       url.searchParams.set('apiUrl', options.useNewApiAddress && !options.includeApiKey ? '{address}' : normalizeBaseUrl(baseUrl))
       if (options.includeApiKey && profile.apiKey.trim()) {
         url.searchParams.set('apiKey', profile.apiKey.trim())
       } else if (!options.includeApiKey && options.useNewApiKey) {
         url.searchParams.set('apiKey', '{key}')
       }
-      url.searchParams.set('apiMode', profile.apiMode)
-      const model = profile.model.trim() || getDefaultModelForMode(profile.apiMode)
+      url.searchParams.set('connectionId', profile.connectionId)
+      const model = profile.model.trim() || getDefaultModelForConnection(profile.connectionId)
       url.searchParams.set('model', !options.includeApiKey && options.useNewApiModel ? '{model}' : model)
-      if (profile.apiMode === 'responses') url.searchParams.set('imageGenerationModel', profile.imageGenerationModel?.trim() ?? '')
+      if (profile.connectionId === 'openai-responses') url.searchParams.set('imageGenerationModel', profile.imageGenerationModel?.trim() ?? '')
       if (profile.name.trim()) url.searchParams.set('profileName', profile.name.trim())
       if (profile.reasoningEffort) url.searchParams.set('reasoningEffort', profile.reasoningEffort)
       if (profile.codexCli) url.searchParams.set('codexCli', 'true')
-      if (profile.streamImages !== DEFAULT_SETTINGS.streamImages) url.searchParams.set('streamImages', String(Boolean(profile.streamImages)))
+      if (Boolean(profile.streamImages) !== (profile.connectionId === 'openai-responses')) url.searchParams.set('streamImages', String(Boolean(profile.streamImages)))
       if (profile.streamPartialImages !== DEFAULT_STREAM_PARTIAL_IMAGES) url.searchParams.set('streamPartialImages', String(normalizeStreamPartialImages(profile.streamPartialImages)))
       if (profile.transparentBackgroundMethod !== 'api') url.searchParams.set('transparentBackgroundMethod', profile.transparentBackgroundMethod)
 
@@ -414,15 +415,15 @@ export default function SettingsModal({ onImportProfile }: { onImportProfile: (s
     return createCustomProfileImportUrl(
       window.location.href,
       profile,
-      draft.customProviders.find((item) => item.id === profile.provider),
+      draft.customConnections.find((item) => item.id === profile.connectionId),
       options,
     )
   }
 
   const copyProfileImportUrl = async (profile: ApiProfile, includeApiKey: boolean, format: 'link' | 'json' | 'file' | 'new-api') => {
     try {
-      const provider = draft.customProviders.find((item) => item.id === profile.provider)
-      const json = createProfileShareJson(profile, provider, includeApiKey)
+      const connection = draft.customConnections.find((item) => item.id === profile.connectionId)
+      const json = createProfileShareJson(profile, connection, includeApiKey)
       if (format === 'file') {
         const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }))
         const el = document.createElement('a')
@@ -436,7 +437,7 @@ export default function SettingsModal({ onImportProfile }: { onImportProfile: (s
       } else {
         const text = format === 'json' ? json : format === 'new-api'
           ? createProfileImportUrl(profile, { ...copyImportUrlOptions, includeApiKey: false })
-          : createProfileShareUrl(window.location.href, profile, provider, includeApiKey)
+          : createProfileShareUrl(window.location.href, profile, connection, includeApiKey)
         await copyTextToClipboard(text)
         showToast(format === 'json' ? '配置已复制' : '分享链接已复制', 'success')
       }
@@ -483,11 +484,11 @@ export default function SettingsModal({ onImportProfile }: { onImportProfile: (s
     const nextTimeout = Number(timeoutInput)
     const normalizedTimeout =
       timeoutInput.trim() === '' || Number.isNaN(nextTimeout)
-        ? DEFAULT_SETTINGS.timeout
+        ? DEFAULT_API_TIMEOUT
         : nextTimeout
     const nextDraft = {
       ...draft,
-      profiles: activeProviderIsOpenAICompatible && !activeProfileLocked
+      profiles: activeConnectionAvailable && !activeProfileLocked
         ? draft.profiles.map((profile) =>
             profile.id === activeProfile.id ? { ...profile, timeout: normalizedTimeout } : profile,
           )
@@ -498,13 +499,13 @@ export default function SettingsModal({ onImportProfile }: { onImportProfile: (s
   }
 
   const commitTimeout = useCallback(() => {
-    if (activeProfileLocked || !isOpenAICompatibleProvider(draft, activeProfile.provider)) return
+    if (activeProfileLocked || !isApiConnectionAvailable(draft, activeProfile.connectionId)) return
     const nextTimeout = Number(timeoutInput)
     const normalizedTimeout =
-      timeoutInput.trim() === '' ? DEFAULT_SETTINGS.timeout : Number.isNaN(nextTimeout) ? activeProfile.timeout : nextTimeout
+      timeoutInput.trim() === '' ? DEFAULT_API_TIMEOUT : Number.isNaN(nextTimeout) ? activeProfile.timeout : nextTimeout
     setTimeoutInput(String(normalizedTimeout))
     updateActiveProfile({ timeout: normalizedTimeout }, true)
-  }, [draft, activeProfile.id, activeProfile.provider, activeProfile.timeout, activeProfileLocked, timeoutInput])
+  }, [draft, activeProfile.id, activeProfile.connectionId, activeProfile.timeout, activeProfileLocked, timeoutInput])
 
   const showNotificationPermissionMessage = (result: Exclude<BrowserNotificationPermissionResult, { ok: true }>) => {
     if (result.reason === 'unsupported') {
@@ -576,7 +577,7 @@ export default function SettingsModal({ onImportProfile }: { onImportProfile: (s
     }
     handleClose()
   })
-  usePreventBackgroundScroll(showSettings, copyImportUrlProfile ? profileShareScrollBoundaryRef : showZipDownloadRouteManager ? zipDownloadRouteScrollBoundaryRef : showCustomProviderImport ? customProviderScrollBoundaryRef : settingsScrollBoundaryRef)
+  usePreventBackgroundScroll(showSettings, copyImportUrlProfile ? profileShareScrollBoundaryRef : showZipDownloadRouteManager ? zipDownloadRouteScrollBoundaryRef : showCustomConnectionImport ? customConnectionScrollBoundaryRef : settingsScrollBoundaryRef)
 
   if (!showSettings) return null
 
@@ -629,8 +630,8 @@ export default function SettingsModal({ onImportProfile }: { onImportProfile: (s
     if (presetConfigOnly) return
     setReusedTaskApiProfile(null)
     const profile = createDefaultOpenAIProfile({ id: newId('openai'), name: '新配置' })
-    const nextDraft = normalizeSettings({ 
-        ...draft, 
+    const nextDraft = normalizeSettings({
+        ...draft,
         profiles: [...draft.profiles, profile],
         activeProfileId: profile.id
     })
@@ -646,7 +647,7 @@ export default function SettingsModal({ onImportProfile }: { onImportProfile: (s
     while (draft.profiles.some((profile) => profile.name === `${baseName}（副本${idx === 1 ? '' : ` ${idx}`}）`)) idx++
     const profile: ApiProfile = {
       ...source,
-      id: newId(source.provider === 'openai' ? 'openai' : 'profile'),
+      id: newId(isOpenAIConnection(source.connectionId) ? 'openai' : 'profile'),
       isDefault: undefined,
       name: `${baseName}（副本${idx === 1 ? '' : ` ${idx}`}）`,
     }
@@ -748,7 +749,7 @@ export default function SettingsModal({ onImportProfile }: { onImportProfile: (s
     setDraggedProfileId(profile.id)
     setProfileTouchDragPreview({
       label: profile.name,
-      providerLabel: getApiProviderLabel(draft, profile.provider),
+      connectionLabel: getApiConnectionLabel(draft, profile.connectionId),
       x: touch.clientX,
       y: touch.clientY,
       width: rect.width,
@@ -822,8 +823,8 @@ export default function SettingsModal({ onImportProfile }: { onImportProfile: (s
     commitSettings(nextDraft)
   }
 
-  const handleProviderReorder = (sourceValue: string | number, targetValue: string | number, position: 'before' | 'after' | null) => {
-    const currentOrder = draft.providerOrder || ['openai', ...draft.customProviders.map(p => p.id)]
+  const handleConnectionReorder = (sourceValue: string | number, targetValue: string | number, position: 'before' | 'after' | null) => {
+    const currentOrder = draft.connectionOrder || defaultConnectionOrder
     const sourceIndex = currentOrder.indexOf(String(sourceValue))
     const targetIndex = currentOrder.indexOf(String(targetValue))
     if (sourceIndex < 0 || targetIndex < 0 || sourceIndex === targetIndex) return
@@ -837,160 +838,159 @@ export default function SettingsModal({ onImportProfile }: { onImportProfile: (s
 
     newOrder.splice(newTargetIndex, 0, removed)
 
-    const nextDraft = normalizeSettings({ ...draft, providerOrder: newOrder })
+    const nextDraft = normalizeSettings({ ...draft, connectionOrder: newOrder })
     commitSettings(nextDraft)
   }
 
-  const handleProviderTypeChange = (value: string | number) => {
-    if (presetConfigOnly || activeProfileLocked) return
-    if (value === ADD_CUSTOM_PROVIDER_VALUE) {
-      setEditingCustomProviderId(null)
-      setCustomProviderJson(DEFAULT_CUSTOM_PROVIDER_JSON)
-      setShowCustomProviderImport(true)
-      setCustomProviderImportError(null)
+  const handleConnectionChange = (value: string | number) => {
+    if (activeProfileLocked || presetConfigOnly) return
+    if (value === ADD_CUSTOM_CONNECTION_VALUE) {
+      setEditingCustomConnectionId(null)
+      setCustomConnectionJson(DEFAULT_CUSTOM_CONNECTION_JSON)
+      setShowCustomConnectionImport(true)
+      setCustomConnectionImportError(null)
       return
     }
-
-    const provider = String(value) as ApiProfile['provider']
-    const customProvider = getCustomProviderDefinition(draft, provider) ?? undefined
-    updateActiveProfile(switchApiProfileProvider(activeProfile, provider, customProvider), true)
+    const connectionId = String(value)
+    const customConnection = getCustomConnectionDefinition(draft, connectionId) ?? undefined
+    updateActiveProfile(switchApiProfileConnection(activeProfile, connectionId, customConnection), true)
   }
 
-  const closeCustomProviderModal = () => {
-    setShowCustomProviderImport(false)
-    setEditingCustomProviderId(null)
+  const closeCustomConnectionModal = () => {
+    setShowCustomConnectionImport(false)
+    setEditingCustomConnectionId(null)
   }
 
-  const buildCustomProviderFromJson = () => {
-    const input = JSON.parse(customProviderJson)
+  const buildCustomConnectionFromJson = () => {
+    const input = JSON.parse(customConnectionJson)
     const usedIds = new Set(
-      draft.customProviders
-        .filter((item) => item.id !== editingCustomProviderId)
+      draft.customConnections
+        .filter((item) => item.id !== editingCustomConnectionId)
         .map((item) => item.id),
     )
-    const provider = normalizeCustomProviderDefinition(
-      editingCustomProviderId && input && typeof input === 'object'
+    const connection = normalizeCustomConnectionDefinition(
+      editingCustomConnectionId && input && typeof input === 'object'
         ? {
             ...input,
-            id: editingCustomProviderId,
+            id: editingCustomConnectionId,
           }
         : input,
       usedIds,
     )
-    if (!provider) throw new Error('自定义服务商配置无效')
-    return provider
+    if (!connection) throw new Error('自定义 HTTP 接口配置无效')
+    return connection
   }
 
-  function openEditCustomProvider(provider: CustomProviderDefinition) {
-    if (presetConfigOnly || isPresetProviderLocked(provider.id)) return
-    setEditingCustomProviderId(provider.id)
-    setCustomProviderJson(JSON.stringify({
-      name: provider.name,
-      submit: provider.submit,
-      editSubmit: provider.editSubmit,
-      poll: provider.poll,
+  function openEditCustomConnection(connection: CustomConnectionDefinition) {
+    if (presetConfigOnly || isPresetConnectionLocked(connection.id)) return
+    setEditingCustomConnectionId(connection.id)
+    setCustomConnectionJson(JSON.stringify({
+      name: connection.name,
+      submit: connection.submit,
+      editSubmit: connection.editSubmit,
+      poll: connection.poll,
     }, null, 2))
-    setShowCustomProviderImport(true)
-    setCustomProviderImportError(null)
+    setShowCustomConnectionImport(true)
+    setCustomConnectionImportError(null)
   }
 
-  const saveCustomProvider = () => {
-    if (presetConfigOnly || (editingCustomProviderId && isPresetProviderLocked(editingCustomProviderId))) return
+  const saveCustomConnection = () => {
+    if (presetConfigOnly || (editingCustomConnectionId && isPresetConnectionLocked(editingCustomConnectionId))) return
     try {
-      const customProvider = buildCustomProviderFromJson()
-      if (editingCustomProviderId) {
+      const customConnection = buildCustomConnectionFromJson()
+      if (editingCustomConnectionId) {
         const nextDraft = normalizeSettings({
           ...draft,
-          customProviders: draft.customProviders.map((provider) =>
-            provider.id === editingCustomProviderId ? customProvider : provider,
+          customConnections: draft.customConnections.map((connection) =>
+            connection.id === editingCustomConnectionId ? customConnection : connection,
           ),
         })
         commitSettings(nextDraft)
-        setShowCustomProviderImport(false)
-        setEditingCustomProviderId(null)
-        setCustomProviderImportError(null)
-        showToast('服务商配置已更新', 'success')
+        setShowCustomConnectionImport(false)
+        setEditingCustomConnectionId(null)
+        setCustomConnectionImportError(null)
+        showToast('自定义 HTTP 接口已更新', 'success')
         return
       }
 
-      const nextProfile = switchApiProfileProvider(activeProfile, customProvider.id, customProvider)
+      const nextProfile = switchApiProfileConnection(activeProfile, customConnection.id, customConnection)
       const nextDraft = normalizeSettings({
         ...draft,
-        customProviders: [...draft.customProviders, customProvider],
+        customConnections: [...draft.customConnections, customConnection],
         profiles: draft.profiles.map((profile) => profile.id === activeProfile.id ? nextProfile : profile),
       })
-      restorePresetProvider(customProvider.id)
+      restorePresetConnection(customConnection.id)
       commitSettings(nextDraft)
-      setShowCustomProviderImport(false)
-      setEditingCustomProviderId(null)
-      setCustomProviderImportError(null)
+      setShowCustomConnectionImport(false)
+      setEditingCustomConnectionId(null)
+      setCustomConnectionImportError(null)
     } catch (err) {
-      setCustomProviderImportError(err instanceof Error ? err.message : String(err))
+      setCustomConnectionImportError(err instanceof Error ? err.message : String(err))
     }
   }
 
-  function confirmDeleteCustomProvider(provider: CustomProviderDefinition) {
-    if (presetConfigOnly || isPresetProviderDeletionPrevented(provider.id, draft.profiles)) return
+  function confirmDeleteCustomConnection(connection: CustomConnectionDefinition) {
+    if (presetConfigOnly || isPresetConnectionDeletionPrevented(connection.id, draft.profiles)) return
     setConfirmDialog({
-      title: '删除服务商',
-      message: `确定要删除自定义服务商「${provider.name}」吗？正在使用它的配置会切回 OpenAI 兼容接口。`,
-      action: () => deleteCustomProvider(provider),
+      title: '删除自定义 HTTP 接口',
+      message: `确定要删除自定义 HTTP 接口「${connection.name}」吗？正在使用它的配置会切回 OpenAI 接口。`,
+      action: () => deleteCustomConnection(connection),
     })
   }
 
-  function deleteCustomProvider(provider: CustomProviderDefinition) {
-    if (presetConfigOnly || isPresetProviderDeletionPrevented(provider.id, draft.profiles)) return
-    const providerId = provider.id
-    if (isPresetProvider(providerId)) dismissPresetProvider(providerId)
+  function deleteCustomConnection(connection: CustomConnectionDefinition) {
+    if (presetConfigOnly || isPresetConnectionDeletionPrevented(connection.id, draft.profiles)) return
+    const connectionId = connection.id
+    if (isPresetConnection(connectionId)) dismissPresetConnection(connectionId)
     const nextDraft = normalizeSettings({
       ...draft,
-      customProviders: draft.customProviders.filter((provider) => provider.id !== providerId),
+      customConnections: draft.customConnections.filter((connection) => connection.id !== connectionId),
       profiles: draft.profiles.map((profile) =>
-        profile.provider === providerId ? switchApiProfileProvider(profile, 'openai') : profile,
+        profile.connectionId === connectionId ? switchApiProfileConnection(profile, 'openai-images') : profile,
       ),
     })
     commitSettings(nextDraft)
-    showToast('服务商已删除', 'success')
+    showToast('自定义 HTTP 接口已删除', 'success')
   }
 
-  const copyCustomProviderLlmPrompt = async () => {
+  const copyCustomConnectionLlmPrompt = async () => {
     try {
-      await copyTextToClipboard(CUSTOM_PROVIDER_LLM_PROMPT)
+      await copyTextToClipboard(CUSTOM_CONNECTION_LLM_PROMPT)
       showToast('LLM 生成提示词已复制', 'success')
     } catch (err) {
       showToast(getClipboardFailureMessage('复制 LLM 生成提示词失败', err), 'error')
     }
   }
 
-  const handleCustomProviderJsonPaste = async () => {
+  const handleCustomConnectionJsonPaste = async () => {
     setIsImportingJson(true)
     try {
       const text = await navigator.clipboard.readText()
       if (!text.trim()) {
         throw new Error('剪贴板为空')
       }
-      const imported = importCustomProviderSettingsFromJson(text, draft.customProviders)
+      const imported = importCustomConnectionSettingsFromJson(text, draft.customConnections)
       if (imported.profiles.length > 0) {
         commitSettings(draft)
-        setShowCustomProviderImport(false)
-        setEditingCustomProviderId(null)
+        setShowCustomConnectionImport(false)
+        setEditingCustomConnectionId(null)
         setShowSettings(false)
         onImportProfile(text)
         return
       }
 
-      const provider = imported.customProviders[0]
-      setCustomProviderJson(JSON.stringify({
-        name: provider.name,
-        submit: provider.submit,
-        editSubmit: provider.editSubmit,
-        poll: provider.poll,
+      const connection = imported.customConnections[0]
+      setCustomConnectionJson(JSON.stringify({
+        name: connection.name,
+        submit: connection.submit,
+        editSubmit: connection.editSubmit,
+        poll: connection.poll,
       }, null, 2))
-      setCustomProviderImportError(null)
+      setCustomConnectionImportError(null)
       showToast('JSON 配置已导入', 'success')
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
-      setCustomProviderImportError(null)
+      setCustomConnectionImportError(null)
       if (err instanceof Error && err.name === 'NotAllowedError') {
         showToast('无法读取剪贴板，请允许浏览器访问剪贴板，或直接粘贴到输入框中', 'error')
       } else {
@@ -1133,7 +1133,7 @@ export default function SettingsModal({ onImportProfile }: { onImportProfile: (s
                       <span className="flex min-w-0 items-center gap-2">
                         <span className="min-w-0 truncate">{activeProfile.name}</span>
                         <span className="hidden shrink-0 rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-600 dark:bg-blue-500/10 dark:text-blue-400 sm:inline">
-                          {getApiProviderLabel(draft, activeProfile.provider)}
+                          {getApiConnectionLabel(draft, activeProfile.connectionId)}
                         </span>
                       </span>
                       <ChevronDownIcon className={`w-3.5 h-3.5 flex-shrink-0 text-gray-400 dark:text-gray-500 transition-transform duration-200 ${showProfileMenu ? 'rotate-180' : ''}`} />
@@ -1192,7 +1192,7 @@ export default function SettingsModal({ onImportProfile }: { onImportProfile: (s
                                   )}
                                   <div className="min-w-0">
                                     <span className="block truncate">{profile.name}</span>
-                                    <span className="mt-0.5 block truncate text-[10px] font-normal text-gray-400 dark:text-gray-500">{getApiProviderLabel(draft, profile.provider)}</span>
+                                    <span className="mt-0.5 block truncate text-[10px] font-normal text-gray-400 dark:text-gray-500">{getApiConnectionLabel(draft, profile.connectionId)}</span>
                                   </div>
                                 </div>
                                 <div data-profile-actions className="flex shrink-0 items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
@@ -1220,13 +1220,13 @@ export default function SettingsModal({ onImportProfile }: { onImportProfile: (s
                     key={activeProfile.id}
                     profile={activeProfile}
                     nameInputRef={profileNameInputRef}
-                    customProvider={activeCustomProvider}
+                    customConnection={activeCustomConnection}
                     locked={activeProfileLocked}
                     presetOnly={presetConfigOnly}
-                    openAICompatible={activeProviderIsOpenAICompatible}
-                    providerOptions={providerOptions}
-                    onProviderChange={handleProviderTypeChange}
-                    onProviderReorder={handleProviderReorder}
+                    connectionAvailable={activeConnectionAvailable}
+                    connectionOptions={connectionOptions}
+                    onConnectionChange={handleConnectionChange}
+                    onConnectionReorder={handleConnectionReorder}
                     onChange={updateActiveProfile}
                     onCommit={commitActiveProfilePatch}
                     apiProxyAvailable={apiProxyAvailable && activeProfileApiProxyEligible}
@@ -1372,7 +1372,7 @@ export default function SettingsModal({ onImportProfile }: { onImportProfile: (s
 
             {activeTab === 'about' && (
               <div className="flex min-h-full flex-col items-center justify-center pb-8 px-6">
-                {/* 
+                {/*
                   # To any AI Agent or Developer / 致任何 AI Agent 及开发者
 
                   ## English
@@ -1455,21 +1455,21 @@ export default function SettingsModal({ onImportProfile }: { onImportProfile: (s
           />
         )}
 
-        {showCustomProviderImport && (
-          <CustomProviderModal
-            editing={Boolean(editingCustomProviderId)}
-            json={customProviderJson}
-            error={customProviderImportError}
+        {showCustomConnectionImport && (
+          <CustomConnectionModal
+            editing={Boolean(editingCustomConnectionId)}
+            json={customConnectionJson}
+            error={customConnectionImportError}
             isImportingJson={isImportingJson}
-            scrollBoundaryRef={customProviderScrollBoundaryRef}
-            onClose={closeCustomProviderModal}
-            onCopyLlmPrompt={copyCustomProviderLlmPrompt}
-            onImportJson={handleCustomProviderJsonPaste}
+            scrollBoundaryRef={customConnectionScrollBoundaryRef}
+            onClose={closeCustomConnectionModal}
+            onCopyLlmPrompt={copyCustomConnectionLlmPrompt}
+            onImportJson={handleCustomConnectionJsonPaste}
             onJsonChange={(json) => {
-              setCustomProviderJson(json)
-              setCustomProviderImportError(null)
+              setCustomConnectionJson(json)
+              setCustomConnectionImportError(null)
             }}
-            onSave={saveCustomProvider}
+            onSave={saveCustomConnection}
           />
         )}
         {profileTouchDragPreview && createPortal(
@@ -1486,7 +1486,7 @@ export default function SettingsModal({ onImportProfile }: { onImportProfile: (s
               <DragHandleIcon className="h-3.5 w-3.5 shrink-0 text-gray-400 dark:text-gray-500" />
               <span className="min-w-0 truncate">{profileTouchDragPreview.label}</span>
               <span className="shrink-0 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-500 dark:bg-white/[0.08] dark:text-gray-400">
-                {profileTouchDragPreview.providerLabel}
+                {profileTouchDragPreview.connectionLabel}
               </span>
             </div>
           </div>,

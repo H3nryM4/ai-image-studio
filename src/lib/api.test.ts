@@ -27,9 +27,9 @@ describe('callImageApi', () => {
     vi.useRealTimers()
   })
 
-  it.each(['fal', 'sb2api-async', 'missing-provider'])('rejects unavailable provider %s before sending a request', async (provider) => {
+  it.each(['missing-connection', 'custom:missing'])('rejects unavailable connection %s before sending a request', async (connection) => {
     const fetchMock = vi.spyOn(globalThis, 'fetch')
-    const profile = createDefaultOpenAIProfile({ provider, baseUrl: 'https://old.example.com/', apiKey: 'old-key' })
+    const profile = createDefaultOpenAIProfile({ connectionId: connection, baseUrl: 'https://old.example.com/', apiKey: 'old-key' })
 
     await expect(callImageApi({
       settings: { ...DEFAULT_SETTINGS, profiles: [profile], activeProfileId: profile.id },
@@ -56,10 +56,7 @@ describe('callImageApi', () => {
       await callImageApi({
         settings: {
           ...DEFAULT_SETTINGS,
-          apiKey: 'test-key',
-          apiMode: 'responses',
-          codexCli,
-          profiles: DEFAULT_SETTINGS.profiles.map((profile) => ({ ...profile, reasoningEffort: 'high' })),
+          profiles: (DEFAULT_SETTINGS.profiles.map((profile) => ({ ...profile, reasoningEffort: 'high' as const }))).map((profile) => ({ ...profile, apiKey: 'test-key', connectionId: 'openai-responses', codexCli })),
         },
         prompt: 'prompt',
         params: { ...DEFAULT_PARAMS },
@@ -85,7 +82,11 @@ describe('callImageApi', () => {
     }))
 
     await callImageApi({
-      settings: { ...DEFAULT_SETTINGS, apiKey: 'test-key', apiMode: 'responses', codexCli: true, allowPromptRewrite: true },
+      settings: {
+        ...DEFAULT_SETTINGS,
+        allowPromptRewrite: true,
+        profiles: [createDefaultOpenAIProfile({ apiKey: 'test-key', connectionId: 'openai-responses', codexCli: true })],
+      },
       prompt: 'prompt',
       params: { ...DEFAULT_PARAMS },
       inputImageDataUrls: [],
@@ -107,13 +108,11 @@ describe('callImageApi', () => {
     await callImageApi({
       settings: {
         ...DEFAULT_SETTINGS,
-        apiKey: 'test-key',
-        apiMode: 'responses',
-        profiles: DEFAULT_SETTINGS.profiles.map((profile) => ({
+        profiles: (DEFAULT_SETTINGS.profiles.map((profile) => ({
           ...profile,
-          apiMode: 'responses' as const,
+          connectionId: 'openai-responses' as const,
           imageGenerationModel: 'gpt-image-2.5-flare',
-        })),
+        }))).map((profile) => ({ ...profile, apiKey: 'test-key', connectionId: 'openai-responses' })),
       },
       prompt: 'prompt',
       params: { ...DEFAULT_PARAMS, quality: 'max' },
@@ -137,8 +136,8 @@ describe('callImageApi', () => {
     }))
 
     const profile = imageGenerationModel === DEFAULT_IMAGES_MODEL
-      ? createDefaultOpenAIProfile({ apiMode: 'responses', apiKey: 'test-key', streamImages: false })
-      : { apiMode: 'responses', apiKey: 'test-key', model: 'legacy-text-model', streamImages: false, ...(imageGenerationModel === undefined ? {} : { imageGenerationModel }) }
+      ? createDefaultOpenAIProfile({ connectionId: 'openai-responses', apiKey: 'test-key', streamImages: false })
+      : { connectionId: 'openai-responses', apiKey: 'test-key', model: 'legacy-text-model', streamImages: false, ...(imageGenerationModel === undefined ? {} : { imageGenerationModel }) }
     const restored = normalizePersistedState({ settings: { profiles: [profile] } }, {
       settings: DEFAULT_SETTINGS,
       params: DEFAULT_PARAMS,
@@ -171,12 +170,11 @@ describe('callImageApi', () => {
     const result = await callImageApi({
       settings: {
         ...DEFAULT_SETTINGS,
-        model: 'gpt-image-2.5-sunburst',
-        profiles: DEFAULT_SETTINGS.profiles.map((profile) => ({
+        profiles: (DEFAULT_SETTINGS.profiles.map((profile) => ({
           ...profile,
           apiKey: 'test-key',
           model: 'gpt-image-2.5-sunburst',
-        })),
+        }))).map((profile) => ({ ...profile, model: 'gpt-image-2.5-sunburst' })),
       },
       prompt: 'prompt',
       params: { ...DEFAULT_PARAMS, quality: 'xhigh' },
@@ -202,9 +200,7 @@ describe('callImageApi', () => {
     await expect(callImageApi({
       settings: {
         ...DEFAULT_SETTINGS,
-        apiKey: 'test-key',
-        apiMode: 'responses',
-        profiles: DEFAULT_SETTINGS.profiles.map((profile) => ({ ...profile, apiMode: 'responses' as const, streamImages })),
+        profiles: (DEFAULT_SETTINGS.profiles.map((profile) => ({ ...profile, connectionId: 'openai-responses' as const, streamImages }))).map((profile) => ({ ...profile, apiKey: 'test-key', connectionId: 'openai-responses' })),
       },
       prompt: 'prompt',
       params: { ...DEFAULT_PARAMS },
@@ -226,9 +222,7 @@ describe('callImageApi', () => {
     await expect(callImageApi({
       settings: {
         ...DEFAULT_SETTINGS,
-        apiKey: 'test-key',
-        apiMode: 'responses',
-        profiles: DEFAULT_SETTINGS.profiles.map((profile) => ({ ...profile, apiMode: 'responses' as const })),
+        profiles: (DEFAULT_SETTINGS.profiles.map((profile) => ({ ...profile, connectionId: 'openai-responses' as const }))).map((profile) => ({ ...profile, apiKey: 'test-key', connectionId: 'openai-responses' })),
       },
       prompt: 'prompt',
       params: { ...DEFAULT_PARAMS },
@@ -247,7 +241,11 @@ describe('callImageApi', () => {
     }))
 
     await callImageApi({
-      settings: { ...DEFAULT_SETTINGS, apiKey: 'test-key', codexCli: true, allowPromptRewrite: true },
+      settings: {
+        ...DEFAULT_SETTINGS,
+        allowPromptRewrite: true,
+        profiles: [createDefaultOpenAIProfile({ apiKey: 'test-key', codexCli: true })],
+      },
       prompt: 'prompt',
       params: { ...DEFAULT_PARAMS },
       inputImageDataUrls: [],
@@ -267,7 +265,10 @@ describe('callImageApi', () => {
     }))
 
     await callImageApi({
-      settings: { ...DEFAULT_SETTINGS, apiKey: 'test-key' },
+      settings: {
+        ...DEFAULT_SETTINGS,
+        profiles: [createDefaultOpenAIProfile({ apiKey: 'test-key' })],
+      },
       prompt: 'prompt',
       params: { ...DEFAULT_PARAMS, output_format: 'webp', transparent_output: true },
       nativeTransparentBackground: true,
@@ -289,7 +290,10 @@ describe('callImageApi', () => {
     }))
 
     await callImageApi({
-      settings: { ...DEFAULT_SETTINGS, apiKey: 'test-key' },
+      settings: {
+        ...DEFAULT_SETTINGS,
+        profiles: [createDefaultOpenAIProfile({ apiKey: 'test-key' })],
+      },
       prompt: 'prompt',
       params: { ...DEFAULT_PARAMS, transparent_output: true },
       nativeTransparentBackground: true,
@@ -310,7 +314,10 @@ describe('callImageApi', () => {
     }))
 
     await callImageApi({
-      settings: { ...DEFAULT_SETTINGS, apiKey: 'test-key', apiMode: 'responses' },
+      settings: {
+        ...DEFAULT_SETTINGS,
+        profiles: [createDefaultOpenAIProfile({ apiKey: 'test-key', connectionId: 'openai-responses' })],
+      },
       prompt: 'prompt',
       params: { ...DEFAULT_PARAMS, transparent_output: true },
       nativeTransparentBackground: true,
@@ -331,7 +338,11 @@ describe('callImageApi', () => {
     }))
 
     await callImageApi({
-      settings: { ...DEFAULT_SETTINGS, apiKey: 'test-key', codexCli: true, allowPromptRewrite: true },
+      settings: {
+        ...DEFAULT_SETTINGS,
+        allowPromptRewrite: true,
+        profiles: [createDefaultOpenAIProfile({ apiKey: 'test-key', codexCli: true })],
+      },
       prompt: 'prompt',
       params: { ...DEFAULT_PARAMS, size: '1024x1024' },
       inputImageDataUrls: [],
@@ -352,7 +363,11 @@ describe('callImageApi', () => {
     }))
 
     await callImageApi({
-      settings: { ...DEFAULT_SETTINGS, apiKey: 'test-key', codexCli: true, allowPromptRewrite: true },
+      settings: {
+        ...DEFAULT_SETTINGS,
+        allowPromptRewrite: true,
+        profiles: [createDefaultOpenAIProfile({ apiKey: 'test-key', codexCli: true })],
+      },
       prompt: 'prompt',
       params: { ...DEFAULT_PARAMS, size: 'auto' },
       inputImageDataUrls: [],
@@ -379,7 +394,10 @@ describe('callImageApi', () => {
     }))
 
     const result = await callImageApi({
-      settings: { ...DEFAULT_SETTINGS, apiKey: 'test-key', codexCli: true },
+      settings: {
+        ...DEFAULT_SETTINGS,
+        profiles: [createDefaultOpenAIProfile({ apiKey: 'test-key', codexCli: true })],
+      },
       prompt: 'prompt',
       params: { ...DEFAULT_PARAMS },
       inputImageDataUrls: [],
@@ -410,7 +428,10 @@ describe('callImageApi', () => {
     }))
 
     const result = await callImageApi({
-      settings: { ...DEFAULT_SETTINGS, apiKey: 'test-key', codexCli: true },
+      settings: {
+        ...DEFAULT_SETTINGS,
+        profiles: [createDefaultOpenAIProfile({ apiKey: 'test-key', codexCli: true })],
+      },
       prompt: 'prompt',
       params: { ...DEFAULT_PARAMS },
       inputImageDataUrls: [],
@@ -445,15 +466,12 @@ describe('callImageApi', () => {
     const result = await callImageApi({
       settings: {
         ...DEFAULT_SETTINGS,
-        apiKey: 'test-key',
-        streamImages: true,
-        streamPartialImages: 3,
-        profiles: DEFAULT_SETTINGS.profiles.map((profile) => ({
+        profiles: (DEFAULT_SETTINGS.profiles.map((profile) => ({
           ...profile,
           apiKey: 'test-key',
           streamImages: true,
           streamPartialImages: 3,
-        })),
+        }))).map((profile) => ({ ...profile, apiKey: 'test-key', streamImages: true, streamPartialImages: 3 })),
       },
       prompt: 'prompt',
       params: { ...DEFAULT_PARAMS },
@@ -507,13 +525,11 @@ describe('callImageApi', () => {
     const result = await callImageApi({
       settings: {
         ...DEFAULT_SETTINGS,
-        apiKey: 'test-key',
-        streamImages: true,
-        profiles: DEFAULT_SETTINGS.profiles.map((profile) => ({
+        profiles: (DEFAULT_SETTINGS.profiles.map((profile) => ({
           ...profile,
           apiKey: 'test-key',
           streamImages: true,
-        })),
+        }))).map((profile) => ({ ...profile, apiKey: 'test-key', streamImages: true })),
       },
       prompt: 'prompt',
       params: { ...DEFAULT_PARAMS },
@@ -535,13 +551,11 @@ describe('callImageApi', () => {
     await expect(callImageApi({
       settings: {
         ...DEFAULT_SETTINGS,
-        apiKey: 'test-key',
-        streamImages: true,
-        profiles: DEFAULT_SETTINGS.profiles.map((profile) => ({
+        profiles: (DEFAULT_SETTINGS.profiles.map((profile) => ({
           ...profile,
           apiKey: 'test-key',
           streamImages: true,
-        })),
+        }))).map((profile) => ({ ...profile, apiKey: 'test-key', streamImages: true })),
       },
       prompt: 'prompt',
       params: { ...DEFAULT_PARAMS },
@@ -558,13 +572,11 @@ describe('callImageApi', () => {
     await expect(callImageApi({
       settings: {
         ...DEFAULT_SETTINGS,
-        apiKey: 'test-key',
-        streamImages: true,
-        profiles: DEFAULT_SETTINGS.profiles.map((profile) => ({
+        profiles: (DEFAULT_SETTINGS.profiles.map((profile) => ({
           ...profile,
           apiKey: 'test-key',
           streamImages: true,
-        })),
+        }))).map((profile) => ({ ...profile, apiKey: 'test-key', streamImages: true })),
       },
       prompt: 'prompt',
       params: { ...DEFAULT_PARAMS },
@@ -581,13 +593,11 @@ describe('callImageApi', () => {
     await expect(callImageApi({
       settings: {
         ...DEFAULT_SETTINGS,
-        apiKey: 'test-key',
-        streamImages: true,
-        profiles: DEFAULT_SETTINGS.profiles.map((profile) => ({
+        profiles: (DEFAULT_SETTINGS.profiles.map((profile) => ({
           ...profile,
           apiKey: 'test-key',
           streamImages: true,
-        })),
+        }))).map((profile) => ({ ...profile, apiKey: 'test-key', streamImages: true })),
       },
       prompt: 'prompt',
       params: { ...DEFAULT_PARAMS },
@@ -610,13 +620,11 @@ describe('callImageApi', () => {
     const result = await callImageApi({
       settings: {
         ...DEFAULT_SETTINGS,
-        apiKey: 'test-key',
-        streamImages: true,
-        profiles: DEFAULT_SETTINGS.profiles.map((profile) => ({
+        profiles: (DEFAULT_SETTINGS.profiles.map((profile) => ({
           ...profile,
           apiKey: 'test-key',
           streamImages: true,
-        })),
+        }))).map((profile) => ({ ...profile, apiKey: 'test-key', streamImages: true })),
       },
       prompt: 'prompt',
       params: { ...DEFAULT_PARAMS },
@@ -651,13 +659,11 @@ describe('callImageApi', () => {
     const result = await callImageApi({
       settings: {
         ...DEFAULT_SETTINGS,
-        apiKey: 'test-key',
-        streamImages: true,
-        profiles: DEFAULT_SETTINGS.profiles.map((profile) => ({
+        profiles: (DEFAULT_SETTINGS.profiles.map((profile) => ({
           ...profile,
           apiKey: 'test-key',
           streamImages: true,
-        })),
+        }))).map((profile) => ({ ...profile, apiKey: 'test-key', streamImages: true })),
       },
       prompt: 'prompt',
       params: { ...DEFAULT_PARAMS },
@@ -700,15 +706,12 @@ describe('callImageApi', () => {
     const result = await callImageApi({
       settings: {
         ...DEFAULT_SETTINGS,
-        apiKey: 'test-key',
-        streamImages: true,
-        streamPartialImages: 1,
-        profiles: DEFAULT_SETTINGS.profiles.map((profile) => ({
+        profiles: (DEFAULT_SETTINGS.profiles.map((profile) => ({
           ...profile,
           apiKey: 'test-key',
           streamImages: true,
           streamPartialImages: 1,
-        })),
+        }))).map((profile) => ({ ...profile, apiKey: 'test-key', streamImages: true, streamPartialImages: 1 })),
       },
       prompt: 'prompt',
       params: { ...DEFAULT_PARAMS, n: 2 },
@@ -748,7 +751,10 @@ describe('callImageApi', () => {
     })
 
     const result = await callImageApi({
-      settings: { ...DEFAULT_SETTINGS, apiKey: 'test-key', codexCli: true },
+      settings: {
+        ...DEFAULT_SETTINGS,
+        profiles: [createDefaultOpenAIProfile({ apiKey: 'test-key', codexCli: true })],
+      },
       prompt: 'prompt',
       params: { ...DEFAULT_PARAMS, n: 3 },
       inputImageDataUrls: [],
@@ -781,17 +787,13 @@ describe('callImageApi', () => {
     const result = await callImageApi({
       settings: {
         ...DEFAULT_SETTINGS,
-        apiKey: 'test-key',
-        apiMode: 'responses',
-        streamImages: true,
-        streamPartialImages: 1,
-        profiles: DEFAULT_SETTINGS.profiles.map((profile) => ({
+        profiles: (DEFAULT_SETTINGS.profiles.map((profile) => ({
           ...profile,
           apiKey: 'test-key',
-          apiMode: 'responses',
+          connectionId: 'openai-responses',
           streamImages: true,
           streamPartialImages: 1,
-        })),
+        }))).map((profile) => ({ ...profile, apiKey: 'test-key', connectionId: 'openai-responses', streamImages: true, streamPartialImages: 1 })),
       },
       prompt: 'prompt',
       params: { ...DEFAULT_PARAMS },
@@ -825,7 +827,10 @@ describe('callImageApi', () => {
     })
 
     const result = await callImageApi({
-      settings: { ...DEFAULT_SETTINGS, apiKey: 'test-key', apiMode: 'responses' },
+      settings: {
+        ...DEFAULT_SETTINGS,
+        profiles: [createDefaultOpenAIProfile({ apiKey: 'test-key', connectionId: 'openai-responses' })],
+      },
       prompt: 'prompt',
       params: { ...DEFAULT_PARAMS, n: 3 },
       inputImageDataUrls: [],
@@ -853,7 +858,10 @@ describe('callImageApi', () => {
     }))
 
     const result = await callImageApi({
-      settings: { ...DEFAULT_SETTINGS, apiKey: 'test-key', apiMode: 'responses' },
+      settings: {
+        ...DEFAULT_SETTINGS,
+        profiles: [createDefaultOpenAIProfile({ apiKey: 'test-key', connectionId: 'openai-responses' })],
+      },
       prompt: 'prompt',
       params: { ...DEFAULT_PARAMS },
       inputImageDataUrls: [],
@@ -883,15 +891,12 @@ describe('callImageApi', () => {
     const result = await callImageApi({
       settings: {
         ...DEFAULT_SETTINGS,
-        apiKey: 'test-key',
-        apiMode: 'responses',
-        streamImages: true,
-        profiles: DEFAULT_SETTINGS.profiles.map((profile) => ({
+        profiles: (DEFAULT_SETTINGS.profiles.map((profile) => ({
           ...profile,
           apiKey: 'test-key',
-          apiMode: 'responses',
+          connectionId: 'openai-responses',
           streamImages: true,
-        })),
+        }))).map((profile) => ({ ...profile, apiKey: 'test-key', connectionId: 'openai-responses', streamImages: true })),
       },
       prompt: 'prompt',
       params: { ...DEFAULT_PARAMS },
@@ -917,9 +922,7 @@ describe('callImageApi', () => {
     await callImageApi({
       settings: {
         ...DEFAULT_SETTINGS,
-        apiKey: 'test-key',
-        apiProxy: true,
-        baseUrl: 'http://api.example.com/v1',
+        profiles: [createDefaultOpenAIProfile({ apiKey: 'test-key', apiProxy: true, baseUrl: 'http://api.example.com/v1' })],
       },
       prompt: 'prompt',
       params: { ...DEFAULT_PARAMS },
@@ -944,9 +947,7 @@ describe('callImageApi', () => {
     await callImageApi({
       settings: {
         ...DEFAULT_SETTINGS,
-        apiKey: 'test-key',
-        apiProxy: true,
-        baseUrl: '',
+        profiles: [createDefaultOpenAIProfile({ apiKey: 'test-key', apiProxy: true, baseUrl: '' })],
       },
       prompt: 'prompt',
       params: { ...DEFAULT_PARAMS },
@@ -959,7 +960,7 @@ describe('callImageApi', () => {
     )
   })
 
-  it('uses the same-origin API proxy path for sync custom providers', async () => {
+  it('uses the same-origin API proxy path for sync custom connections', async () => {
     vi.stubEnv('VITE_API_PROXY_AVAILABLE', 'true')
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
       data: [{ b64_json: 'aW1hZ2U=' }],
@@ -971,10 +972,7 @@ describe('callImageApi', () => {
     await callImageApi({
       settings: {
         ...DEFAULT_SETTINGS,
-        baseUrl: '',
-        apiKey: 'test-key',
-        apiProxy: true,
-        customProviders: [{
+        customConnections: [{
           id: 'custom-sync',
           name: 'Custom Sync',
           template: 'http-image',
@@ -986,16 +984,16 @@ describe('callImageApi', () => {
             result: { b64JsonPaths: ['data.*.b64_json'] },
           },
         }],
-        profiles: [{
+        activeProfileId: 'profile-custom-sync',
+        profiles: ([{
           ...DEFAULT_SETTINGS.profiles[0],
           id: 'profile-custom-sync',
-          provider: 'custom-sync',
+          connectionId: 'custom-sync',
           baseUrl: '',
           apiKey: 'test-key',
           model: 'model',
           apiProxy: true,
-        }],
-        activeProfileId: 'profile-custom-sync',
+        }]).map((profile) => ({ ...profile, baseUrl: '', apiKey: 'test-key', apiProxy: true })),
       },
       prompt: 'prompt',
       params: { ...DEFAULT_PARAMS },
@@ -1011,7 +1009,7 @@ describe('callImageApi', () => {
     expect(body.background).toBe('transparent')
   })
 
-  it('splits Codex CLI sync custom provider output count into concurrent n=1 requests', async () => {
+  it('splits Codex CLI sync custom connection output count into concurrent n=1 requests', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => new Response(JSON.stringify({
       data: [{ b64_json: `aW1hZ2Ut${fetchMock.mock.calls.length}` }],
     }), {
@@ -1022,8 +1020,7 @@ describe('callImageApi', () => {
     const result = await callImageApi({
       settings: {
         ...DEFAULT_SETTINGS,
-        codexCli: true,
-        customProviders: [{
+        customConnections: [{
           id: 'custom-sync',
           name: 'Custom Sync',
           submit: {
@@ -1038,15 +1035,15 @@ describe('callImageApi', () => {
             result: { b64JsonPaths: ['data.*.b64_json'] },
           },
         }],
-        profiles: [{
+        activeProfileId: 'custom-sync-profile',
+        profiles: ([{
           ...DEFAULT_SETTINGS.profiles[0],
           id: 'custom-sync-profile',
-          provider: 'custom-sync',
+          connectionId: 'custom-sync',
           baseUrl: 'https://api.example.com/v1',
           apiKey: 'test-key',
           codexCli: true,
-        }],
-        activeProfileId: 'custom-sync-profile',
+        }]).map((profile) => ({ ...profile, codexCli: true })),
       },
       prompt: 'prompt',
       params: { ...DEFAULT_PARAMS, size: '1024x768', quality: 'high', n: 3 },
@@ -1080,8 +1077,7 @@ describe('callImageApi', () => {
     const result = await callImageApi({
       settings: {
         ...DEFAULT_SETTINGS,
-        codexCli: true,
-        customProviders: [{
+        customConnections: [{
           id: 'custom-sync',
           name: 'Custom Sync',
           submit: {
@@ -1090,12 +1086,12 @@ describe('callImageApi', () => {
             result: { b64JsonPaths: ['data.*.b64_json'] },
           },
         }],
-        profiles: [{
+        profiles: ([{
           ...DEFAULT_SETTINGS.profiles[0],
-          provider: 'custom-sync',
+          connectionId: 'custom-sync',
           baseUrl: 'https://api.example.com/v1',
           codexCli: true,
-        }],
+        }]).map((profile) => ({ ...profile, codexCli: true })),
       },
       prompt: 'prompt',
       params: { ...DEFAULT_PARAMS, n: 3 },
@@ -1107,7 +1103,7 @@ describe('callImageApi', () => {
     expect(result.actualParams).toMatchObject({ n: 2 })
   })
 
-  it('splits a sync edit mapping when the same custom provider has async generation', async () => {
+  it('splits a sync edit mapping when the same custom connection has async generation', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => new Response(JSON.stringify({
       data: [{ b64_json: 'aW1hZ2U=' }],
     }), {
@@ -1118,9 +1114,7 @@ describe('callImageApi', () => {
     await callImageApi({
       settings: {
         ...DEFAULT_SETTINGS,
-        baseUrl: 'https://api.example.com/v1',
-        codexCli: true,
-        customProviders: [{
+        customConnections: [{
           id: 'custom-mixed',
           name: 'Custom Mixed',
           submit: {
@@ -1141,12 +1135,12 @@ describe('callImageApi', () => {
             result: { b64JsonPaths: ['result.data.*.b64_json'] },
           },
         }],
-        profiles: [{
+        profiles: ([{
           ...DEFAULT_SETTINGS.profiles[0],
-          provider: 'custom-mixed',
+          connectionId: 'custom-mixed',
           baseUrl: 'https://api.example.com/v1',
           codexCli: true,
-        }],
+        }]).map((profile) => ({ ...profile, baseUrl: 'https://api.example.com/v1', codexCli: true })),
       },
       prompt: 'prompt',
       params: { ...DEFAULT_PARAMS, size: '1024x768', quality: 'high', n: 3 },
@@ -1167,7 +1161,7 @@ describe('callImageApi', () => {
     }
   })
 
-  it('keeps Codex CLI async custom provider output count in one submitted task', async () => {
+  it('keeps Codex CLI async custom connection output count in one submitted task', async () => {
     const onCustomTaskEnqueued = vi.fn()
     const fetchMock = vi.spyOn(globalThis, 'fetch')
       .mockResolvedValueOnce(new Response(JSON.stringify({ task_id: 'task-1' }), {
@@ -1191,8 +1185,7 @@ describe('callImageApi', () => {
     const result = await callImageApi({
       settings: {
         ...DEFAULT_SETTINGS,
-        codexCli: true,
-        customProviders: [{
+        customConnections: [{
           id: 'custom-async',
           name: 'Custom Async',
           submit: {
@@ -1208,12 +1201,12 @@ describe('callImageApi', () => {
             result: { b64JsonPaths: ['result.data.*.b64_json'] },
           },
         }],
-        profiles: [{
+        profiles: ([{
           ...DEFAULT_SETTINGS.profiles[0],
-          provider: 'custom-async',
+          connectionId: 'custom-async',
           baseUrl: 'https://api.example.com/v1',
           codexCli: true,
-        }],
+        }]).map((profile) => ({ ...profile, codexCli: true })),
       },
       prompt: 'prompt',
       params: { ...DEFAULT_PARAMS, size: '1024x768', quality: 'high', n: 3 },
@@ -1244,7 +1237,7 @@ describe('callImageApi', () => {
     await expect(callImageApi({
       settings: {
         ...DEFAULT_SETTINGS,
-        customProviders: [{
+        customConnections: [{
           id: 'custom-async-background',
           name: 'Custom Async Background',
           submit: {
@@ -1264,7 +1257,7 @@ describe('callImageApi', () => {
         profiles: [{
           ...DEFAULT_SETTINGS.profiles[0],
           id: 'profile-custom-async-background',
-          provider: 'custom-async-background',
+          connectionId: 'custom-async-background',
           baseUrl: 'https://api.example.com/v1',
         }],
         activeProfileId: 'profile-custom-async-background',
@@ -1276,17 +1269,14 @@ describe('callImageApi', () => {
     })).rejects.toThrow('请将「透明背景实现方式」切换为「本地后处理」')
   })
 
-  it('rejects API proxy for async custom providers', async () => {
+  it('rejects API proxy for async custom connections', async () => {
     vi.stubEnv('VITE_API_PROXY_AVAILABLE', 'true')
     const fetchMock = vi.spyOn(globalThis, 'fetch')
 
     await expect(callImageApi({
       settings: {
         ...DEFAULT_SETTINGS,
-        baseUrl: '',
-        apiKey: 'test-key',
-        apiProxy: true,
-        customProviders: [{
+        customConnections: [{
           id: 'custom-async-proxy',
           name: 'Custom Async Proxy',
           template: 'http-image',
@@ -1307,16 +1297,16 @@ describe('callImageApi', () => {
             result: { b64JsonPaths: ['data.*.b64_json'] },
           },
         }],
-        profiles: [{
+        activeProfileId: 'profile-custom-async-proxy',
+        profiles: ([{
           ...DEFAULT_SETTINGS.profiles[0],
           id: 'profile-custom-async-proxy',
-          provider: 'custom-async-proxy',
+          connectionId: 'custom-async-proxy',
           baseUrl: '',
           apiKey: 'test-key',
           model: 'model',
           apiProxy: true,
-        }],
-        activeProfileId: 'profile-custom-async-proxy',
+        }]).map((profile) => ({ ...profile, baseUrl: '', apiKey: 'test-key', apiProxy: true })),
       },
       prompt: 'prompt',
       params: { ...DEFAULT_PARAMS },
@@ -1339,9 +1329,7 @@ describe('callImageApi', () => {
     await callImageApi({
       settings: {
         ...DEFAULT_SETTINGS,
-        apiKey: 'test-key',
-        apiProxy: false,
-        baseUrl: 'http://api.example.com/v1',
+        profiles: [createDefaultOpenAIProfile({ apiKey: 'test-key', apiProxy: false, baseUrl: 'http://api.example.com/v1' })],
       },
       prompt: 'prompt',
       params: { ...DEFAULT_PARAMS },
@@ -1363,7 +1351,10 @@ describe('callImageApi', () => {
     }))
 
     await callImageApi({
-      settings: { ...DEFAULT_SETTINGS, apiKey: 'test-key' },
+      settings: {
+        ...DEFAULT_SETTINGS,
+        profiles: [createDefaultOpenAIProfile({ apiKey: 'test-key' })],
+      },
       prompt: 'prompt',
       params: { ...DEFAULT_PARAMS },
       inputImageDataUrls: [],
@@ -1388,9 +1379,7 @@ describe('callImageApi', () => {
     await callImageApi({
       settings: {
         ...DEFAULT_SETTINGS,
-        apiKey: 'test-key',
-        apiProxy: true,
-        baseUrl: 'http://api.example.com/v1',
+        profiles: [createDefaultOpenAIProfile({ apiKey: 'test-key', apiProxy: true, baseUrl: 'http://api.example.com/v1' })],
       },
       prompt: 'prompt',
       params: { ...DEFAULT_PARAMS },
@@ -1427,8 +1416,7 @@ describe('callImageApi', () => {
     const promise = callImageApi({
       settings: {
         ...DEFAULT_SETTINGS,
-        baseUrl: 'https://api.example.com/v1',
-        customProviders: [{
+        customConnections: [{
           id: 'custom-async',
           name: 'Custom Async',
           template: 'http-image',
@@ -1454,16 +1442,16 @@ describe('callImageApi', () => {
             },
           },
         }],
-        profiles: [{
+        activeProfileId: 'profile-custom',
+        profiles: ([{
           ...DEFAULT_SETTINGS.profiles[0],
           id: 'profile-custom',
-          provider: 'custom-async',
+          connectionId: 'custom-async',
           baseUrl: 'https://api.example.com/v1',
           apiKey: 'test-key',
           model: 'model',
           timeout: 60,
-        }],
-        activeProfileId: 'profile-custom',
+        }]).map((profile) => ({ ...profile, baseUrl: 'https://api.example.com/v1' })),
       },
       prompt: 'prompt',
       params: { ...DEFAULT_PARAMS },
@@ -1508,8 +1496,7 @@ describe('callImageApi', () => {
     const promise = callImageApi({
       settings: {
         ...DEFAULT_SETTINGS,
-        baseUrl: 'https://api.example.com/v1',
-        customProviders: [{
+        customConnections: [{
           id: 'custom-async',
           name: 'Custom Async',
           template: 'http-image',
@@ -1533,17 +1520,16 @@ describe('callImageApi', () => {
             },
           },
         }],
-        profiles: [{
+        activeProfileId: 'profile-custom',
+        profiles: ([{
           ...DEFAULT_SETTINGS.profiles[0],
           id: 'profile-custom',
-          provider: 'custom-async',
+          connectionId: 'custom-async',
           baseUrl: 'https://api.example.com/v1',
           apiKey: 'test-key',
           model: 'model',
           timeout: 1,
-        }],
-        activeProfileId: 'profile-custom',
-        timeout: 1,
+        }]).map((profile) => ({ ...profile, baseUrl: 'https://api.example.com/v1', timeout: 1 })),
       },
       prompt: 'prompt',
       params: { ...DEFAULT_PARAMS },

@@ -3,7 +3,7 @@ import { initStore, useStore } from './store'
 import { clearUrlSettingParams } from './lib/urlSettings'
 import { hasProfileImportUrl } from './lib/profileSharing'
 import { createDefaultOpenAIProfile, hasDefaultPresetConfig, normalizeSettings } from './lib/apiProfiles'
-import { getCustomProviderConfigUrl, hasEmbeddedDefaultConfig, loadCustomProviderSettingsFromUrl, loadEmbeddedDefaultConfig } from './lib/customProviderConfigUrl'
+import { getCustomConnectionConfigUrl, hasEmbeddedDefaultConfig, loadCustomConnectionSettingsFromUrl, loadEmbeddedDefaultConfig } from './lib/customConnectionConfigUrl'
 import { getDefaultPresetProfileId, getPresetProfileIds, isPresetConfigOnlyEnabled, setPresetConfig } from './lib/presetConfig'
 import { useDockerApiUrlMigrationNotice } from './hooks/useDockerApiUrlMigrationNotice'
 import Header from './components/Header'
@@ -36,19 +36,19 @@ export default function App() {
     if (defaultConfigImportStarted) return
     defaultConfigImportStarted = true
 
-    const customProviderConfigUrl = getCustomProviderConfigUrl()
+    const customConnectionConfigUrl = getCustomConnectionConfigUrl()
     const embeddedDefaultConfig = hasEmbeddedDefaultConfig()
     const loadDefaultConfig = () => embeddedDefaultConfig
       ? Promise.resolve().then(() => loadEmbeddedDefaultConfig())
-      : loadCustomProviderSettingsFromUrl(customProviderConfigUrl)
+      : loadCustomConnectionSettingsFromUrl(customConnectionConfigUrl)
 
     void initStore()
       .then(async () => {
-        const importedSettings = embeddedDefaultConfig || customProviderConfigUrl
+        const importedSettings = embeddedDefaultConfig || customConnectionConfigUrl
           ? await loadDefaultConfig()
           : hasDefaultPresetConfig()
             ? {
-                customProviders: [],
+                customConnections: [],
                 profiles: [{ ...createDefaultOpenAIProfile(), isDefault: true }],
               }
             : null
@@ -58,12 +58,12 @@ export default function App() {
         if (importedSettings) {
           await state.setPresetImportedSettings(importedSettings)
         } else if (state.previousPresetConfig) {
-          await state.setPresetImportedSettings({ customProviders: [], profiles: [] })
+          await state.setPresetImportedSettings({ customConnections: [], profiles: [] })
         }
 
         const syncedState = useStore.getState()
         if (!importedSettings) {
-          useStore.setState({ dismissedPresetProfileIds: [], dismissedPresetProviderIds: [] })
+          useStore.setState({ dismissedPresetProfileIds: [], dismissedPresetConnectionIds: [] })
           if (syncedState.settings.profiles.some((profile) => profile.isDefault)) {
             syncedState.setSettings({
               profiles: syncedState.settings.profiles.map((profile) => profile.isDefault ? { ...profile, isDefault: undefined } : profile),

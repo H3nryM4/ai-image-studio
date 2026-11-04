@@ -4,7 +4,7 @@ import { useCloseOnEscape } from '../../hooks/useCloseOnEscape'
 import ViewportTooltip from '../ViewportTooltip'
 import { CloseIcon, LinkIcon } from '../icons'
 
-interface CustomProviderModalProps {
+interface CustomConnectionModalProps {
   editing: boolean
   json: string
   error: string | null
@@ -17,7 +17,7 @@ interface CustomProviderModalProps {
   onSave: () => void
 }
 
-export default function CustomProviderModal({
+export default function CustomConnectionModal({
   editing,
   json,
   error,
@@ -28,7 +28,7 @@ export default function CustomProviderModal({
   onImportJson,
   onJsonChange,
   onSave,
-}: CustomProviderModalProps) {
+}: CustomConnectionModalProps) {
   const llmPromptTooltipTimerRef = useRef<number | null>(null)
   const [llmPromptTooltipVisible, setLlmPromptTooltipVisible] = useState(false)
 
@@ -47,7 +47,7 @@ export default function CustomProviderModal({
       <div className="relative z-10 w-full max-w-md rounded-3xl border border-white/50 bg-white/95 p-5 shadow-2xl ring-1 ring-black/5 animate-modal-in dark:border-white/[0.08] dark:bg-gray-900/95 dark:ring-white/10 flex flex-col h-[85vh] sm:h-[680px] max-h-[90vh] overflow-hidden">
         <div className="mb-5 flex items-center justify-between gap-4 shrink-0">
           <h3 className="text-base font-bold text-gray-800 dark:text-gray-100">
-            {editing ? '编辑自定义服务商' : '创建自定义服务商'}
+            {editing ? '编辑自定义 HTTP 接口' : '创建自定义 HTTP 接口'}
           </h3>
           <div className="flex items-center gap-3">
             <button
@@ -97,7 +97,7 @@ export default function CustomProviderModal({
                   复制生成提示词
                 </button>
                 <ViewportTooltip visible={llmPromptTooltipVisible} className="w-56 whitespace-normal text-center">
-                  生成完整的服务商和配置信息，包含模型和接口地址，导入后只需填入 API Key。
+                  生成接口映射和 API 配置，包含模型和接口地址，导入后只需填入 API Key。
                 </ViewportTooltip>
               </span>
               <button

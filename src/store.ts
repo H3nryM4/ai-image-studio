@@ -1,9 +1,9 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { ApiMode, ApiProfile, AppSettings, BatchProgress, PresetConfig, TaskParams, InputImage, MaskDraft, SketchBoardRequest, TaskRecord, FavoriteCollection, StoredImage, StoredImageThumbnail } from './types'
-import { DEFAULT_PARAMS } from './types'
-import { DEFAULT_SETTINGS, getActiveApiProfile, getCustomProviderDefinition, mergeImportedSettings, mergePresetImportedSettings, normalizeSettings, resolveApiProfileModel, splitModelList, validateApiProfile } from './lib/apiProfiles'
-import { enforcePresetConfigPolicy, getPresetConfig, getPresetProfileIds, getPresetProviderIds, isPresetConfigDeletionPrevented, isPresetConfigOnlyEnabled, isPresetConfigParamsLocked, isPresetProfile, isPresetProviderDeletionPrevented } from './lib/presetConfig'
+import type { ApiProfile, AppSettings, BatchProgress, PresetConfig, TaskParams, InputImage, MaskDraft, SketchBoardRequest, TaskRecord, FavoriteCollection, StoredImage, StoredImageThumbnail } from './types'
+import { DEFAULT_PARAMS, DEFAULT_STREAM_PARTIAL_IMAGES } from './types'
+import { DEFAULT_SETTINGS, getActiveApiProfile, isOpenAIConnection, getCustomConnectionDefinition, mergeImportedSettings, mergePresetImportedSettings, normalizeSettings, resolveApiProfileModel, splitModelList, validateApiProfile } from './lib/apiProfiles'
+import { enforcePresetConfigPolicy, getPresetConfig, getPresetProfileIds, getPresetConnectionIds, isPresetConfigDeletionPrevented, isPresetConfigOnlyEnabled, isPresetConfigParamsLocked, isPresetProfile, isPresetConnectionDeletionPrevented } from './lib/presetConfig'
 import { dismissAllTooltips } from './lib/tooltipDismiss'
 import { getTaskPromptText, remapImageMentionsForOrder, replaceImageMentionsForApi } from './lib/promptImageMentions'
 import { getAllTasks, putTask, deleteTask as dbDeleteTask, commitTaskDeletion, clearTasks as dbClearTasks, getImage, getStoredImageThumbnail, getImageThumbnail, getAllImageIds, putImage, putImageThumbnail, deleteImage, clearImages, storeImage, storeImageWithSize } from './lib/db'
@@ -63,11 +63,11 @@ const TIMEOUT_STREAMING_HINT = '也可尝试打开「流式传输」，并提高
 const TIMEOUT_PARTIAL_IMAGES_ZERO_HINT = '官方流式接口不发送心跳，当前「请求中间步骤图像数」为 0，连接可能因无数据传输而断开。建议提高到 2 或 3。'
 const TIMEOUT_PARTIAL_IMAGES_LOW_HINT = '也可尝试提高「请求中间步骤图像数」来维持连接，避免长时间无数据传输导致断开。'
 
-type TimeoutStreamingHintProfile = Pick<ApiProfile, 'provider' | 'streamImages' | 'streamPartialImages'>
+type TimeoutStreamingHintProfile = Pick<ApiProfile, 'connectionId' | 'streamImages' | 'streamPartialImages'>
 
 function getTimeoutStreamingHint(profile?: TimeoutStreamingHintProfile | null) {
-  if (profile?.provider !== 'openai') return ''
-  const partialImages = profile.streamPartialImages ?? DEFAULT_SETTINGS.streamPartialImages ?? 0
+  if (!profile || !isOpenAIConnection(profile.connectionId)) return ''
+  const partialImages = profile.streamPartialImages ?? DEFAULT_STREAM_PARTIAL_IMAGES
   if (profile.streamImages !== true) return TIMEOUT_STREAMING_HINT
   if (partialImages === 0) return TIMEOUT_PARTIAL_IMAGES_ZERO_HINT
   return partialImages < 3 ? TIMEOUT_PARTIAL_IMAGES_LOW_HINT : ''
@@ -118,9 +118,9 @@ interface AppState {
   dismissedPresetProfileIds: string[]
   dismissPresetProfile: (id: string) => void
   restorePresetProfile: (id: string) => void
-  dismissedPresetProviderIds: string[]
-  dismissPresetProvider: (id: string) => void
-  restorePresetProvider: (id: string) => void
+  dismissedPresetConnectionIds: string[]
+  dismissPresetConnection: (id: string) => void
+  restorePresetConnection: (id: string) => void
   dismissedCodexCliPrompts: string[]
   dismissCodexCliPrompt: (key: string) => void
 
@@ -307,52 +307,23 @@ export const useStore = create<AppState>()(
       restorePresetProfile: (id) => set((state) => ({
         dismissedPresetProfileIds: state.dismissedPresetProfileIds.filter((item) => item !== id),
       })),
-      dismissedPresetProviderIds: [],
-      dismissPresetProvider: (id) => set((state) => ({
-        dismissedPresetProviderIds: state.dismissedPresetProviderIds.includes(id)
-          ? state.dismissedPresetProviderIds
-          : [...state.dismissedPresetProviderIds, id],
+      dismissedPresetConnectionIds: [],
+      dismissPresetConnection: (id) => set((state) => ({
+        dismissedPresetConnectionIds: state.dismissedPresetConnectionIds.includes(id)
+          ? state.dismissedPresetConnectionIds
+          : [...state.dismissedPresetConnectionIds, id],
       })),
-      restorePresetProvider: (id) => set((state) => ({
-        dismissedPresetProviderIds: state.dismissedPresetProviderIds.filter((item) => item !== id),
+      restorePresetConnection: (id) => set((state) => ({
+        dismissedPresetConnectionIds: state.dismissedPresetConnectionIds.filter((item) => item !== id),
       })),
       setSettings: (s) => set((st) => {
         const previous = normalizeSettings(st.settings)
-        const incoming = s as Partial<AppSettings>
-        const hasLegacyOverrides =
-          incoming.baseUrl !== undefined ||
-          incoming.apiKey !== undefined ||
-          incoming.model !== undefined ||
-          incoming.timeout !== undefined ||
-          incoming.apiMode !== undefined ||
-          incoming.codexCli !== undefined ||
-          incoming.apiProxy !== undefined ||
-          incoming.streamImages !== undefined ||
-          incoming.streamPartialImages !== undefined
-        const merged = normalizeSettings({ ...previous, ...incoming })
-        if (hasLegacyOverrides && incoming.profiles === undefined) {
-          merged.profiles = merged.profiles.map((profile) =>
-            profile.id === merged.activeProfileId
-              ? {
-                  ...profile,
-                  baseUrl: incoming.baseUrl ?? profile.baseUrl,
-                  apiKey: incoming.apiKey ?? profile.apiKey,
-                  model: incoming.model ?? profile.model,
-                  timeout: incoming.timeout ?? profile.timeout,
-                  apiMode: incoming.apiMode === 'images' || incoming.apiMode === 'responses' ? incoming.apiMode : profile.apiMode,
-                  codexCli: incoming.codexCli ?? profile.codexCli,
-                  apiProxy: incoming.apiProxy ?? profile.apiProxy,
-                  streamImages: incoming.streamImages ?? profile.streamImages,
-                  streamPartialImages: incoming.streamPartialImages ?? profile.streamPartialImages,
-                }
-              : profile,
-          )
-        }
-        const effectiveDismissedPresetProviderIds = st.dismissedPresetProviderIds.filter((id) =>
-          !isPresetProviderDeletionPrevented(id, previous.profiles),
+        const merged = normalizeSettings({ ...previous, ...s })
+        const effectiveDismissedPresetConnectionIds = st.dismissedPresetConnectionIds.filter((id) =>
+          !isPresetConnectionDeletionPrevented(id, previous.profiles),
         )
         const settings = normalizeSettings(enforcePresetConfigPolicy(merged, {
-          dismissedPresetProviderIds: effectiveDismissedPresetProviderIds,
+          dismissedPresetConnectionIds: effectiveDismissedPresetConnectionIds,
         }))
         const shouldClearReusedProfile = st.reusedTaskApiProfileId && settings.activeProfileId === st.reusedTaskApiProfileId
         return {
@@ -365,32 +336,32 @@ export const useStore = create<AppState>()(
       setPresetImportedSettings: async (importedSettings, transform) => {
         set((state) => {
           const presetIds = getPresetProfileIds()
-          const presetProviderIds = getPresetProviderIds()
+          const presetConnectionIds = getPresetConnectionIds()
           const dismissedPresetProfileIds = state.dismissedPresetProfileIds.filter((id) => presetIds.has(id))
           const deletionPrevented = isPresetConfigDeletionPrevented()
           const remainingPresetProfiles = (getPresetConfig()?.profiles ?? state.settings.profiles)
             .filter((profile) => !dismissedPresetProfileIds.includes(profile.id))
-          const dismissedPresetProviderIds = state.dismissedPresetProviderIds
-            .filter((id) => presetProviderIds.has(id))
-          const effectiveDismissedPresetProviderIds = dismissedPresetProviderIds
-            .filter((id) => !isPresetProviderDeletionPrevented(id, remainingPresetProfiles))
+          const dismissedPresetConnectionIds = state.dismissedPresetConnectionIds
+            .filter((id) => presetConnectionIds.has(id))
+          const effectiveDismissedPresetConnectionIds = dismissedPresetConnectionIds
+            .filter((id) => !isPresetConnectionDeletionPrevented(id, remainingPresetProfiles))
           const merged = mergePresetImportedSettings(state.settings, importedSettings, {
             lockPresetParams: isPresetConfigParamsLocked(),
             dismissedPresetProfileIds: deletionPrevented ? [] : dismissedPresetProfileIds,
-            dismissedPresetProviderIds: effectiveDismissedPresetProviderIds,
+            dismissedPresetConnectionIds: effectiveDismissedPresetConnectionIds,
             previousPresetConfig: state.previousPresetConfig,
             usedPresetProfileIds: state.tasks.flatMap((task) => task.apiProfileId ? [task.apiProfileId] : []),
           })
           const settings = normalizeSettings(enforcePresetConfigPolicy(
             normalizeSettings(transform?.(merged.settings) ?? merged.settings),
-            { dismissedPresetProviderIds: effectiveDismissedPresetProviderIds },
+            { dismissedPresetConnectionIds: effectiveDismissedPresetConnectionIds },
           ))
           const shouldClearReusedProfile = state.reusedTaskApiProfileId && settings.activeProfileId === state.reusedTaskApiProfileId
           return {
             settings,
             previousPresetConfig: getPresetConfig() ? merged.presetConfig : null,
             dismissedPresetProfileIds,
-            dismissedPresetProviderIds,
+            dismissedPresetConnectionIds,
             reusedTaskApiProfileId: shouldClearReusedProfile ? null : state.reusedTaskApiProfileId,
             ...(shouldClearReusedProfile
               ? { reusedTaskApiProfileName: null, reusedTaskApiProfileMissing: false, reusedTaskApiModel: null }
@@ -651,7 +622,7 @@ export const useStore = create<AppState>()(
     }),
     {
       name: 'ai-image-studio',
-      version: 3,
+      version: 4,
       // 旧版本直接丢弃，不映射旧字段。
       migrate: () => ({}),
       partialize: getPersistedState,
@@ -672,10 +643,10 @@ export function getCodexCliPromptKey(settings: AppSettings): string {
   return `${profile.baseUrl}\n${profile.apiKey}`
 }
 
-function isAsyncCustomProviderTask(settings: AppSettings, provider: string, hasInputImages: boolean) {
-  const customProvider = getCustomProviderDefinition(settings, provider)
-  if (!customProvider?.poll) return false
-  const submitMapping = hasInputImages && customProvider.editSubmit ? customProvider.editSubmit : customProvider.submit
+function isAsyncCustomConnectionTask(settings: AppSettings, connection: string, hasInputImages: boolean) {
+  const customConnection = getCustomConnectionDefinition(settings, connection)
+  if (!customConnection?.poll) return false
+  const submitMapping = hasInputImages && customConnection.editSubmit ? customConnection.editSubmit : customConnection.submit
   return Boolean(submitMapping.taskIdPath)
 }
 
@@ -714,11 +685,11 @@ function scheduleOpenAIWatchdog(taskId: string, timeoutSeconds: number, profile?
 function usesConcurrentImageRequests(settings: AppSettings, profile: ApiProfile, params: TaskParams, hasInputImages: boolean) {
   const n = params.n > 0 ? params.n : 1
   if (n <= 1) return false
-  if (profile.provider === 'openai') {
-    if (profile.apiMode === 'responses') return true
-    return profile.apiMode === 'images' && (profile.codexCli || profile.streamImages)
+  if (isOpenAIConnection(profile.connectionId)) {
+    if (profile.connectionId === 'openai-responses') return true
+    return profile.connectionId === 'openai-images' && (profile.codexCli || profile.streamImages)
   }
-  return profile.codexCli && !isAsyncCustomProviderTask(settings, profile.provider, hasInputImages)
+  return profile.codexCli && !isAsyncCustomConnectionTask(settings, profile.connectionId, hasInputImages)
 }
 
 export function taskHasOutputErrors(task: Pick<TaskRecord, 'outputErrors'>) {
@@ -744,7 +715,7 @@ export function showCodexCliPrompt(force = false, reason = '接口返回的提�
   const state = useStore.getState()
   const settings = state.settings
   const promptKey = getCodexCliPromptKey(settings)
-  if (!force && (settings.codexCli || state.dismissedCodexCliPrompts.includes(promptKey))) return
+  if (!force && (getActiveApiProfile(settings).codexCli || state.dismissedCodexCliPrompts.includes(promptKey))) return
   const promptRewriteGuardMessage = settings.allowPromptRewrite
     ? '当前已允许模型改写优化提示词，因此不会额外加入不改写要求。'
     : '同时，提示词文本开头会加入简短的不改写要求，避免模型重写提示词，偏离原意。'
@@ -756,7 +727,9 @@ export function showCodexCliPrompt(force = false, reason = '接口返回的提�
     action: () => {
       const state = useStore.getState()
       state.dismissCodexCliPrompt(promptKey)
-      state.setSettings({ codexCli: true })
+      state.setSettings({
+        profiles: state.settings.profiles.map((profile) => profile.id === state.settings.activeProfileId ? { ...profile, codexCli: true } : profile),
+      })
     },
     cancelAction: () => useStore.getState().dismissCodexCliPrompt(promptKey),
   })
@@ -764,7 +737,7 @@ export function showCodexCliPrompt(force = false, reason = '接口返回的提�
 
 function getCustomRecoveryProfile(settings: AppSettings, task: TaskRecord) {
   const taskProfile = getTaskApiProfile(settings, task)
-  if (taskProfile && taskProfile.provider === task.apiProvider && taskProfile.provider !== 'openai') return taskProfile
+  if (taskProfile && taskProfile.connectionId === task.apiConnectionId && !isOpenAIConnection(taskProfile.connectionId)) return taskProfile
   return null
 }
 
@@ -780,13 +753,6 @@ function createSettingsForApiProfile(settings: AppSettings, profile: ApiProfile)
   const normalized = normalizeSettings(settings)
   return normalizeSettings({
     ...normalized,
-    baseUrl: profile.baseUrl,
-    apiKey: profile.apiKey,
-    model: profile.model,
-    timeout: profile.timeout,
-    apiMode: profile.apiMode,
-    codexCli: profile.codexCli,
-    apiProxy: profile.apiProxy,
     profiles: normalized.profiles.map((item) => item.id === profile.id ? profile : item),
     activeProfileId: profile.id,
   })
@@ -816,15 +782,11 @@ function isApiRequestNetworkError(err: unknown): boolean {
   return false
 }
 
-function getApiModeApiName(apiMode: ApiMode) {
-  return apiMode === 'responses' ? 'Responses API' : 'Image API'
-}
-
 function getApiRequestNetworkErrorHint(
   err: unknown,
   createdAt: number,
   usesApiProxy: boolean,
-  profile?: Pick<ApiProfile, 'provider' | 'apiMode' | 'streamImages' | 'streamPartialImages'> | null,
+  profile?: Pick<ApiProfile, 'connectionId' | 'streamImages' | 'streamPartialImages'> | null,
 ): string | null {
   if (!isApiRequestNetworkError(err)) return null
 
@@ -834,8 +796,8 @@ function getApiRequestNetworkErrorHint(
     if (usesApiProxy) {
       return '提示：请求立即失败，请检查 API 代理服务是否正常运行。'
     }
-    const unsupportedApiHint = profile?.provider === 'openai'
-      ? `\n· API 不支持 ${getApiModeApiName(profile.apiMode)}`
+    const unsupportedApiHint = profile && isOpenAIConnection(profile.connectionId)
+      ? `\n· API 不支持 ${profile.connectionId === 'openai-responses' ? 'Responses API' : 'Images API'}`
       : ''
     return `提示：请求立即失败，可能原因：\n· API 服务器不可达或地址有误，请检查 API URL 是否正确、服务是否正常运行${unsupportedApiHint}\n· 接口不支持浏览器跨域请求，可使用 Docker 部署版或本地运行版并配置 API 代理解决`
   }
@@ -1090,10 +1052,9 @@ export async function submitTask(options: { allowFullMask?: boolean; useCurrentA
       id: genId(),
       prompt: taskPrompt,
       params: taskParams,
-      apiProvider: activeProfile.provider,
+      apiConnectionId: activeProfile.connectionId,
       apiProfileId: activeProfile.id,
       apiProfileName: activeProfile.name,
-      apiMode: activeProfile.apiMode,
       apiModel: activeProfile.model,
       inputImageIds: orderedInputImages.map((i) => i.id),
       maskTargetImageId,
@@ -1318,13 +1279,13 @@ async function executeTask(taskId: string) {
   }
   const activeProfile = taskProfile ?? getActiveApiProfile(settings)
   const requestSettings = createSettingsForApiProfile(settings, activeProfile)
-  const taskProvider = taskProfile?.provider ?? task.apiProvider ?? activeProfile.provider
+  const taskConnection = taskProfile?.connectionId ?? task.apiConnectionId ?? activeProfile.connectionId
   let customTaskInfo: { taskId: string } | null = task.customTaskId
     ? { taskId: task.customTaskId }
     : null
 
   if (
-    !isAsyncCustomProviderTask(requestSettings, taskProvider, task.inputImageIds.length > 0) &&
+    !isAsyncCustomConnectionTask(requestSettings, taskConnection, task.inputImageIds.length > 0) &&
     !usesConcurrentImageRequests(requestSettings, activeProfile, task.params, task.inputImageIds.length > 0)
   ) {
     scheduleOpenAIWatchdog(taskId, activeProfile.timeout, activeProfile)
@@ -1379,7 +1340,7 @@ async function executeTask(taskId: string) {
 
     // 存储输出图片
     const { outputIds, outputDataUrls, outputImageSizes, transparentOriginalImageIds } = await storeTaskOutputImages(task, result.images)
-    const isAsyncCustomTask = taskProvider !== 'openai' && Boolean(customTaskInfo)
+    const isAsyncCustomTask = !isOpenAIConnection(taskConnection) && Boolean(customTaskInfo)
     const actualParamsList = await resolveImageSizeParamsList(
       outputDataUrls,
       isAsyncCustomTask ? undefined : result.actualParamsList,
@@ -1396,7 +1357,7 @@ async function executeTask(taskId: string) {
       (revisedPrompt) => revisedPrompt?.trim() && revisedPrompt.trim() !== requestPrompt.trim(),
     )
     const hasRevisedPromptValue = shouldStoreRevisedPrompts && revisedPrompts?.some((revisedPrompt) => revisedPrompt?.trim())
-    if (taskExecutions.get(taskId) === execution && taskProvider === 'openai' && activeProfile.apiMode === 'responses' && !activeProfile.codexCli) {
+    if (taskExecutions.get(taskId) === execution && taskConnection === 'openai-responses' && !activeProfile.codexCli) {
       if (promptWasRevised) {
         showCodexCliPrompt()
       } else if (!hasRevisedPromptValue) {
@@ -1464,11 +1425,10 @@ async function executeTask(taskId: string) {
       let errorMessage = err instanceof Error ? err.message : String(err)
       const settings = useStore.getState().settings
       const profile = getTaskApiProfile(settings, latestTask)
-      const usesApiProxy = profile?.apiProxy ?? settings.apiProxy
       const activeProfile = getActiveApiProfile(settings)
+      const usesApiProxy = profile?.apiProxy ?? activeProfile.apiProxy
       const hintProfile = profile ?? {
-        provider: latestTask.apiProvider ?? activeProfile.provider,
-        apiMode: settings.apiMode,
+        connectionId: latestTask.apiConnectionId ?? activeProfile.connectionId,
         streamImages: activeProfile.streamImages,
         streamPartialImages: activeProfile.streamPartialImages,
       }
@@ -1616,10 +1576,9 @@ export async function retryTask(task: TaskRecord) {
     id: taskId,
     prompt: source.prompt,
     params: taskParams,
-    apiProvider: activeProfile.provider,
+    apiConnectionId: activeProfile.connectionId,
     apiProfileId: activeProfile.id,
     apiProfileName: activeProfile.name,
-    apiMode: activeProfile.apiMode,
     apiModel: activeProfile.model,
     inputImageIds: [...source.inputImageIds],
     maskTargetImageId: source.maskTargetImageId ?? null,
@@ -1864,7 +1823,7 @@ export async function clearData(options: ClearOptions = { clearConfig: true, cle
     const presetConfig = getPresetConfig()
     useStore.setState({
       dismissedPresetProfileIds: [],
-      dismissedPresetProviderIds: [],
+      dismissedPresetConnectionIds: [],
       dismissedCodexCliPrompts: [],
     })
     if (presetConfig) {
@@ -1911,8 +1870,8 @@ async function recoverCustomTask(taskId: string) {
   if (!task || !task.customTaskId || task.status === 'done') return
 
   const profile = getCustomRecoveryProfile(settings, task)
-  const customProvider = profile ? getCustomProviderDefinition(settings, profile.provider) : null
-  if (!profile || !customProvider?.poll) {
+  const customConnection = profile ? getCustomConnectionDefinition(settings, profile.connectionId) : null
+  if (!profile || !customConnection?.poll) {
     clearCustomRecoveryTimer(taskId)
     updateTaskInStore(taskId, {
       ...createTaskErrorPatch(task, '异步任务的接入方式已不可用，请重新选择。', Date.now()),
@@ -1922,7 +1881,7 @@ async function recoverCustomTask(taskId: string) {
   }
 
   try {
-    const result = await getCustomQueuedImageResult(profile, customProvider, task.customTaskId, task.params)
+    const result = await getCustomQueuedImageResult(profile, customConnection, task.customTaskId, task.params)
     clearCustomRecoveryTimer(taskId)
     await completeRecoveredCustomTask(task, result)
   } catch (err) {
@@ -2023,15 +1982,15 @@ export interface ImportOptions {
   importTasks?: boolean
 }
 
-export async function restoreExplicitPresetConfig(ids: { providerIds: string[], profileIds: string[] }) {
-  const presetProviderIds = getPresetProviderIds()
+export async function restoreExplicitPresetConfig(ids: { connectionIds: string[], profileIds: string[] }) {
+  const presetConnectionIds = getPresetConnectionIds()
   const presetProfileIds = getPresetProfileIds()
-  const providerIds = ids.providerIds.filter((id) => presetProviderIds.has(id))
+  const connectionIds = ids.connectionIds.filter((id) => presetConnectionIds.has(id))
   const profileIds = ids.profileIds.filter((id) => presetProfileIds.has(id))
-  if (!providerIds.length && !profileIds.length) return false
+  if (!connectionIds.length && !profileIds.length) return false
 
   const state = useStore.getState()
-  for (const id of providerIds) state.restorePresetProvider(id)
+  for (const id of connectionIds) state.restorePresetConnection(id)
   for (const id of profileIds) state.restorePresetProfile(id)
   const presetConfig = getPresetConfig()
   if (presetConfig) await useStore.getState().setPresetImportedSettings(presetConfig)
@@ -2141,16 +2100,16 @@ export async function importData(input: File | File[], options: ImportOptions = 
 
     if (options.importConfig && settingsManifests.length) {
       const state = useStore.getState()
-      const providerIds = new Set(settingsManifests.flatMap((part) =>
-        part.manifest.settings?.customProviders?.map((provider) => provider.id) ?? [],
+      const connectionIds = new Set(settingsManifests.flatMap((part) =>
+        part.manifest.settings?.customConnections?.map((connection) => connection.id) ?? [],
       ))
       const profileIds = new Set(settingsManifests.flatMap((part) =>
         part.manifest.settings?.profiles.map((profile) => profile.id) ?? [],
       ))
-      const presetProviderIds = getPresetProviderIds()
+      const presetConnectionIds = getPresetConnectionIds()
       const presetProfileIds = getPresetProfileIds()
-      for (const id of providerIds) {
-        if (presetProviderIds.has(id)) state.restorePresetProvider(id)
+      for (const id of connectionIds) {
+        if (presetConnectionIds.has(id)) state.restorePresetConnection(id)
       }
       for (const id of profileIds) {
         if (presetProfileIds.has(id)) state.restorePresetProfile(id)

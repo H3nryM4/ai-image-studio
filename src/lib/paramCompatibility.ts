@@ -1,5 +1,5 @@
 import { DEFAULT_PARAMS, type AppSettings, type TaskParams } from '../types'
-import { getActiveApiProfile, isOpenAICompatibleProvider } from './apiProfiles'
+import { getActiveApiProfile, isApiConnectionAvailable } from './apiProfiles'
 import { getImageGenerationModel, isGptImage25Model } from './imageModels'
 import { normalizeCodexCliImageSize, normalizeImageSize } from './size'
 
@@ -16,7 +16,7 @@ export function normalizeParamsForSettings(
     n: Math.min(MAX_OPENAI_OUTPUT_IMAGES, Math.max(1, params.n || DEFAULT_PARAMS.n)),
   }
 
-  if (isOpenAICompatibleProvider(settings, activeProfile.provider) && activeProfile.codexCli) {
+  if (isApiConnectionAvailable(settings, activeProfile.connectionId) && activeProfile.codexCli) {
     nextParams.size = normalizeCodexCliImageSize(nextParams.size)
     nextParams.quality = DEFAULT_PARAMS.quality
   }

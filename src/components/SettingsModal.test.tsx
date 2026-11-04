@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
-import { act } from 'react'
+import { act, type ComponentProps } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useStore } from '../store'
-import { createDefaultOpenAIProfile, DEFAULT_SETTINGS, normalizeSettings } from '../lib/apiProfiles'
+import { createDefaultOpenAIProfile, DEFAULT_IMAGES_MODEL, DEFAULT_RESPONSES_MODEL, DEFAULT_SETTINGS, normalizeSettings } from '../lib/apiProfiles'
+import * as presetConfig from '../lib/presetConfig'
+import type Select from './Select'
 import SettingsModal from './SettingsModal'
 
 vi.mock('../store', async () => {
@@ -17,14 +19,22 @@ vi.mock('../store', async () => {
     setSettings: (settings: typeof DEFAULT_SETTINGS) => set({ settings: normalizeSettings(settings) }),
     setShowSettings: (showSettings: boolean) => set({ showSettings }),
     dismissPresetProfile: vi.fn(),
-    dismissPresetProvider: vi.fn(),
-    restorePresetProvider: vi.fn(),
+    dismissPresetConnection: vi.fn(),
+    restorePresetConnection: vi.fn(),
     setReusedTaskApiProfile: vi.fn(),
     setConfirmDialog: vi.fn(),
     showToast: vi.fn(),
   }))
   return { useStore, exportData: vi.fn(), importData: vi.fn(), clearData: vi.fn() }
 })
+
+vi.mock('./Select', () => ({
+  default: (props: ComponentProps<typeof Select>) => (
+    <select value={props.value} disabled={props.disabled} onChange={(e) => props.onChange(e.target.value)}>
+      {props.options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+    </select>
+  ),
+}))
 
 let el: HTMLDivElement
 let root: Root
@@ -49,6 +59,14 @@ afterEach(async () => {
 async function openSettings(settings = normalizeSettings(DEFAULT_SETTINGS)) {
   await act(async () => root.render(<SettingsModal onImportProfile={vi.fn()} />))
   await act(async () => useStore.setState({ settings, showSettings: true }))
+}
+
+async function selectConnection(value: string) {
+  const select = el.querySelector('select')!
+  await act(async () => {
+    select.value = value
+    select.dispatchEvent(new Event('change', { bubbles: true }))
+  })
 }
 
 describe('settings modal', () => {
@@ -114,5 +132,46 @@ describe('settings modal', () => {
     expect(document.getElementById('profile-share-title')).toBeNull()
     expect(el.querySelector<HTMLInputElement>('input[aria-label="配置名称"]')?.value).toBe(profile.name)
     expect(el.querySelector<HTMLInputElement>('input[aria-label="API 地址"]')?.value).toBe(profile.baseUrl)
+  })
+
+  it('switches connection modes and connections while preserving credentials, custom models and connection drafts', async () => {
+    const connection = { id: 'vendor:responses', name: '自定义接入', submit: { path: '/generate' } }
+    const profile = createDefaultOpenAIProfile({ id: 'saved', apiKey: 'local-key', baseUrl: 'https://vendor.example/v1', model: DEFAULT_IMAGES_MODEL })
+    const settings = normalizeSettings({ ...DEFAULT_SETTINGS, customConnections: [connection], profiles: [profile], activeProfileId: profile.id })
+    await openSettings(settings)
+    expect(Array.from(el.querySelector('select')!.options).map((option) => option.value)).toEqual([
+      '__add_custom_connection__', 'openai-images', 'openai-responses', 'vendor:responses',
+    ])
+    expect(el.textContent).toContain('接入方式')
+    expect(el.textContent).not.toContain('API 接口')
+    expect(el.textContent).not.toContain('服务商类型')
+
+    await selectConnection('openai-responses')
+    expect(useStore.getState().settings.profiles[0]).toMatchObject({ connectionId: 'openai-responses', model: DEFAULT_RESPONSES_MODEL, apiKey: profile.apiKey, baseUrl: profile.baseUrl })
+    expect(el.textContent).toContain('请求模型')
+    expect(el.querySelector('input[aria-label="请求模型"]')).not.toBeNull()
+    expect(el.querySelector('input[aria-label="图像生成模型"]')).not.toBeNull()
+    await selectConnection('openai-images')
+    expect(useStore.getState().settings.profiles[0].model).toBe(DEFAULT_IMAGES_MODEL)
+
+    await act(async () => useStore.setState({ showSettings: false }))
+    await act(async () => useStore.setState({ settings: normalizeSettings({ ...settings, profiles: [{ ...profile, model: 'vendor/model' }] }), showSettings: true }))
+    await selectConnection('openai-responses')
+    expect(useStore.getState().settings.profiles[0].model).toBe('vendor/model')
+    await selectConnection('vendor:responses')
+    expect(useStore.getState().settings.profiles[0]).toMatchObject({ connectionId: connection.id, model: 'vendor/model' })
+    await selectConnection('openai-responses')
+    expect(useStore.getState().settings.profiles[0]).toMatchObject({ connectionId: 'openai-responses', model: 'vendor/model', apiKey: profile.apiKey, baseUrl: profile.baseUrl })
+    await selectConnection('vendor:responses')
+    expect(useStore.getState().settings.profiles[0]).toMatchObject({ connectionId: connection.id, apiKey: profile.apiKey })
+  })
+
+  it('keeps the connection fixed in preset-only mode', async () => {
+    vi.spyOn(presetConfig, 'isPresetConfigOnlyEnabled').mockReturnValue(true)
+    await openSettings()
+    expect(Array.from(el.querySelector('select')!.options).map((option) => option.value)).toEqual(['openai-images'])
+    expect(el.querySelector('select')!.disabled).toBe(true)
+    await selectConnection('openai-responses')
+    expect(useStore.getState().settings.profiles[0].connectionId).toBe('openai-images')
   })
 })

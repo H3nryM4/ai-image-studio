@@ -1,7 +1,7 @@
 import type { TaskRecord, StoredImage, StoredImageThumbnail } from '../types'
 
 const DB_NAME = 'ai-image-studio'
-const DB_VERSION = 4
+const DB_VERSION = 5
 const STORE_TASKS = 'tasks'
 const STORE_IMAGES = 'images'
 const STORE_THUMBNAILS = 'thumbnails'
@@ -17,7 +17,7 @@ function openDB(): Promise<IDBDatabase> {
     req.onupgradeneeded = (e) => {
       const db = (e.target as IDBOpenDBRequest).result
       // 新结构直接重置旧数据，不迁移已移除的功能。
-      if (e.oldVersion > 0 && e.oldVersion < 4) {
+      if (e.oldVersion > 0 && e.oldVersion < DB_VERSION) {
         for (const name of Array.from(db.objectStoreNames)) db.deleteObjectStore(name)
       }
       if (!db.objectStoreNames.contains(STORE_TASKS)) {

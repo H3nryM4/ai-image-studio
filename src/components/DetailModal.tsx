@@ -11,7 +11,7 @@ import { createMaskPreviewDataUrl } from '../lib/canvasImage'
 import { dismissAllTooltips } from '../lib/tooltipDismiss'
 import { downloadImageEntriesAsZip, downloadImageIds, getImageZipEntries } from '../lib/downloadImages'
 import { getImageComments, getTaskPromptText, replaceImageMentionsForApi } from '../lib/promptImageMentions'
-import { getApiProviderLabel } from '../lib/apiProfiles'
+import { getApiConnectionLabel, getActiveApiProfile } from '../lib/apiProfiles'
 import { CloseIcon, CodeIcon, CopyIcon, DownloadIcon, EditIcon, LinkIcon, TrashIcon } from './icons'
 
 import ViewportTooltip from './ViewportTooltip'
@@ -251,14 +251,13 @@ export default function DetailModal() {
   const promptSentToApi = replaceImageMentionsForApi(requestPrompt, task.inputImageIds.length).trim()
   const showRevisedPrompt = Boolean(currentRevisedPrompt && currentRevisedPrompt !== promptSentToApi)
   const codexCliPromptKey = getCodexCliPromptKey(settings)
-  const hasHandledPromptWarning = settings.codexCli || dismissedCodexCliPrompts.includes(codexCliPromptKey)
-  const taskProvider = task.apiProvider
-  const isOpenAiTask = (taskProvider ?? 'openai') === 'openai'
-  const showPromptWarning = Boolean(isOpenAiTask && task.apiMode === 'responses' && currentOutputImageId && (!currentRevisedPrompt || showRevisedPrompt) && !hasHandledPromptWarning)
-  const taskProviderName = taskProvider ? getApiProviderLabel(settings, taskProvider) : '未知'
+  const hasHandledPromptWarning = getActiveApiProfile(settings).codexCli || dismissedCodexCliPrompts.includes(codexCliPromptKey)
+  const taskConnection = task.apiConnectionId
+  const showPromptWarning = Boolean(taskConnection === 'openai-responses' && currentOutputImageId && (!currentRevisedPrompt || showRevisedPrompt) && !hasHandledPromptWarning)
+  const taskConnectionName = taskConnection ? getApiConnectionLabel(settings, taskConnection) : '未知'
   const taskProfileName = task.apiProfileName || '未知'
   const taskModel = task.apiModel || '未知'
-  const showSourceInfo = Boolean(task.apiProvider || task.apiProfileName || task.apiModel)
+  const showSourceInfo = Boolean(task.apiConnectionId || task.apiProfileName || task.apiModel)
   const isCustomReconnecting = task.status === 'error' && task.customRecoverable
   const rawImageUrls = task.rawImageUrls ?? []
   const streamPreviewLen = streamPreviewItems.length
@@ -941,7 +940,7 @@ export default function DetailModal() {
                 <span className="text-gray-400 dark:text-gray-500">来源</span>
                 <br />
                 <div className="mt-0.5 overflow-x-auto hide-scrollbar whitespace-nowrap mask-edge-r pr-2">
-                  <span className="font-medium text-gray-700 dark:text-gray-200">{taskProviderName}</span>
+                  <span className="font-medium text-gray-700 dark:text-gray-200">{taskConnectionName}</span>
                   <span className="text-gray-400 dark:text-gray-500"> · {taskProfileName} · {taskModel}</span>
                 </div>
               </div>

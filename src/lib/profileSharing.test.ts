@@ -11,7 +11,7 @@ afterEach(() => {
 
 describe('profile sharing', () => {
   it('round-trips a complete profile through a fragment without including credentials or local identity by default', () => {
-    const profile = { ...saved, name: '中文 & + 配置', responseFormatB64Json: true, streamImages: true, streamPartialImages: 3 as const, timeout: 217, imageGenerationModel: '', providerDrafts: { openai: { baseUrl: 'https://old.example' } } }
+    const profile = { ...saved, name: '中文 & + 配置', responseFormatB64Json: true, streamImages: true, streamPartialImages: 3 as const, timeout: 217, imageGenerationModel: '', connectionDrafts: { openai: { baseUrl: 'https://old.example' } } }
     const url = new URL(createProfileShareUrl('https://studio.example/app?old=1#section', profile))
     expect(url.search).toBe('')
     expect(url.hash).toMatch(/^#config=/)
@@ -20,7 +20,7 @@ describe('profile sharing', () => {
     const raw = JSON.parse(new URLSearchParams(url.hash.slice(1)).get('config')!)
     expect(raw.profiles[0]).not.toHaveProperty('id')
     expect(raw.profiles[0]).not.toHaveProperty('isDefault')
-    expect(raw.profiles[0]).not.toHaveProperty('providerDrafts')
+    expect(raw.profiles[0]).not.toHaveProperty('connectionDrafts')
     const imported = readProfileImport(url.toString(), current)
     expect(imported.profiles[0]).toMatchObject({ name: profile.name, apiKey: '', responseFormatB64Json: true, streamImages: true, streamPartialImages: 3, timeout: 217, imageGenerationModel: '' })
   })
@@ -52,15 +52,15 @@ describe('profile sharing', () => {
     expect(legacy.profiles[0]).toMatchObject({ baseUrl: 'https://other.example/v1', apiKey: '', model: 'other' })
   })
 
-  it('adds profiles with colliding source IDs and custom provider IDs without overwriting local data', () => {
-    const provider = { id: 'custom', name: '本地服务', submit: { path: '/local' } }
-    const base = normalizeSettings({ customProviders: [provider], profiles: [{ ...saved, provider: 'custom' }] })
-    const incoming = readProfileImport(JSON.stringify({ customProviders: [{ ...provider, name: '传入服务', submit: { path: '/incoming' } }], profiles: [{ ...saved, provider: 'custom' }] }), base)
+  it('adds profiles with colliding source IDs and custom connection IDs without overwriting local data', () => {
+    const connection = { id: 'custom', name: '本地服务', submit: { path: '/local' } }
+    const base = normalizeSettings({ customConnections: [connection], profiles: [{ ...saved, connectionId: 'custom' }] })
+    const incoming = readProfileImport(JSON.stringify({ customConnections: [{ ...connection, name: '传入服务', submit: { path: '/incoming' } }], profiles: [{ ...saved, connectionId: 'custom' }] }), base)
     const next = applyProfileImport(base, incoming, 'add')
-    expect(next.customProviders[0]).toEqual(base.customProviders[0])
-    expect(next.customProviders).toHaveLength(2)
+    expect(next.customConnections[0]).toEqual(base.customConnections[0])
+    expect(next.customConnections).toHaveLength(2)
     expect(next.profiles[0]).toEqual(base.profiles[0])
-    expect(next.profiles[1].provider).toBe(next.customProviders[1].id)
+    expect(next.profiles[1].connectionId).toBe(next.customConnections[1].id)
     expect(next.profiles[1].id).not.toBe(saved.id)
     expect(findSharedProfile(base, incoming)).toBeNull()
   })
@@ -94,8 +94,8 @@ describe('profile sharing', () => {
     expect(() => readProfileImport('https://studio.example/?settings=broken', current)).toThrow('JSON 无效')
     expect(() => readProfileImport('https://studio.example/#config=%7B%7D', current)).toThrow()
     expect(() => readProfileImport('https://studio.example/?unrelated=1', current)).toThrow('没有 API 配置')
-    expect(() => readProfileImport(JSON.stringify({ format: 'ai-image-studio-profile', version: 2, profiles: [saved] }), current)).toThrow('不支持此配置版本')
-    expect(() => readProfileImport(JSON.stringify({ profiles: [{ provider: 'missing' }] }), current)).toThrow('不存在的自定义服务商')
+    expect(() => readProfileImport(JSON.stringify({ format: 'ai-image-studio-profile', version: 1, profiles: [saved] }), current)).toThrow('不支持此配置版本')
+    expect(() => readProfileImport(JSON.stringify({ profiles: [{ connectionId: 'missing' }] }), current)).toThrow('不存在的自定义服务商')
   })
 
   it('previews only allowed fields in a locked preset deployment and rejects normal add/replace actions', async () => {
@@ -103,7 +103,7 @@ describe('profile sharing', () => {
     vi.stubEnv('VITE_SHOW_PRESET_CONFIG_ONLY', 'true')
     vi.stubEnv('VITE_LOCK_PRESET_CONFIG_PARAMS', 'true')
     const policy = await import('./presetConfig')
-    policy.setPresetConfig({ customProviders: [], profiles: [saved] })
+    policy.setPresetConfig({ customConnections: [], profiles: [saved] })
     const sharing = await import('./profileSharing')
     const imported = sharing.readProfileImport('https://studio.example/?profileId=saved&apiKey=new-key&model=untrusted-model', current)
     expect(imported.profiles[0]).toMatchObject({ id: saved.id, model: saved.model, apiKey: 'new-key' })

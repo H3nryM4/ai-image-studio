@@ -1,28 +1,28 @@
-import type { ApiProfile, AppSettings, CustomProviderDefinition } from '../types'
-import { DEFAULT_SETTINGS, findEquivalentApiProfile, importCustomProviderSettingsFromJson, normalizeSettings, type ImportedProviderSettings } from './apiProfiles'
+import type { ApiProfile, AppSettings, CustomConnectionDefinition } from '../types'
+import { DEFAULT_SETTINGS, findEquivalentApiProfile, importCustomConnectionSettingsFromJson, normalizeSettings, type ImportedConnectionSettings } from './apiProfiles'
 import { getPresetConfig, isPresetConfigOnlyEnabled, isPresetProfileLocked } from './presetConfig'
 import { buildSettingsFromUrlParams, getUrlSettingsPayload, hasUrlSettingParams } from './urlSettings'
 
-export function createProfileShareJson(profile: ApiProfile, provider?: CustomProviderDefinition, includeApiKey = false) {
+export function createProfileShareJson(profile: ApiProfile, connection?: CustomConnectionDefinition, includeApiKey = false) {
   return JSON.stringify({
     format: 'ai-image-studio-profile',
-    version: 1,
-    ...(provider ? { customProviders: [provider] } : {}),
+    version: 2,
+    ...(connection ? { customConnections: [connection] } : {}),
     profiles: [{
       ...profile,
       id: undefined,
       isDefault: undefined,
-      providerDrafts: undefined,
+      connectionDrafts: undefined,
       selectedModel: undefined,
       apiKey: includeApiKey ? profile.apiKey : '',
     }],
   }, null, 2)
 }
 
-export function createProfileShareUrl(baseUrl: string, profile: ApiProfile, provider?: CustomProviderDefinition, includeApiKey = false) {
+export function createProfileShareUrl(baseUrl: string, profile: ApiProfile, connection?: CustomConnectionDefinition, includeApiKey = false) {
   const url = new URL(baseUrl)
   url.search = ''
-  url.hash = new URLSearchParams({ config: createProfileShareJson(profile, provider, includeApiKey) }).toString()
+  url.hash = new URLSearchParams({ config: createProfileShareJson(profile, connection, includeApiKey) }).toString()
   return url.toString()
 }
 
@@ -52,13 +52,13 @@ export function readProfileImport(text: string, current: AppSettings) {
     }
   }
 
-  let imported: ImportedProviderSettings | null = null
+  let imported: ImportedConnectionSettings | null = null
   if (json) {
     const raw = JSON.parse(json.replace(/^```[^\r\n]*\r?\n([\s\S]*?)\r?\n```$/, '$1')) as unknown
-    if (raw && typeof raw === 'object' && 'format' in raw && raw.format === 'ai-image-studio-profile' && 'version' in raw && raw.version !== 1) {
+    if (raw && typeof raw === 'object' && 'format' in raw && raw.format === 'ai-image-studio-profile' && 'version' in raw && raw.version !== 2) {
       throw new Error('不支持此配置版本，请更新应用后重试')
     }
-    imported = importCustomProviderSettingsFromJson(JSON.stringify(raw))
+    imported = importCustomConnectionSettingsFromJson(JSON.stringify(raw))
     if (!imported.profiles.length) throw new Error('配置中没有 API 配置，请在服务商编辑器中导入服务商定义')
     params.set('settings', JSON.stringify(imported))
   }
@@ -67,13 +67,13 @@ export function readProfileImport(text: string, current: AppSettings) {
     const preset = getPresetConfig()
     const base = normalizeSettings({
       ...current,
-      customProviders: [...current.customProviders, ...(preset?.customProviders.filter((provider) => !current.customProviders.some((item) => item.id === provider.id)) ?? [])],
+      customConnections: [...current.customConnections, ...(preset?.customConnections.filter((connection) => !current.customConnections.some((item) => item.id === connection.id)) ?? [])],
       profiles: [...current.profiles, ...(preset?.profiles.filter((profile) => !current.profiles.some((item) => item.id === profile.id)) ?? [])],
     })
     const next = buildSettingsFromUrlParams(base, params)
     const profile = next.profiles?.find((profile) => profile.id === next.activeProfileId)
     if (!profile) throw new Error('此部署仅支持导入匹配的预置配置')
-    return { customProviders: base.customProviders, profiles: [{ ...profile, apiKey: profile.apiKey === '{key}' ? '' : profile.apiKey }], params }
+    return { customConnections: base.customConnections, profiles: [{ ...profile, apiKey: profile.apiKey === '{key}' ? '' : profile.apiKey }], params }
   }
 
   const hasFields = [...params.keys()].some((key) => key !== 'settings' && key !== 'profileId')
@@ -86,7 +86,7 @@ export function readProfileImport(text: string, current: AppSettings) {
     const profile = next.profiles?.find((profile) => profile.id === next.activeProfileId)
     if (!profile) throw new Error('链接中没有可导入的 API 配置')
     imported = {
-      customProviders: next.customProviders ?? [],
+      customConnections: next.customConnections ?? [],
       profiles: [profile],
     }
   }
@@ -98,21 +98,21 @@ export function readProfileImport(text: string, current: AppSettings) {
   }
 }
 
-export function findSharedProfile(current: AppSettings, imported: ImportedProviderSettings) {
+export function findSharedProfile(current: AppSettings, imported: ImportedConnectionSettings) {
   if (imported.profiles.length !== 1) return null
   // 分享文件中的 ID 属于发送方，不能用来判断本地配置是否相同。
   const profile = imported.profiles[0]
-  const provider = imported.customProviders.find((provider) => provider.id === profile.provider)
-  const existingProvider = provider
-    ? current.customProviders.find((item) => JSON.stringify({ ...item, id: undefined }) === JSON.stringify({ ...provider, id: undefined }))
+  const connection = imported.customConnections.find((connection) => connection.id === profile.connectionId)
+  const existingConnection = connection
+    ? current.customConnections.find((item) => JSON.stringify({ ...item, id: undefined }) === JSON.stringify({ ...connection, id: undefined }))
     : null
-  if (provider && !existingProvider) return null
-  return findEquivalentApiProfile(current, { ...profile, id: '', provider: existingProvider?.id ?? profile.provider })
+  if (connection && !existingConnection) return null
+  return findEquivalentApiProfile(current, { ...profile, id: '', connectionId: existingConnection?.id ?? profile.connectionId })
 }
 
 export function applyProfileImport(
   current: AppSettings,
-  imported: ImportedProviderSettings,
+  imported: ImportedConnectionSettings,
   mode: 'add' | 'reuse' | 'replace',
   targetId?: string,
 ) {
@@ -128,19 +128,19 @@ export function applyProfileImport(
     throw new Error('无法覆盖所选配置')
   }
 
-  const customProviders = [...current.customProviders]
-  const providerIds = new Map<string, string>()
-  for (const provider of imported.customProviders) {
-    const existing = customProviders.find((item) => JSON.stringify({ ...item, id: undefined }) === JSON.stringify({ ...provider, id: undefined }))
+  const customConnections = [...current.customConnections]
+  const connectionIds = new Map<string, string>()
+  for (const connection of imported.customConnections) {
+    const existing = customConnections.find((item) => JSON.stringify({ ...item, id: undefined }) === JSON.stringify({ ...connection, id: undefined }))
     if (existing) {
-      providerIds.set(provider.id, existing.id)
+      connectionIds.set(connection.id, existing.id)
       continue
     }
-    let id = provider.id
+    let id = connection.id
     let suffix = 1
-    while (customProviders.some((item) => item.id === id)) id = `${provider.id}-${suffix++}`
-    customProviders.push({ ...provider, id })
-    providerIds.set(provider.id, id)
+    while (customConnections.some((item) => item.id === id)) id = `${connection.id}-${suffix++}`
+    customConnections.push({ ...connection, id })
+    connectionIds.set(connection.id, id)
   }
 
   const profiles = [...current.profiles]
@@ -153,11 +153,11 @@ export function applyProfileImport(
       ...profile,
       id,
       isDefault: mode === 'replace' ? target?.isDefault : undefined,
-      provider: providerIds.get(profile.provider) ?? profile.provider,
+      connectionId: connectionIds.get(profile.connectionId) ?? profile.connectionId,
     }
     if (mode === 'replace') profiles[profiles.findIndex((item) => item.id === id)] = next
     else profiles.push(next)
     importedIds.push(id)
   }
-  return normalizeSettings({ ...current, customProviders, profiles, activeProfileId: importedIds[0] })
+  return normalizeSettings({ ...current, customConnections, profiles, activeProfileId: importedIds[0] })
 }

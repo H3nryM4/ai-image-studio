@@ -38,17 +38,17 @@ describe('parameter compatibility', () => {
     expect(normalizeParamsForSettings({ ...DEFAULT_PARAMS, size: 'auto' }, settings).size).toBe('auto')
   })
 
-  it('applies Codex CLI parameter limits to custom providers', () => {
+  it('applies Codex CLI parameter limits to custom connections', () => {
     const settings = normalizeSettings({
       ...DEFAULT_SETTINGS,
-      customProviders: [{
-        id: 'custom-provider',
-        name: 'Custom Provider',
+      customConnections: [{
+        id: 'custom-connection',
+        name: 'Custom Connection',
         submit: { path: 'images/generations' },
       }],
       profiles: [{
         ...createDefaultOpenAIProfile(),
-        provider: 'custom-provider',
+        connectionId: 'custom-connection',
         codexCli: true,
       }],
     })
@@ -67,11 +67,11 @@ describe('parameter compatibility', () => {
     expect(normalizeParamsForSettings({ ...DEFAULT_PARAMS, quality: 'max' }, settings).quality).toBe('max')
   })
 
-  it.each(['vendor/gpt-image-2.5-custom', 'my-gpt-image-2.5-proxy'])('keeps 2.5 quality levels for a custom provider model %s', (model) => {
-    const profile = { ...createDefaultOpenAIProfile({ model }), provider: 'custom-provider' }
+  it.each(['vendor/gpt-image-2.5-custom', 'my-gpt-image-2.5-proxy'])('keeps 2.5 quality levels for a custom connection model %s', (model) => {
+    const profile = { ...createDefaultOpenAIProfile({ model }), connectionId: 'custom-connection' }
     const settings = normalizeSettings({
       ...DEFAULT_SETTINGS,
-      customProviders: [{ id: 'custom-provider', name: 'Custom Provider', submit: { path: 'images/generations' } }],
+      customConnections: [{ id: 'custom-connection', name: 'Custom Connection', submit: { path: 'images/generations' } }],
       profiles: [profile],
       activeProfileId: profile.id,
     })

@@ -1,4 +1,4 @@
-import { DEFAULT_STREAM_PARTIAL_IMAGES, type ApiProfile, type CustomProviderDefinition, type CustomProviderPollMapping, type CustomProviderResultMapping, type CustomProviderSubmitMapping, type ImageApiResponse, type ImageResponseItem, type ResponsesApiResponse, type ResponsesOutputItem, type TaskParams } from '../types'
+import { DEFAULT_STREAM_PARTIAL_IMAGES, type ApiProfile, type CustomConnectionDefinition, type CustomConnectionPollMapping, type CustomConnectionResultMapping, type CustomConnectionSubmitMapping, type ImageApiResponse, type ImageResponseItem, type ResponsesApiResponse, type ResponsesOutputItem, type TaskParams } from '../types'
 import { dataUrlToBlob, imageDataUrlToPngBlob, maskDataUrlToPngBlob } from './canvasImage'
 import { buildApiUrl, readClientDevProxyConfig, shouldUseApiProxy } from './devProxy'
 import {
@@ -434,18 +434,8 @@ async function parseResponsesApiStreamResponse(
   }
 }
 
-export async function callOpenAICompatibleImageApi(opts: CallApiOptions, profile: ApiProfile, customProvider?: CustomProviderDefinition | null): Promise<CallApiResult> {
-  if (customProvider) {
-    const n = opts.params.n > 0 ? opts.params.n : 1
-    const submitMapping = opts.inputImageDataUrls.length > 0 && customProvider.editSubmit
-      ? customProvider.editSubmit
-      : customProvider.submit
-    const isAsync = Boolean(submitMapping.taskIdPath)
-    if (profile.codexCli && n > 1 && !isAsync) return callCustomHttpImageApiConcurrent(opts, profile, customProvider, n)
-    return callCustomHttpImageApi(opts, profile, customProvider)
-  }
-
-  return profile.apiMode === 'responses'
+export async function callOpenAICompatibleImageApi(opts: CallApiOptions, profile: ApiProfile): Promise<CallApiResult> {
+  return profile.connectionId === 'openai-responses'
     ? callResponsesImageApi(opts, profile)
     : callImagesApi(opts, profile)
 }
@@ -642,7 +632,7 @@ function sleep(ms: number, signal: AbortSignal): Promise<void> {
   })
 }
 
-function getTaskState(payload: unknown, poll: CustomProviderPollMapping): 'success' | 'failure' | 'pending' {
+function getTaskState(payload: unknown, poll: CustomConnectionPollMapping): 'success' | 'failure' | 'pending' {
   const status = getByPath(payload, poll.statusPath)
   const statusText = typeof status === 'string' ? status : String(status ?? '')
   if (poll.successValues.includes(statusText)) return 'success'
@@ -682,7 +672,7 @@ function resolveTemplateValue(value: unknown, context: Record<string, unknown>):
   return value
 }
 
-function createCustomProviderContext(opts: CallApiOptions, profile: ApiProfile) {
+function createCustomConnectionContext(opts: CallApiOptions, profile: ApiProfile) {
   const sizePrompt = profile.codexCli
     ? prependCodexCliSizePrompt(opts.prompt, opts.params.size)
     : opts.prompt
@@ -718,7 +708,7 @@ function renderQuery(query: Record<string, string> | undefined, context: Record<
   return entries.length ? Object.fromEntries(entries) : undefined
 }
 
-async function createCustomMultipartBody(mapping: CustomProviderSubmitMapping, opts: CallApiOptions, context: Record<string, unknown>): Promise<FormData> {
+async function createCustomMultipartBody(mapping: CustomConnectionSubmitMapping, opts: CallApiOptions, context: Record<string, unknown>): Promise<FormData> {
   const formData = new FormData()
   const body = resolveTemplateValue(mapping.body ?? {}, context)
   if (body && typeof body === 'object' && !Array.isArray(body)) {
@@ -764,7 +754,7 @@ async function createCustomMultipartBody(mapping: CustomProviderSubmitMapping, o
   return formData
 }
 
-async function extractCustomImages(payload: unknown, result: CustomProviderResultMapping, mime: string, signal?: AbortSignal): Promise<CallApiResult> {
+async function extractCustomImages(payload: unknown, result: CustomConnectionResultMapping, mime: string, signal?: AbortSignal): Promise<CallApiResult> {
   const images: string[] = []
   const imageUrls = (result.imageUrlPaths ?? []).flatMap((path) =>
     getAllByPath(payload, path).filter((value): value is string => isHttpUrl(value) || isDataUrl(value)),
@@ -794,9 +784,9 @@ async function extractCustomImages(payload: unknown, result: CustomProviderResul
   return { images, ...(rawImageUrls.length ? { rawImageUrls } : {}) }
 }
 
-async function submitCustomRequest(mapping: CustomProviderSubmitMapping, opts: CallApiOptions, profile: ApiProfile, controller: AbortController, proxyConfig: ReturnType<typeof readClientDevProxyConfig>, useApiProxy: boolean): Promise<unknown> {
+async function submitCustomRequest(mapping: CustomConnectionSubmitMapping, opts: CallApiOptions, profile: ApiProfile, controller: AbortController, proxyConfig: ReturnType<typeof readClientDevProxyConfig>, useApiProxy: boolean): Promise<unknown> {
   const requestHeaders = createRequestHeaders(profile)
-  const context = createCustomProviderContext(opts, profile)
+  const context = createCustomConnectionContext(opts, profile)
   const method = mapping.method ?? 'POST'
   const contentType = mapping.contentType ?? 'json'
   const path = appendQuery(mapping.path, renderQuery(mapping.query, context))
@@ -841,7 +831,7 @@ async function submitCustomRequest(mapping: CustomProviderSubmitMapping, opts: C
 
 async function pollCustomTaskResult(
   profile: ApiProfile,
-  poll: CustomProviderPollMapping,
+  poll: CustomConnectionPollMapping,
   taskId: string,
   mime: string,
   signal?: AbortSignal,
@@ -899,18 +889,20 @@ async function pollCustomTaskResult(
 
 export async function getCustomQueuedImageResult(
   profile: ApiProfile,
-  customProvider: CustomProviderDefinition,
+  customConnection: CustomConnectionDefinition,
   taskId: string,
   params: TaskParams,
 ): Promise<CallApiResult> {
-  if (!customProvider.poll) throw new Error('自定义异步任务缺少 poll 配置')
+  if (!customConnection.poll) throw new Error('自定义异步任务缺少 poll 配置')
   const mime = MIME_MAP[params.output_format] || 'image/png'
-  return pollCustomTaskResult(profile, customProvider.poll, taskId, mime)
+  return pollCustomTaskResult(profile, customConnection.poll, taskId, mime)
 }
 
-async function callCustomHttpImageApi(opts: CallApiOptions, profile: ApiProfile, customProvider: CustomProviderDefinition): Promise<CallApiResult> {
-  const { params, inputImageDataUrls } = opts
-  const isEdit = inputImageDataUrls.length > 0
+export async function callCustomHttpImageApi(opts: CallApiOptions, profile: ApiProfile, customConnection: CustomConnectionDefinition): Promise<CallApiResult> {
+  const n = opts.params.n > 0 ? opts.params.n : 1
+  const submitMapping = opts.inputImageDataUrls.length > 0 && customConnection.editSubmit ? customConnection.editSubmit : customConnection.submit
+  if (profile.codexCli && n > 1 && !submitMapping.taskIdPath) return callCustomHttpImageApiConcurrent(opts, profile, customConnection, n)
+  const params = opts.params
   const mime = MIME_MAP[params.output_format] || 'image/png'
   const controller = new AbortController()
   let timeoutId: ReturnType<typeof setTimeout> | null = setTimeout(() => controller.abort(), profile.timeout * 1000)
@@ -918,11 +910,10 @@ async function callCustomHttpImageApi(opts: CallApiOptions, profile: ApiProfile,
   try {
     const proxyConfig = readClientDevProxyConfig()
     const useApiProxy = shouldUseApiProxy(profile.apiProxy, proxyConfig)
-    const submitMapping = isEdit && customProvider.editSubmit ? customProvider.editSubmit : customProvider.submit
     if (useApiProxy && (submitMapping.method ?? 'POST') !== 'POST') {
       throw new Error('API 代理暂不支持使用 GET 提交的自定义服务商。请关闭 API 代理，或改用 POST 提交的自定义服务商配置。')
     }
-    if (useApiProxy && (submitMapping.taskIdPath || customProvider.poll)) {
+    if (useApiProxy && (submitMapping.taskIdPath || customConnection.poll)) {
       throw new Error('API 代理暂不支持使用异步任务的自定义服务商。请关闭 API 代理，或改用同步返回图片的自定义服务商配置。')
     }
     const submitPayload = await submitCustomRequest(submitMapping, opts, profile, controller, proxyConfig, useApiProxy)
@@ -934,13 +925,13 @@ async function callCustomHttpImageApi(opts: CallApiOptions, profile: ApiProfile,
       throw err
     }
     if (!taskId) return extractCustomImages(submitPayload, submitMapping.result ?? {}, mime, controller.signal)
-    if (!customProvider.poll) throw new Error('异步接口返回了 task_id，但服务商配置缺少 poll')
+    if (!customConnection.poll) throw new Error('异步接口返回了 task_id，但服务商配置缺少 poll')
     opts.onCustomTaskEnqueued?.({ taskId })
     if (timeoutId) {
       clearTimeout(timeoutId)
       timeoutId = null
     }
-    return pollCustomTaskResult(profile, customProvider.poll, taskId, mime, controller.signal)
+    return pollCustomTaskResult(profile, customConnection.poll, taskId, mime, controller.signal)
   } finally {
     if (timeoutId) clearTimeout(timeoutId)
   }
@@ -980,13 +971,13 @@ function mergeConcurrentApiResults(results: PromiseSettledResult<CallApiResult>[
 async function callCustomHttpImageApiConcurrent(
   opts: CallApiOptions,
   profile: ApiProfile,
-  customProvider: CustomProviderDefinition,
+  customConnection: CustomConnectionDefinition,
   n: number,
 ): Promise<CallApiResult> {
   const results = await Promise.allSettled(Array.from({ length: n }).map(() => callCustomHttpImageApi({
     ...opts,
     params: { ...opts.params, n: 1 },
-  }, profile, customProvider)))
+  }, profile, customConnection)))
   return mergeConcurrentApiResults(results)
 }
 

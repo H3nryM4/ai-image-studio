@@ -3,11 +3,11 @@ import { act, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { useCloseOnEscape } from '../../hooks/useCloseOnEscape'
-import CustomProviderModal from './CustomProviderModal'
+import CustomConnectionModal from './CustomConnectionModal'
 
 afterEach(() => vi.unstubAllGlobals())
 
-describe('custom provider modal', () => {
+describe('custom connection modal', () => {
   it('closes the editor with Escape while keeping its parent settings open', async () => {
     vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
     const closeSettings = vi.fn()
@@ -17,7 +17,7 @@ describe('custom provider modal', () => {
       useCloseOnEscape(true, closeSettings)
       return <>
         <button onClick={() => setEditing(true)}>打开编辑器</button>
-        {editing && <CustomProviderModal
+        {editing && <CustomConnectionModal
           editing={false}
           json="{}"
           error={null}

@@ -1,4 +1,4 @@
-import type { ApiProfile, CustomProviderDefinition } from '../types'
+import type { ApiProfile, CustomConnectionDefinition } from '../types'
 
 interface ProfileImportUrlOptions {
   includeApiKey: boolean
@@ -10,7 +10,7 @@ interface ProfileImportUrlOptions {
 export function createCustomProfileImportUrl(
   baseUrl: string,
   profile: ApiProfile,
-  provider: CustomProviderDefinition | undefined,
+  connection: CustomConnectionDefinition | undefined,
   options: ProfileImportUrlOptions,
 ) {
   const url = new URL(baseUrl)
@@ -28,7 +28,7 @@ export function createCustomProfileImportUrl(
     if (options.useNewApiModel) importProfile.model = '{model}'
   }
   url.searchParams.set('settings', JSON.stringify({
-    ...(provider ? { customProviders: [provider] } : {}),
+    ...(connection ? { customConnections: [connection] } : {}),
     profiles: [importProfile],
   }))
 

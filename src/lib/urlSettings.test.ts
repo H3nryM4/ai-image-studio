@@ -19,7 +19,7 @@ async function importPresetConfigOnlyUrlSettings(options: { locked?: boolean, mu
   const apiProfiles = await import('./apiProfiles')
   const presetConfig = await import('./presetConfig')
   presetConfig.setPresetConfig({
-    customProviders: [],
+    customConnections: [],
     profiles: options.multiple
       ? [
           apiProfiles.createDefaultOpenAIProfile({ id: 'preset-a', name: 'Preset A', isDefault: true }),
@@ -31,21 +31,21 @@ async function importPresetConfigOnlyUrlSettings(options: { locked?: boolean, mu
 }
 
 describe('URL settings params', () => {
-  it('preserves an existing model when apiMode changes', () => {
+  it('preserves an existing model when the connection changes', () => {
     const current = normalizeSettings({ profiles: [createDefaultOpenAIProfile({ id: 'saved', model: 'vendor/model', imageGenerationModel: '' })] })
-    const switched = normalizeSettings(buildSettingsFromUrlParams(current, new URLSearchParams('profileId=saved&apiMode=responses')))
-    expect(switched.profiles[0]).toMatchObject({ apiMode: 'responses', model: 'vendor/model', imageGenerationModel: '' })
+    const switched = normalizeSettings(buildSettingsFromUrlParams(current, new URLSearchParams('profileId=saved&connectionId=openai-responses')))
+    expect(switched.profiles[0]).toMatchObject({ connectionId: 'openai-responses', model: 'vendor/model', imageGenerationModel: '' })
   })
 
   it('reports only IDs explicitly included in URL settings and profileId', () => {
     const params = new URLSearchParams('profileId=preset-query-profile')
     params.set('settings', JSON.stringify({
-      customProviders: [{ id: 'preset-provider' }, { name: 'No ID' }],
-      profiles: [{ id: 'preset-json-profile' }, { provider: 'openai' }],
+      customConnections: [{ id: 'preset-connection' }, { name: 'No ID' }],
+      profiles: [{ id: 'preset-json-profile' }, { connectionId: 'openai-images' }],
     }))
 
     expect(getExplicitUrlSettingsIds(params)).toEqual({
-      providerIds: ['preset-provider'],
+      connectionIds: ['preset-connection'],
       profileIds: ['preset-json-profile', 'preset-query-profile'],
     })
   })
@@ -61,7 +61,7 @@ describe('URL settings params', () => {
     expect(next.activeProfileId).not.toBe(current.activeProfileId)
     expect(next.profiles.find((profile) => profile.id === next.activeProfileId)).toMatchObject({
       name: 'URL 参数配置',
-      provider: 'openai',
+      connectionId: 'openai-images',
       baseUrl: 'https://api.example.com/v1',
       apiKey: 'test-key',
       model: DEFAULT_IMAGES_MODEL,
@@ -94,7 +94,7 @@ describe('URL settings params', () => {
       apiKey: 'existing-key',
       model: 'existing-responses-model',
       timeout: 900,
-      apiMode: 'responses',
+      connectionId: 'openai-responses',
       apiProxy: true,
       responseFormatB64Json: true,
     })
@@ -115,7 +115,7 @@ describe('URL settings params', () => {
       apiKey: 'existing-key',
       model: 'existing-responses-model',
       timeout: 900,
-      apiMode: 'responses',
+      connectionId: 'openai-responses',
       apiProxy: true,
       responseFormatB64Json: true,
     })
@@ -124,10 +124,10 @@ describe('URL settings params', () => {
   it('generates unique IDs for ID-less profiles in settings URLs', () => {
     const params = new URLSearchParams()
     params.set('settings', JSON.stringify({
-      customProviders: [{ id: 'url-provider', name: 'URL Provider', submit: { path: 'generate' } }],
+      customConnections: [{ id: 'url-connection', name: 'URL Connection', submit: { path: 'generate' } }],
       profiles: [
-        { provider: 'url-provider', model: 'model-a' },
-        { provider: 'url-provider', model: 'model-b' },
+        { connectionId: 'url-connection', model: 'model-a' },
+        { connectionId: 'url-connection', model: 'model-b' },
       ],
     }))
 
@@ -149,11 +149,10 @@ describe('URL settings params', () => {
     })
 
     expect(next.profiles.find((profile) => profile.id === next.activeProfileId)).toMatchObject({
-      provider: 'openai',
       baseUrl: 'https://api.example.com/v1',
       apiKey: 'test-key',
       model: 'custom-image-model',
-      apiMode: 'images',
+      connectionId: 'openai-images',
     })
   })
 
@@ -161,11 +160,11 @@ describe('URL settings params', () => {
     const current = normalizeSettings(DEFAULT_SETTINGS)
     const next = normalizeSettings({
       ...current,
-      ...buildSettingsFromUrlParams(current, new URLSearchParams('apiMode=responses&reasoningEffort=max')),
+      ...buildSettingsFromUrlParams(current, new URLSearchParams('connectionId=openai-responses&reasoningEffort=max')),
     })
 
     expect(next.profiles.find((profile) => profile.id === next.activeProfileId)).toMatchObject({
-      apiMode: 'responses',
+      connectionId: 'openai-responses',
       reasoningEffort: 'max',
     })
   })
@@ -174,22 +173,22 @@ describe('URL settings params', () => {
     const current = normalizeSettings(DEFAULT_SETTINGS)
     const next = normalizeSettings({
       ...current,
-      ...buildSettingsFromUrlParams(current, new URLSearchParams('apiMode=responses&imageGenerationModel=gpt-image-2.5-flare')),
+      ...buildSettingsFromUrlParams(current, new URLSearchParams('connectionId=openai-responses&imageGenerationModel=gpt-image-2.5-flare')),
     })
 
     expect(next.profiles.find((profile) => profile.id === next.activeProfileId)).toMatchObject({
-      apiMode: 'responses',
+      connectionId: 'openai-responses',
       imageGenerationModel: 'gpt-image-2.5-flare',
     })
   })
 
   it.each(['', '   ', ' gpt-image-2.5-flare '])('preserves explicit image generation model %j in new and same-ID URL imports', (model) => {
     const current = normalizeSettings(DEFAULT_SETTINGS)
-    const params = new URLSearchParams({ apiMode: 'responses', imageGenerationModel: model })
+    const params = new URLSearchParams({ connectionId: 'openai-responses', imageGenerationModel: model })
     const created = normalizeSettings(buildSettingsFromUrlParams(current, params))
     expect(created.profiles.find((profile) => profile.id === created.activeProfileId)?.imageGenerationModel).toBe(model.trim())
 
-    const profile = createDefaultOpenAIProfile({ id: 'shared-responses', apiMode: 'responses', imageGenerationModel: 'custom-image-model' })
+    const profile = createDefaultOpenAIProfile({ id: 'shared-responses', connectionId: 'openai-responses', imageGenerationModel: 'custom-image-model' })
     const existing = normalizeSettings({ profiles: [profile], activeProfileId: profile.id })
     params.set('profileId', profile.id)
     const updated = normalizeSettings(buildSettingsFromUrlParams(existing, params))
@@ -199,7 +198,7 @@ describe('URL settings params', () => {
 
   it.each(['', '   '])('preserves blank image generation model %j in JSON settings imports', (model) => {
     const params = new URLSearchParams({ settings: JSON.stringify({ profiles: [
-      createDefaultOpenAIProfile({ id: 'shared-responses', apiMode: 'responses', imageGenerationModel: model }),
+      createDefaultOpenAIProfile({ id: 'shared-responses', connectionId: 'openai-responses', imageGenerationModel: model }),
     ] }) })
     const next = normalizeSettings(buildSettingsFromUrlParams(DEFAULT_SETTINGS, params))
     expect(next.profiles.find((profile) => profile.id === next.activeProfileId)?.imageGenerationModel).toBe('')
@@ -207,21 +206,21 @@ describe('URL settings params', () => {
 
   it.each(['query', 'json'])('preserves blank image generation models in preset-only %s imports', async (source) => {
     const { buildSettingsFromUrlParams } = await importPresetConfigOnlyUrlSettings()
-    const profile = createDefaultOpenAIProfile({ apiMode: 'responses', imageGenerationModel: 'custom-image-model' })
+    const profile = createDefaultOpenAIProfile({ connectionId: 'openai-responses', imageGenerationModel: 'custom-image-model' })
     const current = normalizeSettings({ profiles: [profile], activeProfileId: profile.id })
     for (const model of ['', '   ']) {
       const params = new URLSearchParams(source === 'query'
         ? { imageGenerationModel: model }
-        : { settings: JSON.stringify({ profiles: [{ provider: 'openai', imageGenerationModel: model }] }) })
+        : { settings: JSON.stringify({ profiles: [{ connectionId: 'openai-responses', imageGenerationModel: model }] }) })
       const next = normalizeSettings(buildSettingsFromUrlParams(current, params))
       expect(next.profiles[0].imageGenerationModel).toBe('')
     }
   })
 
   it('preserves an existing image generation model when the URL omits it', () => {
-    const profile = createDefaultOpenAIProfile({ id: 'shared-responses', apiMode: 'responses', imageGenerationModel: 'custom-image-model' })
+    const profile = createDefaultOpenAIProfile({ id: 'shared-responses', connectionId: 'openai-responses', imageGenerationModel: 'custom-image-model' })
     const current = normalizeSettings({ profiles: [profile], activeProfileId: profile.id })
-    const next = normalizeSettings(buildSettingsFromUrlParams(current, new URLSearchParams({ profileId: profile.id, apiMode: 'responses' })))
+    const next = normalizeSettings(buildSettingsFromUrlParams(current, new URLSearchParams({ profileId: profile.id, connectionId: 'openai-responses' })))
     expect(next.profiles[0].imageGenerationModel).toBe('custom-image-model')
   })
 
@@ -234,7 +233,7 @@ describe('URL settings params', () => {
 
     expect(next.profiles.find((profile) => profile.id === next.activeProfileId)).toMatchObject({
       name: '测试配置',
-      provider: 'openai',
+      connectionId: 'openai-images',
       baseUrl: 'https://api.example.com/v1',
       apiKey: 'test-key',
     })
@@ -284,7 +283,7 @@ describe('URL settings params', () => {
     expect(next.activeProfileId).not.toBe(existingProfile.id)
     expect(activeProfile).toMatchObject({
       name: 'URL Profile',
-      provider: 'openai',
+      connectionId: 'openai-images',
       baseUrl: 'https://api.example.com/v1/',
       apiKey: 'test-key',
     })
@@ -312,7 +311,7 @@ describe('URL settings params', () => {
     expect(next.profiles).toHaveLength(3)
     expect(next.activeProfileId).not.toBe(existingProfile.id)
     expect(activeProfile).toMatchObject({
-      provider: 'openai',
+      connectionId: 'openai-images',
       baseUrl: 'https://api.example.com/v1/',
       apiKey: 'test-key',
       codexCli: true,
@@ -342,7 +341,7 @@ describe('URL settings params', () => {
     expect(next.profiles).toHaveLength(3)
     expect(next.activeProfileId).not.toBe(existingProfile.id)
     expect(activeProfile).toMatchObject({
-      provider: 'openai',
+      connectionId: 'openai-images',
       baseUrl: 'https://api.example.com/v1/',
       apiKey: 'test-key',
       streamImages: true,
@@ -351,7 +350,7 @@ describe('URL settings params', () => {
   })
 
   it('creates an OpenAI profile from legacy params when an unavailable connection is active', () => {
-    const altProfile = createDefaultOpenAIProfile({ id: 'alternate-active', provider: 'removed-provider', apiKey: 'alternate-key' })
+    const altProfile = createDefaultOpenAIProfile({ id: 'alternate-active', connectionId: 'removed-connection', apiKey: 'alternate-key' })
     const current = normalizeSettings({
       ...DEFAULT_SETTINGS,
       profiles: [altProfile],
@@ -364,7 +363,7 @@ describe('URL settings params', () => {
 
     expect(next.profiles).toHaveLength(2)
     expect(next.profiles.find((profile) => profile.id === next.activeProfileId)).toMatchObject({
-      provider: 'openai',
+      connectionId: 'openai-images',
       baseUrl: 'https://api.example.com/v1',
       apiKey: 'openai-key',
     })
@@ -373,14 +372,14 @@ describe('URL settings params', () => {
   it('applies the codex CLI query parameter to a requested custom profile', () => {
     const current = normalizeSettings({
       ...DEFAULT_SETTINGS,
-      customProviders: [{
-        id: 'custom-provider',
-        name: 'Custom Provider',
+      customConnections: [{
+        id: 'custom-connection',
+        name: 'Custom Connection',
         submit: { path: 'images/generations' },
       }],
       profiles: [{
         ...createDefaultOpenAIProfile({ id: 'custom-profile' }),
-        provider: 'custom-provider',
+        connectionId: 'custom-connection',
         codexCli: false,
       }],
       activeProfileId: 'custom-profile',
@@ -392,7 +391,7 @@ describe('URL settings params', () => {
 
     expect(next.profiles).toHaveLength(1)
     expect(next.activeProfileId).toBe('custom-profile')
-    expect(next.profiles[0]).toMatchObject({ provider: 'custom-provider', codexCli: true })
+    expect(next.profiles[0]).toMatchObject({ connectionId: 'custom-connection', codexCli: true })
   })
 
   it('applies the transparent background method to the active OpenAI profile', () => {
@@ -413,10 +412,10 @@ describe('URL settings params', () => {
   it('applies the transparent background method to a requested custom profile', () => {
     const current = normalizeSettings({
       ...DEFAULT_SETTINGS,
-      customProviders: [{ id: 'custom-provider', name: 'Custom Provider', submit: { path: 'images/generations' } }],
+      customConnections: [{ id: 'custom-connection', name: 'Custom Connection', submit: { path: 'images/generations' } }],
       profiles: [{
         ...createDefaultOpenAIProfile({ id: 'custom-profile' }),
-        provider: 'custom-provider',
+        connectionId: 'custom-connection',
       }],
       activeProfileId: 'custom-profile',
     })
@@ -438,9 +437,9 @@ describe('URL settings params', () => {
     expect(params.toString()).toBe('foo=bar')
   })
 
-  it('imports settings with custom providers from URL params', () => {
+  it('imports settings with custom connections from URL params', () => {
     const importedSettings = {
-      customProviders: [{
+      customConnections: [{
         id: 'custom-json',
         name: 'Custom JSON',
         submit: {
@@ -454,12 +453,11 @@ describe('URL settings params', () => {
       profiles: [{
         id: 'custom-profile',
         name: 'Custom Profile',
-        provider: 'custom-json',
+        connectionId: 'custom-json',
         baseUrl: 'https://api.example.com/v1',
         apiKey: 'custom-key',
         model: 'custom-model',
         timeout: 300,
-        apiMode: 'images',
         codexCli: false,
         apiProxy: false,
       }],
@@ -472,12 +470,12 @@ describe('URL settings params', () => {
       ...buildSettingsFromUrlParams(DEFAULT_SETTINGS, params),
     })
 
-    expect(next.customProviders).toHaveLength(1)
-    expect(next.customProviders[0]).toMatchObject({ id: 'custom-json', name: 'Custom JSON' })
+    expect(next.customConnections).toHaveLength(1)
+    expect(next.customConnections[0]).toMatchObject({ id: 'custom-json', name: 'Custom JSON' })
     expect(next.activeProfileId).toBe('custom-profile')
     expect(next.profiles[0]).toMatchObject({
       id: 'custom-profile',
-      provider: 'custom-json',
+      connectionId: 'custom-json',
       apiKey: 'custom-key',
       model: 'custom-model',
     })
@@ -496,7 +494,7 @@ describe('URL settings params', () => {
       activeProfileId: 'current-openai',
     })
     const importedSettings = {
-      customProviders: [{
+      customConnections: [{
         id: 'custom-json',
         name: 'Custom JSON',
         submit: {
@@ -510,12 +508,11 @@ describe('URL settings params', () => {
       profiles: [{
         id: 'custom-profile',
         name: 'Custom Profile',
-        provider: 'custom-json',
+        connectionId: 'custom-json',
         baseUrl: 'https://api.example.com/v1',
         apiKey: 'custom-key',
         model: 'custom-model',
         timeout: 300,
-        apiMode: 'images',
         codexCli: false,
         apiProxy: false,
       }],
@@ -531,19 +528,19 @@ describe('URL settings params', () => {
 
     expect(next.activeProfileId).not.toBe('current-openai')
     expect(activeProfile).toMatchObject({
-      provider: 'custom-json',
+      connectionId: 'custom-json',
       baseUrl: 'https://api.example.com/v1',
       apiKey: 'custom-key',
       model: 'custom-model',
     })
   })
 
-  it('imports custom provider settings wrapper from URL params', () => {
+  it('imports custom connection settings wrapper from URL params', () => {
     const params = new URLSearchParams()
     params.set('settings', JSON.stringify({
       version: 1,
       settings: {
-        customProviders: [{
+        customConnections: [{
           id: 'wrapped-custom',
           name: 'Wrapped Custom',
           submit: {
@@ -557,12 +554,11 @@ describe('URL settings params', () => {
         profiles: [{
           id: 'wrapped-profile',
           name: 'Wrapped Profile',
-          provider: 'wrapped-custom',
+          connectionId: 'wrapped-custom',
           baseUrl: 'https://wrapped.example.com/v1',
           apiKey: 'wrapped-key',
           model: 'wrapped-model',
           timeout: 300,
-          apiMode: 'images',
           codexCli: false,
           apiProxy: false,
         }],
@@ -574,12 +570,12 @@ describe('URL settings params', () => {
       ...buildSettingsFromUrlParams(DEFAULT_SETTINGS, params),
     })
 
-    expect(next.customProviders).toHaveLength(1)
-    expect(next.customProviders[0]).toMatchObject({ id: 'wrapped-custom', name: 'Wrapped Custom' })
+    expect(next.customConnections).toHaveLength(1)
+    expect(next.customConnections[0]).toMatchObject({ id: 'wrapped-custom', name: 'Wrapped Custom' })
     expect(next.profiles).toHaveLength(1)
     expect(next.profiles[0]).toMatchObject({
       id: 'wrapped-profile',
-      provider: 'wrapped-custom',
+      connectionId: 'wrapped-custom',
       baseUrl: 'https://wrapped.example.com/v1',
       apiKey: 'wrapped-key',
       model: 'wrapped-model',
@@ -591,27 +587,26 @@ describe('URL settings params', () => {
     const current = normalizeSettings(DEFAULT_SETTINGS)
     const next = normalizeSettings({
       ...current,
-      ...buildSettingsFromUrlParams(current, new URLSearchParams('apiUrl=https://api.example.com/v1&apiKey=test-key&model=custom-model&profileName=导入配置&apiMode=responses')),
+      ...buildSettingsFromUrlParams(current, new URLSearchParams('apiUrl=https://api.example.com/v1&apiKey=test-key&model=custom-model&profileName=导入配置&connectionId=openai-responses')),
     })
 
     expect(next.profiles).toHaveLength(1)
-    expect(next.customProviders).toHaveLength(0)
+    expect(next.customConnections).toHaveLength(0)
     expect(next.activeProfileId).toBe(current.activeProfileId)
     expect(next.profiles[0]).toMatchObject({
       id: current.activeProfileId,
-      provider: 'openai',
       name: '导入配置',
       baseUrl: 'https://api.example.com/v1',
       apiKey: 'test-key',
       model: 'custom-model',
-      apiMode: 'responses',
+      connectionId: 'openai-images',
     })
   })
 
-  it('ignores imported custom providers and non-default provider profiles when only default config is shown', async () => {
+  it('ignores imported custom connections and non-default connection profiles when only default config is shown', async () => {
     const { buildSettingsFromUrlParams } = await importPresetConfigOnlyUrlSettings()
     const importedSettings = {
-      customProviders: [{
+      customConnections: [{
         id: 'custom-json',
         name: 'Custom JSON',
         submit: {
@@ -625,12 +620,11 @@ describe('URL settings params', () => {
       profiles: [{
         id: 'custom-profile',
         name: 'Custom Profile',
-        provider: 'custom-json',
+        connectionId: 'custom-json',
         baseUrl: 'https://custom.example.com/v1',
         apiKey: 'custom-key',
         model: 'custom-model',
         timeout: 300,
-        apiMode: 'images',
         codexCli: false,
         apiProxy: false,
       }],
@@ -645,20 +639,20 @@ describe('URL settings params', () => {
     })
 
     expect(next.profiles).toHaveLength(1)
-    expect(next.customProviders).toHaveLength(0)
+    expect(next.customConnections).toHaveLength(0)
     expect(next.activeProfileId).toBe(current.activeProfileId)
     expect(next.profiles[0]).toMatchObject({
-      provider: 'openai',
+      connectionId: 'openai-images',
       baseUrl: current.profiles[0].baseUrl,
       apiKey: current.profiles[0].apiKey,
       model: current.profiles[0].model,
     })
   })
 
-  it('patches from a matching imported profile without importing custom providers when only default config is shown', async () => {
+  it('patches from a matching imported profile without importing custom connections when only default config is shown', async () => {
     const { buildSettingsFromUrlParams } = await importPresetConfigOnlyUrlSettings()
     const importedSettings = {
-      customProviders: [{
+      customConnections: [{
         id: 'custom-json',
         name: 'Custom JSON',
         submit: {
@@ -672,23 +666,21 @@ describe('URL settings params', () => {
       profiles: [{
         id: 'custom-profile',
         name: 'Custom Profile',
-        provider: 'custom-json',
+        connectionId: 'custom-json',
         baseUrl: 'https://custom.example.com/v1',
         apiKey: 'custom-key',
         model: 'custom-model',
         timeout: 300,
-        apiMode: 'images',
         codexCli: false,
         apiProxy: false,
       }, {
         id: 'openai-profile',
         name: 'OpenAI Profile',
-        provider: 'openai',
         baseUrl: 'https://openai.example.com/v1',
         apiKey: 'openai-key',
         model: 'openai-model',
         timeout: 120,
-        apiMode: 'responses',
+        connectionId: 'openai-images',
         codexCli: true,
         apiProxy: true,
       }],
@@ -703,25 +695,24 @@ describe('URL settings params', () => {
     })
 
     expect(next.profiles).toHaveLength(1)
-    expect(next.customProviders).toHaveLength(0)
+    expect(next.customConnections).toHaveLength(0)
     expect(next.activeProfileId).toBe(current.activeProfileId)
     expect(next.profiles[0]).toMatchObject({
       id: current.activeProfileId,
-      provider: 'openai',
       name: 'OpenAI Profile',
       baseUrl: 'https://openai.example.com/v1',
       apiKey: 'openai-key',
       model: 'openai-model',
       timeout: 120,
-      apiMode: 'responses',
+      connectionId: 'openai-images',
       codexCli: true,
       apiProxy: true,
     })
   })
 
-  it('does not switch away from the default custom provider when only default config is shown', async () => {
+  it('does not switch away from the default custom connection when only default config is shown', async () => {
     const { buildSettingsFromUrlParams } = await importPresetConfigOnlyUrlSettings()
-    const customProvider = {
+    const customConnection = {
       id: 'custom-default',
       name: 'Custom Default',
       submit: {
@@ -734,11 +725,11 @@ describe('URL settings params', () => {
     }
     const current = normalizeSettings({
       ...DEFAULT_SETTINGS,
-      customProviders: [customProvider],
+      customConnections: [customConnection],
       profiles: [{
         ...createDefaultOpenAIProfile({ id: 'custom-default-profile' }),
         name: 'Custom Default Profile',
-        provider: customProvider.id,
+        connectionId: customConnection.id,
         baseUrl: 'https://custom-default.example.com/v1',
         apiKey: 'custom-default-key',
         model: 'custom-default-model',
@@ -747,31 +738,29 @@ describe('URL settings params', () => {
     })
     const params = new URLSearchParams()
     params.set('settings', JSON.stringify({
-      customProviders: [{
+      customConnections: [{
         id: 'another-custom',
         name: 'Another Custom',
-        submit: customProvider.submit,
+        submit: customConnection.submit,
       }],
       profiles: [{
         id: 'openai-profile',
         name: 'Ignored OpenAI',
-        provider: 'openai',
         baseUrl: 'https://openai.example.com/v1',
         apiKey: 'openai-key',
         model: 'openai-model',
         timeout: 120,
-        apiMode: 'responses',
+        connectionId: 'openai-responses',
         codexCli: true,
         apiProxy: true,
       }, {
         id: 'matching-custom-profile',
         name: 'Patched Custom Default',
-        provider: customProvider.id,
+        connectionId: customConnection.id,
         baseUrl: 'https://patched-custom.example.com/v1',
         apiKey: 'patched-custom-key',
         model: 'patched-custom-model',
         timeout: 240,
-        apiMode: 'images',
         codexCli: false,
         apiProxy: false,
       }],
@@ -783,19 +772,18 @@ describe('URL settings params', () => {
       ...buildSettingsFromUrlParams(current, params),
     })
 
-    expect(next.customProviders).toHaveLength(1)
-    expect(next.customProviders[0].id).toBe(customProvider.id)
+    expect(next.customConnections).toHaveLength(1)
+    expect(next.customConnections[0].id).toBe(customConnection.id)
     expect(next.profiles).toHaveLength(1)
     expect(next.activeProfileId).toBe(current.activeProfileId)
     expect(next.profiles[0]).toMatchObject({
       id: current.activeProfileId,
-      provider: customProvider.id,
+      connectionId: customConnection.id,
       name: 'Patched Custom Default',
       baseUrl: 'https://patched-custom.example.com/v1',
       apiKey: 'patched-custom-key',
       model: 'patched-custom-model',
       timeout: 240,
-      apiMode: 'images',
       codexCli: true,
     })
   })
@@ -824,7 +812,7 @@ describe('URL settings params', () => {
     params.set('settings', JSON.stringify({
       profiles: [{
         id: 'preset-b',
-        provider: 'openai',
+        connectionId: 'openai-images',
         model: 'patched-model-b',
         timeout: 240,
         transparentBackgroundMethod: 'local',
@@ -868,22 +856,21 @@ describe('URL settings params', () => {
     vi.stubEnv('VITE_SHOW_PRESET_CONFIG_ONLY', 'true')
     const apiProfiles = await import('./apiProfiles')
     const presetConfig = await import('./presetConfig')
-    const provider = {
+    const connection = {
       id: 'custom-preset',
       name: 'Custom Preset',
       submit: { path: 'custom/image-tasks' },
     }
     const profile = apiProfiles.createDefaultOpenAIProfile({
       id: 'custom-preset-profile',
-      provider: provider.id,
+      connectionId: connection.id,
       baseUrl: 'https://old.example.com/',
-      apiMode: 'images',
     })
-    presetConfig.setPresetConfig({ customProviders: [provider], profiles: [profile] })
+    presetConfig.setPresetConfig({ customConnections: [connection], profiles: [profile] })
     const { buildSettingsFromUrlParams } = await import('./urlSettings')
     const current = apiProfiles.normalizeSettings({
       ...apiProfiles.DEFAULT_SETTINGS,
-      customProviders: [provider],
+      customConnections: [connection],
       profiles: [profile],
       activeProfileId: profile.id,
     })
@@ -898,7 +885,7 @@ describe('URL settings params', () => {
     expect(next.profiles[0].baseUrl).toBe('https://new.example.com/')
   })
 
-  it('ignores a same-ID settings profile with a conflicting provider in preset-only mode', async () => {
+  it('ignores a same-ID settings profile with a conflicting connection in preset-only mode', async () => {
     const { buildSettingsFromUrlParams } = await importPresetConfigOnlyUrlSettings({ multiple: true })
     const current = normalizeSettings({
       ...DEFAULT_SETTINGS,
@@ -912,7 +899,7 @@ describe('URL settings params', () => {
     params.set('settings', JSON.stringify({
       profiles: [{
         id: 'preset-b',
-        provider: 'conflicting-provider',
+        connectionId: 'conflicting-connection',
         apiKey: 'json-key',
         model: 'conflicting-model',
       }],
@@ -925,7 +912,7 @@ describe('URL settings params', () => {
 
     expect(next.activeProfileId).toBe('preset-b')
     expect(next.profiles.find((profile) => profile.id === 'preset-b')).toMatchObject({
-      provider: 'openai',
+      connectionId: 'openai-images',
       apiKey: 'query-key',
       model: 'original-model',
     })
@@ -945,7 +932,7 @@ describe('URL settings params', () => {
     params.set('settings', JSON.stringify({
       profiles: [{
         id: 'other-profile',
-        provider: 'openai',
+        connectionId: 'openai-images',
         apiKey: 'json-key',
         model: 'fallback-model',
       }],

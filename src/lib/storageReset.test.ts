@@ -20,16 +20,16 @@ afterEach(() => {
 describe('local state version reset', () => {
   it('discards old state once and keeps new input and settings on rehydration', async () => {
     localStorage.setItem('ai-image-studio', JSON.stringify({
-      version: 2,
+      version: 3,
       state: { prompt: '旧输入', settings: { apiKey: 'old-test-key' } },
     }))
     const { useStore } = await import('../store')
     await useStore.persist.rehydrate()
     expect(useStore.getState().prompt).toBe('')
-    expect(useStore.getState().settings.apiKey).not.toBe('old-test-key')
+    expect(useStore.getState().settings.profiles[0].apiKey).not.toBe('old-test-key')
     useStore.getState().setPrompt('新输入')
     useStore.getState().setSettings({ batchPromptConcurrency: 5 })
-    expect(JSON.parse(localStorage.getItem('ai-image-studio')!).version).toBe(3)
+    expect(JSON.parse(localStorage.getItem('ai-image-studio')!).version).toBe(4)
 
     await useStore.persist.rehydrate()
     expect(useStore.getState().prompt).toBe('新输入')

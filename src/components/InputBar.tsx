@@ -2,7 +2,7 @@ import { useRef, useEffect, useCallback, useState, useMemo, useLayoutEffect } fr
 import { createPortal } from 'react-dom'
 import { deleteFavoriteCollection, useStore, submitTask, stopBatchPrompts, addImageFromFile, removeMultipleTasks, taskMatchesFilterStatus, taskMatchesSearchQuery } from '../store'
 import { DEFAULT_PARAMS, MAX_INPUT_IMAGES, type TaskRecord } from '../types'
-import { getActiveApiProfile, isOpenAICompatibleProvider, normalizeSettings, resolveApiProfileModel, splitModelList } from '../lib/apiProfiles'
+import { getActiveApiProfile, isApiConnectionAvailable, normalizeSettings, resolveApiProfileModel, splitModelList } from '../lib/apiProfiles'
 import { getImageGenerationModel, isGptImage25Model } from '../lib/imageModels'
 import { ensureImageCached } from '../lib/imageCache'
 import { splitBatchPrompts } from '../lib/batchPrompts'
@@ -403,7 +403,7 @@ export default function InputBar() {
       ? settings
       : normalizeSettings({ ...settings, activeProfileId: activeProfile.id })
   ), [activeProfile.id, currentActiveProfile.id, settings])
-  const hasSubmitApiConfig = Boolean(activeProfile.apiKey) && isOpenAICompatibleProvider(effectiveSettings, activeProfile.provider)
+  const hasSubmitApiConfig = Boolean(activeProfile.apiKey) && isApiConnectionAvailable(effectiveSettings, activeProfile.connectionId)
   // 批量进行中需等待完成或停止后再提交
   const batchRunning = Boolean(batchProgress)
   const canSubmit = Boolean(prompt.trim() && hasSubmitApiConfig && !batchRunning)
@@ -435,7 +435,7 @@ export default function InputBar() {
   const outputImageLimit = MAX_OPENAI_OUTPUT_IMAGES
   const nDraftValue = Number(nInput)
   const effectiveNValue = Number.isNaN(nDraftValue) ? params.n : nDraftValue
-  const streamConcurrentByN = activeProfile.provider === 'openai' && activeProfile.streamImages === true && effectiveNValue > 1
+  const streamConcurrentByN = (activeProfile.connectionId === 'openai-images' || activeProfile.connectionId === 'openai-responses') && activeProfile.streamImages === true && effectiveNValue > 1
   const nLimitHintText = `最大请求数量为 ${outputImageLimit}`
   const displaySize = (activeProfile.codexCli ? normalizeCodexCliImageSize(params.size) : normalizeImageSize(params.size)) || DEFAULT_PARAMS.size
 
