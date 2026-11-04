@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react'
 import { existsSync, readFileSync } from 'fs'
 import { resolve } from 'path'
 import { fileURLToPath } from 'url'
-import { normalizeDevProxyConfig } from './src/lib/devProxy'
+import { normalizeDevProxyConfig } from './src/lib/devProxy.ts'
 
 const pkg = JSON.parse(readFileSync('./package.json', 'utf-8'))
 

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { dismissAllTooltips } from '../../lib/tooltipDismiss'
 import { ChevronDownIcon } from '../icons'
 
-export const CHIP_BASE_CLASS = 'h-8 px-3.5 rounded-full text-xs transition-colors duration-200 focus:outline-none'
+export const CHIP_BASE_CLASS = 'h-8 px-3.5 rounded-full text-xs transition-colors duration-200 focus:outline-hidden'
 export const CHIP_IDLE_CLASS = 'bg-black/[0.04] dark:bg-white/[0.06] hover:bg-black/[0.07] dark:hover:bg-white/[0.1] text-gray-700 dark:text-gray-200'
 const PANEL_WIDTH = 240
 const ACTIVE_CLASS = 'bg-blue-500/[0.1] dark:bg-blue-500/[0.16] hover:bg-blue-500/[0.14] dark:hover:bg-blue-500/[0.22] text-blue-600 dark:text-blue-400'
@@ -58,9 +58,9 @@ export default function ParamPopoverChip({
         aria-expanded={open}
         className={`flex w-full items-center gap-1 min-w-0 ${CHIP_BASE_CLASS} ${active ? ACTIVE_CLASS : CHIP_IDLE_CLASS} ${open && !active ? '!bg-black/[0.07] dark:!bg-white/[0.1]' : ''}`}
       >
-        <span className="flex-shrink-0">{label}</span>
+        <span className="shrink-0">{label}</span>
         {summary && <span className={`flex-1 truncate text-left ${active ? 'opacity-75' : 'text-gray-400 dark:text-gray-500'}`}>· {summary}</span>}
-        <ChevronDownIcon className={`w-3.5 h-3.5 flex-shrink-0 transition-transform duration-200 ${active ? '' : 'text-gray-400 dark:text-gray-500'} ${open ? 'rotate-180' : ''}`} />
+        <ChevronDownIcon className={`w-3.5 h-3.5 shrink-0 transition-transform duration-200 ${active ? '' : 'text-gray-400 dark:text-gray-500'} ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && (
         <div

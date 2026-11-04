@@ -7,7 +7,7 @@ import { ChevronDownIcon } from '../icons'
 import SettingLabel from './SettingLabel'
 import SettingSwitch from './SettingSwitch'
 
-const INPUT_CLASS_NAME = 'w-full rounded-xl border border-transparent bg-black/[0.04] px-3 py-2.5 text-sm text-gray-700 outline-none transition focus:border-blue-300 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white/[0.06] dark:text-gray-200 dark:focus:border-blue-500/50'
+const INPUT_CLASS_NAME = 'w-full rounded-xl border border-transparent bg-black/[0.04] px-3 py-2.5 text-sm text-gray-700 outline-hidden transition focus:border-blue-300 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white/[0.06] dark:text-gray-200 dark:focus:border-blue-500/50'
 
 interface ApiProfileEditorProps {
   profile: ApiProfile

@@ -4,7 +4,7 @@ import { ChevronRightIcon } from '../icons'
 import SettingLabel from './SettingLabel'
 import SettingSwitch from './SettingSwitch'
 
-const SELECT_CLASS_NAME = 'w-full rounded-xl border border-transparent bg-black/[0.04] px-3 py-1.5 text-xs text-gray-700 outline-none transition hover:bg-black/[0.07] dark:bg-white/[0.06] dark:text-gray-200 dark:hover:bg-white/[0.1]'
+const SELECT_CLASS_NAME = 'w-full rounded-xl border border-transparent bg-black/[0.04] px-3 py-1.5 text-xs text-gray-700 outline-hidden transition hover:bg-black/[0.07] dark:bg-white/[0.06] dark:text-gray-200 dark:hover:bg-white/[0.1]'
 
 interface GeneralSettingsTabProps {
   draft: AppSettings

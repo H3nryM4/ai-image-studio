@@ -135,7 +135,7 @@ export default function SearchBar() {
 
   return (
     <div ref={rootRef} data-no-drag-select className="mt-6 mb-4 flex flex-wrap items-center gap-2 sm:gap-3">
-      <div className="flex gap-2 flex-shrink-0 z-20">
+      <div className="flex gap-2 shrink-0 z-20">
         <SearchActionButton
           tooltip={favoriteTooltip}
           onClick={handleFavoriteClick}
@@ -168,7 +168,7 @@ export default function SearchBar() {
                   { label: '生成中', value: 'running' },
                   { label: '失败', value: 'error' },
                 ]}
-                className="px-3 py-2.5 rounded-xl border border-transparent bg-black/[0.04] dark:bg-white/[0.06] hover:bg-black/[0.07] dark:hover:bg-white/[0.1] text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition"
+                className="px-3 py-2.5 rounded-xl border border-transparent bg-black/[0.04] dark:bg-white/[0.06] hover:bg-black/[0.07] dark:hover:bg-white/[0.1] text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition"
               />
             </div>
             {isFailedFilter && !selectionMode && (
@@ -178,7 +178,7 @@ export default function SearchBar() {
                 disabled={failedCount === 0}
                 title={failedCount > 0 ? `清除 ${failedCount} 条失败记录` : '没有失败记录'}
                 aria-label={failedCount > 0 ? `清除 ${failedCount} 条失败记录` : '没有失败记录'}
-                className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-xl border border-transparent bg-black/[0.04] text-gray-400 transition-all hover:bg-black/[0.07] hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500/30 disabled:cursor-not-allowed disabled:opacity-55 disabled:hover:bg-black/[0.07] disabled:hover:text-gray-400 dark:bg-white/[0.06] dark:text-gray-500 dark:hover:bg-white/[0.1] dark:hover:text-gray-300 dark:disabled:hover:bg-gray-900 dark:disabled:hover:text-gray-500"
+                className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-xl border border-transparent bg-black/[0.04] text-gray-400 transition-all hover:bg-black/[0.07] hover:text-gray-600 focus:outline-hidden focus:ring-2 focus:ring-blue-500/30 disabled:cursor-not-allowed disabled:opacity-55 disabled:hover:bg-black/[0.07] disabled:hover:text-gray-400 dark:bg-white/[0.06] dark:text-gray-500 dark:hover:bg-white/[0.1] dark:hover:text-gray-300 dark:disabled:hover:bg-gray-900 dark:disabled:hover:text-gray-500"
               >
                 <TrashIcon className="h-[18px] w-[18px]" />
               </button>
@@ -206,7 +206,7 @@ export default function SearchBar() {
           onChange={(e) => setSearchQuery(e.target.value)}
           type="text"
           placeholder={inCollectionOverview ? '搜索收藏夹名称...' : '搜索提示词、参数...'}
-          className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-transparent bg-black/[0.04] dark:bg-white/[0.06] text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition"
+          className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-transparent bg-black/[0.04] dark:bg-white/[0.06] text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition"
         />
       </div>
       <div className="relative ml-auto shrink-0" {...selectionTooltip.handlers}>

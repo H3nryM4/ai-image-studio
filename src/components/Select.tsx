@@ -197,7 +197,7 @@ export default function Select({ value, onChange, onReorder, options, disabled, 
         }`}
       >
         <span className="truncate">{prefix}{selectedOption?.label ?? value}</span>
-        <ChevronDownIcon className={`w-3.5 h-3.5 flex-shrink-0 text-gray-400 dark:text-gray-500 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+        <ChevronDownIcon className={`w-3.5 h-3.5 shrink-0 text-gray-400 dark:text-gray-500 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
         {showValueTooltips && (
           <ViewportTooltip visible={triggerTooltip.visible} className="max-w-[300px] break-words whitespace-pre-wrap">
             {selectedOption?.label ?? value}
@@ -419,10 +419,10 @@ export default function Select({ value, onChange, onReorder, options, disabled, 
               }`}
             >
               {dragOverValue === option.value && dragDropPosition === 'before' && draggedValue !== option.value && (
-                <div className="absolute -top-[1px] left-0 right-0 h-[2px] bg-blue-500 rounded-full z-40 shadow-sm pointer-events-none" />
+                <div className="absolute -top-[1px] left-0 right-0 h-[2px] bg-blue-500 rounded-full z-40 shadow-xs pointer-events-none" />
               )}
               {dragOverValue === option.value && dragDropPosition === 'after' && draggedValue !== option.value && (
-                <div className="absolute -bottom-[1px] left-0 right-0 h-[2px] bg-blue-500 rounded-full z-40 shadow-sm pointer-events-none" />
+                <div className="absolute -bottom-[1px] left-0 right-0 h-[2px] bg-blue-500 rounded-full z-40 shadow-xs pointer-events-none" />
               )}
               {showValueTooltips && hoveredOptionTooltip === option.value && (
                 <ViewportTooltip visible={true} className="max-w-[300px] break-words whitespace-pre-wrap">

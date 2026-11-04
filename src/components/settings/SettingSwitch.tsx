@@ -22,7 +22,7 @@ export default function SettingSwitch({ label, help, checked, disabled = false, 
         aria-label={label}
         className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${checked ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-600'}`}
       >
-        <span className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${checked ? 'translate-x-[18px]' : 'translate-x-[2px]'}`} />
+        <span className={`inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${checked ? 'translate-x-[18px]' : 'translate-x-[2px]'}`} />
       </button>
     </div>
   )

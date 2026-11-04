@@ -43,7 +43,7 @@ export default function CustomConnectionModal({
 
   return createPortal(
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/30 backdrop-blur-sm animate-overlay-in" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/30 backdrop-blur-xs animate-overlay-in" onClick={onClose} />
       <div className="relative z-10 w-full max-w-md rounded-3xl border border-white/50 bg-white/95 p-5 shadow-2xl ring-1 ring-black/5 animate-modal-in dark:border-white/[0.08] dark:bg-gray-900/95 dark:ring-white/10 flex flex-col h-[85vh] sm:h-[680px] max-h-[90vh] overflow-hidden">
         <div className="mb-5 flex items-center justify-between gap-4 shrink-0">
           <h3 className="text-base font-bold text-gray-800 dark:text-gray-100">
@@ -128,7 +128,7 @@ export default function CustomConnectionModal({
                 value={json}
                 onChange={(e) => onJsonChange(e.target.value)}
                 spellCheck={false}
-                className="flex-1 min-h-[150px] w-full resize-none rounded-xl border border-transparent bg-black/[0.04] px-3 py-2 font-mono text-xs leading-relaxed text-gray-700 outline-none transition focus:border-blue-300 dark:bg-white/[0.06] dark:text-gray-200 dark:focus:border-blue-500/50 custom-scrollbar"
+                className="flex-1 min-h-[150px] w-full resize-none rounded-xl border border-transparent bg-black/[0.04] px-3 py-2 font-mono text-xs leading-relaxed text-gray-700 outline-hidden transition focus:border-blue-300 dark:bg-white/[0.06] dark:text-gray-200 dark:focus:border-blue-500/50 custom-scrollbar"
               />
             </label>
           </div>

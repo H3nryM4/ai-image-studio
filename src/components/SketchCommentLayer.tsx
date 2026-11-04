@@ -161,12 +161,12 @@ export default function SketchCommentLayer({
             onKeyDown={(event) => {
               if (event.key === 'Enter' && !event.nativeEvent.isComposing) event.currentTarget.blur()
             }}
-            className="min-w-0 flex-1 bg-transparent px-1.5 text-sm text-gray-800 outline-none placeholder:text-gray-400 dark:text-gray-100 dark:placeholder:text-gray-500"
+            className="min-w-0 flex-1 bg-transparent px-1.5 text-sm text-gray-800 outline-hidden placeholder:text-gray-400 dark:text-gray-100 dark:placeholder:text-gray-500"
           />
           <TooltipButton
             tooltip="完成"
             wrapperClassName="relative inline-flex flex-none"
-            className="flex h-8 w-8 items-center justify-center rounded-xl bg-blue-500 text-white shadow-sm transition hover:bg-blue-600"
+            className="flex h-8 w-8 items-center justify-center rounded-xl bg-blue-500 text-white shadow-xs transition hover:bg-blue-600"
             onClick={onFinish}
           >
             <CheckIcon />

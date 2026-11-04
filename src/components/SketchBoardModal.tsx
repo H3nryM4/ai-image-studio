@@ -1010,7 +1010,7 @@ function SketchBoardEditor({ baseImageSrc, replaceImageId }: SketchBoardRequest)
                   transformOrigin: '0 0',
                 }}
               >
-                <div className="absolute inset-0 overflow-hidden rounded-lg shadow-sm ring-1 ring-black/5 dark:ring-white/10" style={{ background: paperColor }}>
+                <div className="absolute inset-0 overflow-hidden rounded-lg shadow-xs ring-1 ring-black/5 dark:ring-white/10" style={{ background: paperColor }}>
                   <canvas
                     ref={canvasRef}
                     width={docSize.width}
@@ -1151,7 +1151,7 @@ function SketchBoardEditor({ baseImageSrc, replaceImageId }: SketchBoardRequest)
         <button
           onClick={handleConfirm}
           disabled={!canConfirm || isSaving}
-          className="flex h-10 flex-none items-center gap-1.5 rounded-xl bg-blue-500 px-4 text-sm font-medium text-white shadow-sm transition hover:bg-blue-600 active:bg-blue-700 disabled:opacity-50"
+          className="flex h-10 flex-none items-center gap-1.5 rounded-xl bg-blue-500 px-4 text-sm font-medium text-white shadow-xs transition hover:bg-blue-600 active:bg-blue-700 disabled:opacity-50"
         >
           <CheckIcon />
           {isSaving ? '保存中...' : '完成'}

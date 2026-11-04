@@ -73,7 +73,7 @@ export default function ProfileImportModal({ source, onClose }: ProfileImportMod
 
   return createPortal(
     <div data-no-drag-select className="fixed inset-0 z-[115] flex items-center justify-center p-4" onClick={() => { if (!busy) onClose() }}>
-      <div className="absolute inset-0 bg-black/30 backdrop-blur-sm animate-overlay-in" />
+      <div className="absolute inset-0 bg-black/30 backdrop-blur-xs animate-overlay-in" />
       <div ref={scrollRef} role="dialog" aria-modal="true" aria-labelledby="profile-import-title" className="relative max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-3xl border border-white/50 bg-white p-6 shadow-2xl dark:border-white/[0.08] dark:bg-gray-900 custom-scrollbar" onClick={(e) => e.stopPropagation()}>
         <div className="mb-5 flex items-center justify-between gap-3">
           <h3 id="profile-import-title" className="flex items-center gap-2 text-base font-bold text-gray-800 dark:text-gray-100"><ImportIcon className="h-5 w-5 text-blue-500" />{preview ? '预览 API 配置' : '导入 API 配置'}</h3>
@@ -84,7 +84,7 @@ export default function ProfileImportModal({ source, onClose }: ProfileImportMod
           <div className="space-y-4">
             <label className="block text-sm text-gray-600 dark:text-gray-300">
               分享链接或配置 JSON
-              <textarea autoFocus value={text} onChange={(e) => setText(e.target.value)} rows={7} placeholder="在此粘贴…" className="mt-2 w-full resize-y rounded-xl border border-gray-200 bg-gray-50 p-3 text-sm outline-none focus:border-blue-400 dark:border-white/10 dark:bg-white/[0.04]" />
+              <textarea autoFocus value={text} onChange={(e) => setText(e.target.value)} rows={7} placeholder="在此粘贴…" className="mt-2 w-full resize-y rounded-xl border border-gray-200 bg-gray-50 p-3 text-sm outline-hidden focus:border-blue-400 dark:border-white/10 dark:bg-white/[0.04]" />
             </label>
             <div className="flex items-center justify-between gap-3">
               <button type="button" onClick={() => fileRef.current?.click()} className="text-sm text-blue-600 hover:text-blue-500 dark:text-blue-400">选择 JSON 文件</button>
@@ -106,7 +106,7 @@ export default function ProfileImportModal({ source, onClose }: ProfileImportMod
                 </dl>
                 {mode !== 'reuse' && <label className="block text-xs text-gray-500 dark:text-gray-400">
                   API Key
-                  <input type="password" autoComplete="off" value={profile.apiKey} disabled={busy} placeholder="可稍后填写" onChange={(e) => setPreview({ ...preview, profiles: preview.profiles.map((item, i) => i === idx ? { ...item, apiKey: e.target.value } : item) })} className="mt-1.5 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 outline-none focus:border-blue-400 dark:border-white/10 dark:bg-gray-900 dark:text-gray-200" />
+                  <input type="password" autoComplete="off" value={profile.apiKey} disabled={busy} placeholder="可稍后填写" onChange={(e) => setPreview({ ...preview, profiles: preview.profiles.map((item, i) => i === idx ? { ...item, apiKey: e.target.value } : item) })} className="mt-1.5 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 outline-hidden focus:border-blue-400 dark:border-white/10 dark:bg-gray-900 dark:text-gray-200" />
                 </label>}
               </div>
             ))}

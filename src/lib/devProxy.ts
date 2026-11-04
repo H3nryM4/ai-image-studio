@@ -1,4 +1,4 @@
-import { readRuntimeEnv } from './runtimeEnv'
+import { readRuntimeEnv } from './runtimeEnv.ts'
 
 export interface DevProxyConfig {
   enabled: boolean

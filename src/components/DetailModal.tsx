@@ -455,7 +455,7 @@ export default function DetailModal() {
         </div>
 
         {/* 左侧：图片 */}
-        <div className="md:w-1/2 w-full h-64 md:h-auto bg-gray-100 dark:bg-black/20 relative flex items-center justify-center flex-shrink-0 min-h-[16rem]">
+        <div className="md:w-1/2 w-full h-64 md:h-auto bg-gray-100 dark:bg-black/20 relative flex items-center justify-center shrink-0 min-h-[16rem]">
           {task.status === 'done' && outputLen > 0 && (currentOutputImageId || task.outputImages.length > 0) && (
             <div className="absolute right-3 top-[15px] z-20 flex items-center gap-1.5">
               {currentOutputImageId && (
@@ -467,7 +467,7 @@ export default function DetailModal() {
                       downloadImageTooltip.handlers.onClick()
                       handleDownloadCurrentOutput(e)
                     }}
-                      className="flex items-center justify-center px-1.5 py-0.5 bg-black/50 text-white rounded backdrop-blur-sm hover:bg-black/70 transition focus:outline-none focus:ring-1 focus:ring-white/50"
+                      className="flex items-center justify-center px-1.5 py-0.5 bg-black/50 text-white rounded backdrop-blur-xs hover:bg-black/70 transition focus:outline-hidden focus:ring-1 focus:ring-white/50"
                     aria-label="下载图片"
                   >
                     <DownloadIcon className="h-4 w-4" />
@@ -486,7 +486,7 @@ export default function DetailModal() {
                       downloadAllTooltip.handlers.onClick()
                       handleDownloadAllOutputs(e)
                     }}
-                    className="flex items-center justify-center pl-1.5 pr-2 py-0.5 gap-0.5 bg-black/50 text-white rounded backdrop-blur-sm hover:bg-black/70 transition focus:outline-none focus:ring-1 focus:ring-white/50"
+                    className="flex items-center justify-center pl-1.5 pr-2 py-0.5 gap-0.5 bg-black/50 text-white rounded backdrop-blur-xs hover:bg-black/70 transition focus:outline-hidden focus:ring-1 focus:ring-white/50"
                     aria-label="下载全部"
                   >
                     <DownloadIcon className="h-4 w-4" />
@@ -526,16 +526,16 @@ export default function DetailModal() {
               <div data-selectable-text className="absolute left-4 top-[15px] flex items-center gap-1.5">
                 {currentImageRatio && currentImageSize ? (
                   <>
-                    <span className="bg-black/50 text-white text-xs px-2 py-0.5 rounded backdrop-blur-sm font-mono">
+                    <span className="bg-black/50 text-white text-xs px-2 py-0.5 rounded backdrop-blur-xs font-mono">
                       {currentImageRatio}
                     </span>
-                    <span className="bg-black/50 text-white/90 text-xs px-2 py-0.5 rounded backdrop-blur-sm font-medium">
+                    <span className="bg-black/50 text-white/90 text-xs px-2 py-0.5 rounded backdrop-blur-xs font-medium">
                       {currentImageSize}
                     </span>
                   </>
                 ) : (
                   formatDuration() && (
-                    <span className="flex items-center gap-1 bg-black/50 text-white text-xs px-2 py-0.5 rounded backdrop-blur-sm font-mono">
+                    <span className="flex items-center gap-1 bg-black/50 text-white text-xs px-2 py-0.5 rounded backdrop-blur-xs font-mono">
                       <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
@@ -582,7 +582,7 @@ export default function DetailModal() {
                       downloadOriginalImageTooltip.handlers.onClick()
                       handleDownloadCurrentOriginalOutput(e)
                     }}
-                    className="flex items-center justify-center gap-0.5 rounded bg-black/50 py-0.5 pl-1.5 pr-2 text-white backdrop-blur-sm transition hover:bg-black/70 focus:outline-none focus:ring-1 focus:ring-white/50"
+                    className="flex items-center justify-center gap-0.5 rounded bg-black/50 py-0.5 pl-1.5 pr-2 text-white backdrop-blur-xs transition hover:bg-black/70 focus:outline-hidden focus:ring-1 focus:ring-white/50"
                     aria-label="下载原图"
                   >
                     <DownloadIcon className="h-4 w-4" />
@@ -638,7 +638,7 @@ export default function DetailModal() {
           )}
           {task.status === 'running' && (
             <>
-              <div className="absolute left-4 top-4 flex items-center gap-1 bg-black/50 text-white text-xs px-2 py-0.5 rounded backdrop-blur-sm font-mono">
+              <div className="absolute left-4 top-4 flex items-center gap-1 bg-black/50 text-white text-xs px-2 py-0.5 rounded backdrop-blur-xs font-mono">
                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
@@ -662,7 +662,7 @@ export default function DetailModal() {
                     </svg>
                   )}
                   {streamPreviewLoaded && (
-                    <span className="absolute top-4 right-4 flex items-center gap-1 rounded bg-blue-500 px-2 py-0.5 text-xs font-medium text-white backdrop-blur-sm">
+                    <span className="absolute top-4 right-4 flex items-center gap-1 rounded bg-blue-500 px-2 py-0.5 text-xs font-medium text-white backdrop-blur-xs">
                       流式预览
                     </span>
                   )}
@@ -903,7 +903,7 @@ export default function DetailModal() {
                         <div key={imgId} className="relative group inline-block">
                           <div
                             className={`relative w-16 h-16 rounded-lg overflow-hidden border cursor-pointer hover:opacity-80 transition ${
-                              isMaskTarget || commentCount > 0 ? 'border-blue-500 border-2 shadow-sm' : 'border-gray-200 dark:border-white/[0.08]'
+                              isMaskTarget || commentCount > 0 ? 'border-blue-500 border-2 shadow-xs' : 'border-gray-200 dark:border-white/[0.08]'
                             }`}
                             onClick={() => setLightboxImageId(imgId, allInputImageIds, task.prompt)}
                           >
@@ -916,7 +916,7 @@ export default function DetailModal() {
                               />
                             )}
                             {isMaskTarget && (
-                              <span className="absolute left-1 top-1 rounded bg-blue-500/90 px-1.5 py-0.5 text-[8px] leading-none text-white font-bold tracking-wider backdrop-blur-sm z-10 pointer-events-none">
+                              <span className="absolute left-1 top-1 rounded bg-blue-500/90 px-1.5 py-0.5 text-[8px] leading-none text-white font-bold tracking-wider backdrop-blur-xs z-10 pointer-events-none">
                                 MASK
                               </span>
                             )}
@@ -1036,7 +1036,7 @@ export default function DetailModal() {
               onClick={handleReuse}
               className="col-span-2 sm:flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-500/20 transition text-sm font-medium whitespace-nowrap"
             >
-              <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
               </svg>
               复用配置
@@ -1046,14 +1046,14 @@ export default function DetailModal() {
               disabled={!outputLen}
               className="col-span-2 sm:flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-green-50 dark:bg-green-500/10 text-green-600 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-500/20 disabled:opacity-40 disabled:cursor-not-allowed transition text-sm font-medium whitespace-nowrap"
             >
-              <EditIcon className="w-4 h-4 flex-shrink-0" />
+              <EditIcon className="w-4 h-4 shrink-0" />
               编辑输出
             </button>
             <button
               onClick={handleDelete}
               className="col-span-3 sm:flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-500/20 transition text-sm font-medium whitespace-nowrap"
             >
-              <TrashIcon className="w-4 h-4 flex-shrink-0" />
+              <TrashIcon className="w-4 h-4 shrink-0" />
               删除任务
             </button>
             <button
@@ -1075,7 +1075,7 @@ export default function DetailModal() {
 
       {showRawUrlsModal && rawImageUrls.length > 0 && (
         <div
-          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm sm:p-6"
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4 backdrop-blur-xs sm:p-6"
           onPointerDown={(e) => {
             rawUrlsBackdropPointerDownRef.current = e.target === e.currentTarget
           }}
@@ -1116,7 +1116,7 @@ export default function DetailModal() {
             <div className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-5 bg-gray-50/50 dark:bg-black/20 overscroll-contain">
               <div className="space-y-2.5">
                 {rawImageUrls.map((url, i) => (
-                  <div key={i} className="group flex items-center gap-3 p-3 sm:p-4 rounded-xl bg-white dark:bg-[#1c1c1e] border border-gray-100 dark:border-white/[0.06] shadow-sm hover:shadow-md transition-all">
+                  <div key={i} className="group flex items-center gap-3 p-3 sm:p-4 rounded-xl bg-white dark:bg-[#1c1c1e] border border-gray-100 dark:border-white/[0.06] shadow-xs hover:shadow-md transition-all">
                     <div className="flex-1 min-w-0 flex flex-col gap-1">
                       <div className="text-xs font-medium text-gray-400 dark:text-gray-500">
                         图片 {i + 1}
@@ -1135,7 +1135,7 @@ export default function DetailModal() {
                           showToast(getClipboardFailureMessage('复制失败', err), 'error')
                         }
                       }}
-                      className="flex-shrink-0 p-2 sm:px-3 sm:py-1.5 flex items-center justify-center gap-1.5 rounded-lg bg-gray-50 dark:bg-white/[0.04] text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/[0.08] transition-colors text-xs font-medium border border-transparent dark:border-white/[0.04]"
+                      className="shrink-0 p-2 sm:px-3 sm:py-1.5 flex items-center justify-center gap-1.5 rounded-lg bg-gray-50 dark:bg-white/[0.04] text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/[0.08] transition-colors text-xs font-medium border border-transparent dark:border-white/[0.04]"
                       title="复制链接"
                     >
                       <CopyIcon className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
@@ -1151,7 +1151,7 @@ export default function DetailModal() {
 
       {showRawResponseModal && task?.rawResponsePayload && (
         <div
-          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm sm:p-6"
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4 backdrop-blur-xs sm:p-6"
           onPointerDown={(e) => {
             rawResponseBackdropPointerDownRef.current = e.target === e.currentTarget
           }}

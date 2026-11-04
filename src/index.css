@@ -1,9 +1,19 @@
 @import url('https://fontsapi.zeoseven.com/442/main/result.css');
 @import url('https://cdn.jsdelivr.net/npm/@lobehub/webfont-harmony-sans-sc@1.0.0/css/index.css');
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@config "../tailwind.config.js";
+
+/* 保持 v3 的默认边框颜色，避免未指定颜色的边框变成 currentColor */
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, #e4e4e7);
+  }
+}
 
 :root {
   --background: 0 0% 100%;

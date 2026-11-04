@@ -20,12 +20,12 @@ function Switch({ checked, disabled, label, onToggle }: { checked: boolean; disa
       type="button"
       onClick={onToggle}
       disabled={disabled}
-      className={`relative inline-flex h-4 w-7 flex-shrink-0 items-center rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${checked ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-600'}`}
+      className={`relative inline-flex h-4 w-7 shrink-0 items-center rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${checked ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-600'}`}
       role="switch"
       aria-checked={checked}
       aria-label={label}
     >
-      <span className={`inline-block h-3 w-3 transform rounded-full bg-white shadow transition-transform ${checked ? 'translate-x-[14px]' : 'translate-x-[2px]'}`} />
+      <span className={`inline-block h-3 w-3 transform rounded-full bg-white shadow-sm transition-transform ${checked ? 'translate-x-[14px]' : 'translate-x-[2px]'}`} />
     </button>
   )
 }
@@ -72,7 +72,7 @@ function ConcurrencyInput({ value, disabled, onCommit }: { value: number; disabl
         disabled={disabled}
         type="number"
         min={1}
-        className={`w-28 px-3 py-1.5 rounded-xl border border-transparent focus:border-blue-300 dark:focus:border-blue-500/50 focus:outline-none text-xs transition-all duration-200 ${
+        className={`w-28 px-3 py-1.5 rounded-xl border border-transparent focus:border-blue-300 dark:focus:border-blue-500/50 focus:outline-hidden text-xs transition-all duration-200 ${
           disabled ? 'bg-black/[0.03] dark:bg-white/[0.04] opacity-50 cursor-not-allowed' : 'bg-black/[0.04] dark:bg-white/[0.06]'
         }`}
       />
@@ -284,7 +284,7 @@ export default function InputParamsPanel({
           min={1}
           max={outputImageLimit}
           style={{ width: `${Math.max(1, nInput.length)}ch` }}
-          className="bg-transparent text-xs focus:outline-none disabled:cursor-not-allowed [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+          className="bg-transparent text-xs focus:outline-hidden disabled:cursor-not-allowed [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
         />
         <ButtonTooltip visible={nLimitHint.visible} text={nLimitHintText} />
         <ButtonTooltip visible={streamConcurrentByN && streamConcurrentHint.visible && !nLimitHint.visible} text="数量大于 1 时会将多图生成拆分为并发单图" />
@@ -365,7 +365,7 @@ export default function InputParamsPanel({
                   min={0}
                   max={100}
                   placeholder="0-100"
-                  className={`w-28 px-3 py-1.5 rounded-xl border border-transparent focus:border-blue-300 dark:focus:border-blue-500/50 focus:outline-none text-xs transition-all duration-200 ${
+                  className={`w-28 px-3 py-1.5 rounded-xl border border-transparent focus:border-blue-300 dark:focus:border-blue-500/50 focus:outline-hidden text-xs transition-all duration-200 ${
                     compressionDisabled
                       ? 'bg-black/[0.03] dark:bg-white/[0.04] opacity-50 cursor-not-allowed'
                       : 'bg-black/[0.04] dark:bg-white/[0.06]'

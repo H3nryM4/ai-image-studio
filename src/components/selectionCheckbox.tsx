@@ -11,7 +11,7 @@ export default function SelectionCheckbox({ checked, label, onChange }: {
       onTouchStart={(e) => e.stopPropagation()}
     >
       <input type="checkbox" checked={checked} onChange={onChange} aria-label={label} className="peer sr-only" />
-      <span aria-hidden="true" className={`flex h-5 w-5 items-center justify-center rounded-full border shadow-sm transition-[background-color,border-color,box-shadow] duration-150 peer-focus-visible:ring-2 peer-focus-visible:ring-blue-400 peer-focus-visible:ring-offset-2 dark:peer-focus-visible:ring-offset-gray-900 ${checked
+      <span aria-hidden="true" className={`flex h-5 w-5 items-center justify-center rounded-full border shadow-xs transition-[background-color,border-color,box-shadow] duration-150 peer-focus-visible:ring-2 peer-focus-visible:ring-blue-400 peer-focus-visible:ring-offset-2 dark:peer-focus-visible:ring-offset-gray-900 ${checked
         ? 'border-blue-500 bg-blue-500 text-white'
         : 'border-gray-300 bg-white/90 text-transparent hover:border-blue-400 dark:border-gray-500 dark:bg-gray-800/90'
       }`}>

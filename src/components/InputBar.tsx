@@ -1018,13 +1018,13 @@ export default function InputBar() {
           text={imageHintText}
         />
         {showDropBefore && (
-          <div className="absolute -left-[5px] top-0 bottom-0 w-[2px] bg-blue-500 rounded-full z-40 shadow-sm pointer-events-none" />
+          <div className="absolute -left-[5px] top-0 bottom-0 w-[2px] bg-blue-500 rounded-full z-40 shadow-xs pointer-events-none" />
         )}
         {showDropAfter && (
-          <div className="absolute -right-[5px] top-0 bottom-0 w-[2px] bg-blue-500 rounded-full z-40 shadow-sm pointer-events-none" />
+          <div className="absolute -right-[5px] top-0 bottom-0 w-[2px] bg-blue-500 rounded-full z-40 shadow-xs pointer-events-none" />
         )}
         <div
-          className={`relative w-[52px] h-[52px] rounded-xl overflow-hidden shadow-sm cursor-grab active:cursor-grabbing select-none ${
+          className={`relative w-[52px] h-[52px] rounded-xl overflow-hidden shadow-xs cursor-grab active:cursor-grabbing select-none ${
             isMaskTarget || commentCount > 0
               ? 'border-2 border-blue-500'
               : 'border border-gray-200 dark:border-white/[0.08]'
@@ -1044,16 +1044,16 @@ export default function InputBar() {
             </div>
           )}
           {isMaskTarget && (
-            <span className="absolute left-1 top-1 rounded bg-blue-500/90 px-1.5 py-0.5 text-[8px] leading-none text-white font-bold tracking-wider backdrop-blur-sm z-10 pointer-events-none">
+            <span className="absolute left-1 top-1 rounded bg-blue-500/90 px-1.5 py-0.5 text-[8px] leading-none text-white font-bold tracking-wider backdrop-blur-xs z-10 pointer-events-none">
               MASK
             </span>
           )}
           {commentCount > 0 && <CommentBadge count={commentCount} className={isMaskTarget ? 'left-1 top-[18px]' : 'left-1 top-1'} />}
-          <span className="absolute bottom-1 left-1 flex h-4 w-4 items-center justify-center rounded-full bg-black/55 text-[9px] font-semibold text-white backdrop-blur-sm z-10 pointer-events-none">
+          <span className="absolute bottom-1 left-1 flex h-4 w-4 items-center justify-center rounded-full bg-black/55 text-[9px] font-semibold text-white backdrop-blur-xs z-10 pointer-events-none">
             {idx + 1}
           </span>
           <button
-            className="absolute inset-0 w-full h-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer z-20 focus:outline-none border-none"
+            className="absolute inset-0 w-full h-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer z-20 focus:outline-hidden border-none"
             onClick={(e) => {
               e.stopPropagation()
               setLightboxImageId(img.id, inputImages.map((i) => i.id), prompt)
@@ -1088,7 +1088,7 @@ export default function InputBar() {
   const renderAddImageButton = (mobile: boolean) => (
     <div
       data-add-image-menu
-      className="relative flex-shrink-0"
+      className="relative shrink-0"
       onMouseEnter={() => setAttachHover(true)}
       onMouseLeave={() => setAttachHover(false)}
     >
@@ -1099,10 +1099,10 @@ export default function InputBar() {
           setAttachHover(false)
           setShowUploadMenu(!showUploadMenu)
         }}
-        className={`p-2.5 rounded-xl transition-all shadow-sm ${
+        className={`p-2.5 rounded-xl transition-all shadow-xs ${
           atImageLimit
             ? 'bg-gray-200 dark:bg-white/[0.04] text-gray-300 dark:text-gray-500 cursor-not-allowed'
-            : 'bg-gray-200 dark:bg-white/[0.06] hover:bg-gray-300 dark:hover:bg-white/[0.1] text-gray-500 dark:text-gray-300 hover:shadow'
+            : 'bg-gray-200 dark:bg-white/[0.06] hover:bg-gray-300 dark:hover:bg-white/[0.1] text-gray-500 dark:text-gray-300 hover:shadow-sm'
         }`}
         aria-label={uploadImageTooltipText}
         aria-expanded={showUploadMenu}
@@ -1172,7 +1172,7 @@ export default function InputBar() {
           action: () => clearInputImages(),
         })
       }
-      className="w-[52px] h-[52px] rounded-xl border border-dashed border-gray-300 dark:border-white/[0.08] flex flex-col items-center justify-center gap-0.5 text-gray-400 dark:text-gray-500 hover:text-red-600 hover:border-red-300 hover:bg-red-500/[0.1] dark:hover:bg-red-500/[0.16] transition-all cursor-pointer flex-shrink-0"
+      className="w-[52px] h-[52px] rounded-xl border border-dashed border-gray-300 dark:border-white/[0.08] flex flex-col items-center justify-center gap-0.5 text-gray-400 dark:text-gray-500 hover:text-red-600 hover:border-red-300 hover:bg-red-500/[0.1] dark:hover:bg-red-500/[0.16] transition-all cursor-pointer shrink-0"
       title={maskTargetImage ? '清空遮罩主图、参考图和遮罩' : '清空全部参考图'}
     >
       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1350,7 +1350,7 @@ export default function InputBar() {
                 syncCommentTagSelection(el)
               }}
               aria-label={promptPlaceholder}
-              className={`col-start-1 row-start-1 min-h-[42px] w-full overflow-hidden ios-rounded-scroll-fix whitespace-pre-wrap break-words rounded-2xl border border-gray-200/60 bg-white/50 pl-4 pr-10 py-3 text-sm leading-relaxed shadow-sm outline-none transition-[border-color,box-shadow] duration-200 focus:ring-1 focus:ring-blue-300/40 dark:border-white/[0.08] dark:bg-white/[0.03] dark:text-gray-100 dark:focus:ring-blue-500/30${promptExpanded ? ' !h-full !overflow-y-auto' : ''}`}
+              className={`col-start-1 row-start-1 min-h-[42px] w-full overflow-hidden ios-rounded-scroll-fix whitespace-pre-wrap break-words rounded-2xl border border-gray-200/60 bg-white/50 pl-4 pr-10 py-3 text-sm leading-relaxed shadow-xs outline-hidden transition-[border-color,box-shadow] duration-200 focus:ring-1 focus:ring-blue-300/40 dark:border-white/[0.08] dark:bg-white/[0.03] dark:text-gray-100 dark:focus:ring-blue-500/30${promptExpanded ? ' !h-full !overflow-y-auto' : ''}`}
             />
             {prompt.length === 0 && (
               <div className={`prompt-placeholder col-start-1 row-start-1 pointer-events-none pl-4 pr-10 py-3 text-sm leading-relaxed text-gray-400 dark:text-gray-500${
@@ -1374,7 +1374,7 @@ export default function InputBar() {
                     setClearPromptHover(false)
                     handleClearPrompt()
                   }}
-                  className="flex items-center justify-center rounded-full p-1 text-gray-400 transition-all duration-200 hover:bg-gray-100 hover:text-gray-600 focus:outline-none dark:hover:bg-white/[0.08] dark:hover:text-gray-200"
+                  className="flex items-center justify-center rounded-full p-1 text-gray-400 transition-all duration-200 hover:bg-gray-100 hover:text-gray-600 focus:outline-hidden dark:hover:bg-white/[0.08] dark:hover:text-gray-200"
                   aria-label="清空文本"
                 >
                   <CloseIcon className="w-3.5 h-3.5" />
@@ -1395,7 +1395,7 @@ export default function InputBar() {
                     setPromptExpanded((expanded) => !expanded)
                     setMobileCollapsed(false)
                   }}
-                  className="flex items-center justify-center rounded-md p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 focus:outline-none dark:hover:bg-white/[0.08] dark:hover:text-gray-200"
+                  className="flex items-center justify-center rounded-md p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 focus:outline-hidden dark:hover:bg-white/[0.08] dark:hover:text-gray-200"
                   aria-label={promptExpanded ? '恢复输入框' : '展开输入框'}
                   aria-pressed={promptExpanded}
                 >
@@ -1411,7 +1411,7 @@ export default function InputBar() {
             <div className="hidden sm:flex items-center justify-between gap-3">
               {renderParams()}
 
-              <div className="flex gap-2 flex-shrink-0">
+              <div className="flex gap-2 shrink-0">
                 {renderAddImageButton(false)}
                 <div
                   className="relative"
@@ -1422,7 +1422,7 @@ export default function InputBar() {
                   <button
                     onClick={() => hasSubmitApiConfig ? void submitTask() : setShowSettings(true)}
                     disabled={hasSubmitApiConfig ? !canSubmit : false}
-                    className={`p-2.5 rounded-xl transition-all shadow-sm hover:shadow ${
+                    className={`p-2.5 rounded-xl transition-all shadow-xs hover:shadow-sm ${
                       !hasSubmitApiConfig
                         ? 'bg-gray-300 dark:bg-white/[0.06] text-white cursor-pointer'
                         : 'bg-blue-500 text-white hover:bg-blue-600 disabled:bg-gray-300 dark:disabled:bg-white/[0.04] disabled:opacity-50 disabled:cursor-not-allowed'
@@ -1458,7 +1458,7 @@ export default function InputBar() {
                     onClick={() => hasSubmitApiConfig ? void submitTask() : setShowSettings(true)}
                     disabled={hasSubmitApiConfig ? !canSubmit : false}
                     aria-label={submitButtonAriaLabel}
-                    className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium transition-all shadow-sm ${
+                    className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium transition-all shadow-xs ${
                       !hasSubmitApiConfig
                         ? 'bg-gray-300 dark:bg-white/[0.06] text-white cursor-pointer'
                         : 'bg-blue-500 text-white hover:bg-blue-600 disabled:bg-gray-300 dark:disabled:bg-white/[0.04] disabled:opacity-50 disabled:cursor-not-allowed'

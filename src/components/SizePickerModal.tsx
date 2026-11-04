@@ -182,7 +182,7 @@ export default function SizePickerModal({ currentSize, onSelect, onClose, allowA
       onMouseDown={handleMouseDown}
       onMouseUp={handleMouseUp}
     >
-      <div className="absolute inset-0 bg-black/30 backdrop-blur-sm animate-overlay-in" />
+      <div className="absolute inset-0 bg-black/30 backdrop-blur-xs animate-overlay-in" />
       <div
         ref={modalRef}
         className="relative z-10 w-full max-w-md rounded-3xl border border-white/50 bg-white/95 p-5 shadow-2xl ring-1 ring-black/5 animate-modal-in dark:border-white/[0.08] dark:bg-gray-900/95 dark:ring-white/10"
@@ -208,20 +208,20 @@ export default function SizePickerModal({ currentSize, onSelect, onClose, allowA
             {allowAuto && (
               <button
                 onClick={() => setMode('auto')}
-                className={`flex-1 rounded-lg py-1.5 text-sm font-medium transition ${mode === 'auto' ? 'bg-white text-gray-800 shadow-sm dark:bg-gray-700 dark:text-gray-100' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'}`}
+                className={`flex-1 rounded-lg py-1.5 text-sm font-medium transition ${mode === 'auto' ? 'bg-white text-gray-800 shadow-xs dark:bg-gray-700 dark:text-gray-100' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'}`}
               >
                 自动
               </button>
             )}
             <button
               onClick={() => setMode('ratio')}
-              className={`flex-1 rounded-lg py-1.5 text-sm font-medium transition ${mode === 'ratio' ? 'bg-white text-gray-800 shadow-sm dark:bg-gray-700 dark:text-gray-100' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'}`}
+              className={`flex-1 rounded-lg py-1.5 text-sm font-medium transition ${mode === 'ratio' ? 'bg-white text-gray-800 shadow-xs dark:bg-gray-700 dark:text-gray-100' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'}`}
             >
               按比例
             </button>
             <button
               onClick={() => setMode('resolution')}
-              className={`flex-1 rounded-lg py-1.5 text-sm font-medium transition ${mode === 'resolution' ? 'bg-white text-gray-800 shadow-sm dark:bg-gray-700 dark:text-gray-100' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'}`}
+              className={`flex-1 rounded-lg py-1.5 text-sm font-medium transition ${mode === 'resolution' ? 'bg-white text-gray-800 shadow-xs dark:bg-gray-700 dark:text-gray-100' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'}`}
             >
               自定义宽高
             </button>
@@ -338,7 +338,7 @@ export default function SizePickerModal({ currentSize, onSelect, onClose, allowA
                       value={customRatio}
                       onChange={(e) => setCustomRatio(e.target.value)}
                       placeholder="例如 5:4 / 2.39:1"
-                      className={`w-full rounded-xl border px-3 py-2 text-sm outline-none transition ${
+                      className={`w-full rounded-xl border px-3 py-2 text-sm outline-hidden transition ${
                         customRatioValid
                           ? 'border-transparent bg-black/[0.04] text-gray-700 focus:border-blue-300 dark:bg-white/[0.06] dark:text-gray-200 dark:focus:border-blue-500/50'
                           : 'border-red-300 bg-white/60 text-gray-700 focus:border-red-400 dark:border-red-500/40 dark:bg-white/[0.03] dark:text-gray-200'
@@ -360,7 +360,7 @@ export default function SizePickerModal({ currentSize, onSelect, onClose, allowA
                         type="number"
                         value={customW}
                         onChange={(e) => setCustomW(e.target.value)}
-                        className="w-full rounded-xl border border-transparent bg-black/[0.04] px-3 py-2 text-sm text-gray-700 outline-none transition focus:border-blue-300 dark:bg-white/[0.06] dark:text-gray-200 dark:focus:border-blue-500/50"
+                        className="w-full rounded-xl border border-transparent bg-black/[0.04] px-3 py-2 text-sm text-gray-700 outline-hidden transition focus:border-blue-300 dark:bg-white/[0.06] dark:text-gray-200 dark:focus:border-blue-500/50"
                         placeholder="例如 1024"
                       />
                     </label>
@@ -375,7 +375,7 @@ export default function SizePickerModal({ currentSize, onSelect, onClose, allowA
                         type="number"
                         value={customH}
                         onChange={(e) => setCustomH(e.target.value)}
-                        className="w-full rounded-xl border border-transparent bg-black/[0.04] px-3 py-2 text-sm text-gray-700 outline-none transition focus:border-blue-300 dark:bg-white/[0.06] dark:text-gray-200 dark:focus:border-blue-500/50"
+                        className="w-full rounded-xl border border-transparent bg-black/[0.04] px-3 py-2 text-sm text-gray-700 outline-hidden transition focus:border-blue-300 dark:bg-white/[0.06] dark:text-gray-200 dark:focus:border-blue-500/50"
                         placeholder="例如 1024"
                       />
                     </label>
@@ -383,7 +383,7 @@ export default function SizePickerModal({ currentSize, onSelect, onClose, allowA
                 </section>
                 <div className="rounded-xl border border-transparent bg-black/[0.04] p-3 text-xs text-gray-600 dark:bg-white/[0.06] dark:text-gray-400">
                   <div className="flex items-start gap-2">
-                    <svg className="mt-[2px] h-4 w-4 flex-shrink-0 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="mt-[2px] h-4 w-4 shrink-0 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                     <div className="whitespace-pre-line leading-relaxed">{sizeLimitText}</div>

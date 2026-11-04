@@ -218,7 +218,7 @@ export default function ImageContextMenu() {
           onClick={handleCopy}
           className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700/50 flex items-center gap-2 transition-colors"
         >
-          <CopyIcon className="w-4 h-4 flex-shrink-0" />
+          <CopyIcon className="w-4 h-4 shrink-0" />
           复制
         </button>
       )}
@@ -226,7 +226,7 @@ export default function ImageContextMenu() {
         onClick={handleDownload}
         className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700/50 flex items-center gap-2 transition-colors"
       >
-        <DownloadIcon className="w-4 h-4 flex-shrink-0" />
+        <DownloadIcon className="w-4 h-4 shrink-0" />
         下载
       </button>
       {showDownloadAll && (
@@ -234,7 +234,7 @@ export default function ImageContextMenu() {
           onClick={handleDownloadAll}
           className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700/50 flex items-center gap-2 transition-colors"
         >
-          <DownloadIcon className="w-4 h-4 flex-shrink-0" />
+          <DownloadIcon className="w-4 h-4 shrink-0" />
           下载全部
         </button>
       )}
@@ -242,7 +242,7 @@ export default function ImageContextMenu() {
         onClick={handleEdit}
         className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700/50 flex items-center gap-2 transition-colors"
       >
-        <EditIcon className="w-4 h-4 flex-shrink-0" />
+        <EditIcon className="w-4 h-4 shrink-0" />
         编辑
       </button>
     </div>

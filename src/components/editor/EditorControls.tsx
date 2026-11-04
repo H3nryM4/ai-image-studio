@@ -9,7 +9,7 @@ export const EDITOR_ICON_BUTTON_CLASS = 'flex h-8 w-8 sm:h-9 sm:w-9 items-center
 export function getEditorToolButtonClass(active: boolean) {
   return `flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-xl transition-colors disabled:opacity-40 ${
     active
-      ? 'bg-white text-blue-500 shadow-sm dark:bg-white/[0.12] dark:text-blue-400 dark:shadow-none'
+      ? 'bg-white text-blue-500 shadow-xs dark:bg-white/[0.12] dark:text-blue-400 dark:shadow-none'
       : 'text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-100'
   }`
 }
@@ -17,7 +17,7 @@ export function getEditorToolButtonClass(active: boolean) {
 export function EditorShell({ onBackdropClick, children }: { onBackdropClick: () => void; children: ReactNode }) {
   return (
     <div data-no-drag-select className="fixed inset-0 z-[80] flex items-center justify-center sm:p-4">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-overlay-in" onClick={onBackdropClick} />
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-xs animate-overlay-in" onClick={onBackdropClick} />
       <div className="relative z-10 flex h-full w-full flex-col overflow-hidden bg-white shadow-2xl animate-modal-in dark:bg-gray-900 sm:h-[min(92vh,920px)] sm:max-w-5xl sm:rounded-3xl sm:border sm:border-white/50 sm:ring-1 sm:ring-black/5 sm:dark:border-white/[0.08] sm:dark:ring-white/10">
         {children}
       </div>
@@ -92,7 +92,7 @@ export function EditorSizeSlider({
   return (
     <div className={`absolute left-3 top-1/2 z-10 flex -translate-y-1/2 flex-col items-center gap-2 sm:left-5 ${disabled ? 'pointer-events-none opacity-40' : ''}`}>
       <div
-        className="relative h-48 w-9 cursor-ns-resize touch-none select-none rounded-full border border-gray-200/80 bg-white/95 shadow-sm dark:border-white/[0.08] dark:bg-gray-800/95"
+        className="relative h-48 w-9 cursor-ns-resize touch-none select-none rounded-full border border-gray-200/80 bg-white/95 shadow-xs dark:border-white/[0.08] dark:bg-gray-800/95"
         role="slider"
         aria-label={label}
         aria-valuemin={min}
@@ -143,7 +143,7 @@ export function EditorResetViewButton({ onClick }: { onClick: () => void }) {
     <TooltipButton
       tooltip="重置视图"
       wrapperClassName="absolute bottom-3 right-3 z-10 inline-flex"
-      className="flex h-9 w-9 items-center justify-center rounded-full border border-gray-200/80 bg-white/95 text-gray-600 shadow-sm transition hover:text-gray-900 dark:border-white/[0.08] dark:bg-gray-800/95 dark:text-gray-300 dark:hover:text-white"
+      className="flex h-9 w-9 items-center justify-center rounded-full border border-gray-200/80 bg-white/95 text-gray-600 shadow-xs transition hover:text-gray-900 dark:border-white/[0.08] dark:bg-gray-800/95 dark:text-gray-300 dark:hover:text-white"
       onClick={onClick}
     >
       <ResetViewIcon />

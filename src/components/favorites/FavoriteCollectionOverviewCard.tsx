@@ -233,7 +233,7 @@ export function FavoriteCollectionOverviewCard({
       >
         {selectionMode && <SelectionCheckbox checked={isSelected} label={`选择收藏夹「${card.name}」`} onChange={onToggleSelection} />}
         <div className="flex h-40">
-          <div className={`${selectionMode ? 'w-32 min-w-[8rem] sm:w-40 sm:min-w-[10rem]' : 'w-40 min-w-[10rem]'} h-full bg-gray-100 dark:bg-black/20 relative flex items-center justify-center overflow-hidden flex-shrink-0`}>
+          <div className={`${selectionMode ? 'w-32 min-w-[8rem] sm:w-40 sm:min-w-[10rem]' : 'w-40 min-w-[10rem]'} h-full bg-gray-100 dark:bg-black/20 relative flex items-center justify-center overflow-hidden shrink-0`}>
             <CoverThumbnail task={coverTask} />
           </div>
           <div className="flex-1 p-3 flex flex-col min-w-0">
@@ -243,7 +243,7 @@ export function FavoriteCollectionOverviewCard({
                 {editingId === card.id ? (
                   <input
                     type="text"
-                    className="h-6 min-w-0 flex-1 rounded border border-blue-400/50 bg-white px-1.5 py-0 text-[14px] leading-6 text-gray-900 shadow-sm outline-none focus:border-blue-500 dark:border-white/20 dark:bg-black/20 dark:text-white dark:focus:border-white/40"
+                    className="h-6 min-w-0 flex-1 rounded border border-blue-400/50 bg-white px-1.5 py-0 text-[14px] leading-6 text-gray-900 shadow-xs outline-hidden focus:border-blue-500 dark:border-white/20 dark:bg-black/20 dark:text-white dark:focus:border-white/40"
                     value={editingName}
                     onChange={(e) => setEditingName(e.target.value)}
                     onKeyDown={handleRenameKeyDown}

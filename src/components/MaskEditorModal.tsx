@@ -514,7 +514,7 @@ function MaskEditor({ imageId }: { imageId: string }) {
             }}
           >
             <div
-              className="absolute inset-0 overflow-hidden rounded-lg shadow-sm ring-1 ring-black/5 will-change-transform dark:ring-white/10"
+              className="absolute inset-0 overflow-hidden rounded-lg shadow-xs ring-1 ring-black/5 will-change-transform dark:ring-white/10"
               style={{
                 transform: `matrix(${viewport.transform.scale}, 0, 0, ${viewport.transform.scale}, ${viewport.transform.x}, ${viewport.transform.y})`,
                 transformOrigin: '0 0',
@@ -583,7 +583,7 @@ function MaskEditor({ imageId }: { imageId: string }) {
           <button
             onClick={handleSave}
             disabled={!isReady || isSaving}
-            className="flex h-10 items-center gap-1.5 rounded-xl bg-blue-500 px-4 text-sm font-medium text-white shadow-sm transition hover:bg-blue-600 active:bg-blue-700 disabled:opacity-50"
+            className="flex h-10 items-center gap-1.5 rounded-xl bg-blue-500 px-4 text-sm font-medium text-white shadow-xs transition hover:bg-blue-600 active:bg-blue-700 disabled:opacity-50"
           >
             <CheckIcon />
             {isSaving ? '保存中...' : '保存'}

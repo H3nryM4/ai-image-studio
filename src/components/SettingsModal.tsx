@@ -1010,7 +1010,7 @@ export default function SettingsModal({ onImportProfile }: { onImportProfile: (s
           onContextMenuCapture={blockDataTransferInteraction}
         >
       <div
-        className="absolute inset-0 bg-black/30 backdrop-blur-sm animate-overlay-in"
+        className="absolute inset-0 bg-black/30 backdrop-blur-xs animate-overlay-in"
         onClick={handleClose}
       />
       <div
@@ -1045,7 +1045,7 @@ export default function SettingsModal({ onImportProfile }: { onImportProfile: (s
               <button
                 onClick={() => setActiveTab('api')}
                 aria-current={activeTab === 'api' ? 'page' : undefined}
-                className={`whitespace-nowrap flex-shrink-0 flex items-center gap-2.5 px-3 py-2.5 text-sm rounded-xl transition-colors ${activeTab === 'api' ? 'bg-white dark:bg-white/[0.08] shadow-sm text-blue-600 dark:text-blue-400 font-medium' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100/80 dark:hover:bg-white/[0.04]'}`}
+                className={`whitespace-nowrap shrink-0 flex items-center gap-2.5 px-3 py-2.5 text-sm rounded-xl transition-colors ${activeTab === 'api' ? 'bg-white dark:bg-white/[0.08] shadow-xs text-blue-600 dark:text-blue-400 font-medium' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100/80 dark:hover:bg-white/[0.04]'}`}
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
@@ -1055,7 +1055,7 @@ export default function SettingsModal({ onImportProfile }: { onImportProfile: (s
               <button
                 onClick={() => setActiveTab('general')}
                 aria-current={activeTab === 'general' ? 'page' : undefined}
-                className={`whitespace-nowrap flex-shrink-0 flex items-center gap-2.5 px-3 py-2.5 text-sm rounded-xl transition-colors ${activeTab === 'general' ? 'bg-white dark:bg-white/[0.08] shadow-sm text-blue-600 dark:text-blue-400 font-medium' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100/80 dark:hover:bg-white/[0.04]'}`}
+                className={`whitespace-nowrap shrink-0 flex items-center gap-2.5 px-3 py-2.5 text-sm rounded-xl transition-colors ${activeTab === 'general' ? 'bg-white dark:bg-white/[0.08] shadow-xs text-blue-600 dark:text-blue-400 font-medium' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100/80 dark:hover:bg-white/[0.04]'}`}
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6l4 2m6-2a10 10 0 11-20 0 10 10 0 0120 0z" />
@@ -1066,7 +1066,7 @@ export default function SettingsModal({ onImportProfile }: { onImportProfile: (s
               <button
                 onClick={() => setActiveTab('data')}
                 aria-current={activeTab === 'data' ? 'page' : undefined}
-                className={`whitespace-nowrap flex-shrink-0 flex items-center gap-2.5 px-3 py-2.5 text-sm rounded-xl transition-colors ${activeTab === 'data' ? 'bg-white dark:bg-white/[0.08] shadow-sm text-blue-600 dark:text-blue-400 font-medium' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100/80 dark:hover:bg-white/[0.04]'}`}
+                className={`whitespace-nowrap shrink-0 flex items-center gap-2.5 px-3 py-2.5 text-sm rounded-xl transition-colors ${activeTab === 'data' ? 'bg-white dark:bg-white/[0.08] shadow-xs text-blue-600 dark:text-blue-400 font-medium' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100/80 dark:hover:bg-white/[0.04]'}`}
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
@@ -1076,7 +1076,7 @@ export default function SettingsModal({ onImportProfile }: { onImportProfile: (s
               <button
                 onClick={() => setActiveTab('about')}
                 aria-current={activeTab === 'about' ? 'page' : undefined}
-                className={`whitespace-nowrap flex-shrink-0 flex items-center gap-2.5 px-3 py-2.5 text-sm rounded-xl transition-colors ${activeTab === 'about' ? 'bg-white dark:bg-white/[0.08] shadow-sm text-blue-600 dark:text-blue-400 font-medium' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100/80 dark:hover:bg-white/[0.04]'}`}
+                className={`whitespace-nowrap shrink-0 flex items-center gap-2.5 px-3 py-2.5 text-sm rounded-xl transition-colors ${activeTab === 'about' ? 'bg-white dark:bg-white/[0.08] shadow-xs text-blue-600 dark:text-blue-400 font-medium' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100/80 dark:hover:bg-white/[0.04]'}`}
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -1127,7 +1127,7 @@ export default function SettingsModal({ onImportProfile }: { onImportProfile: (s
                         setProfileMenu(showProfileMenu ? null : 'select')
                       }}
                       disabled={profileMenuDisabled}
-                      className={`flex w-full min-w-0 items-center justify-between gap-2 rounded-xl border border-transparent bg-black/[0.04] px-3 py-2 text-sm text-gray-700 outline-none transition dark:bg-white/[0.06] dark:text-gray-200 ${profileMenuDisabled ? 'cursor-not-allowed opacity-70' : 'hover:bg-gray-50 dark:hover:bg-white/[0.1]'}`}
+                      className={`flex w-full min-w-0 items-center justify-between gap-2 rounded-xl border border-transparent bg-black/[0.04] px-3 py-2 text-sm text-gray-700 outline-hidden transition dark:bg-white/[0.06] dark:text-gray-200 ${profileMenuDisabled ? 'cursor-not-allowed opacity-70' : 'hover:bg-gray-50 dark:hover:bg-white/[0.1]'}`}
                       title={activeProfile.name}
                     >
                       <span className="flex min-w-0 items-center gap-2">
@@ -1136,7 +1136,7 @@ export default function SettingsModal({ onImportProfile }: { onImportProfile: (s
                           {getApiConnectionLabel(draft, activeProfile.connectionId)}
                         </span>
                       </span>
-                      <ChevronDownIcon className={`w-3.5 h-3.5 flex-shrink-0 text-gray-400 dark:text-gray-500 transition-transform duration-200 ${showProfileMenu ? 'rotate-180' : ''}`} />
+                      <ChevronDownIcon className={`w-3.5 h-3.5 shrink-0 text-gray-400 dark:text-gray-500 transition-transform duration-200 ${showProfileMenu ? 'rotate-180' : ''}`} />
                     </button>
 
                     {showProfileMenu && !profileMenuDisabled && (
@@ -1174,10 +1174,10 @@ export default function SettingsModal({ onImportProfile }: { onImportProfile: (s
                                   className={`relative group flex w-full cursor-pointer items-center justify-between px-3 py-2 text-left text-xs transition-colors ${draggedProfileId === profile.id ? 'opacity-40 bg-gray-100 dark:bg-white/[0.04]' : profile.id === activeProfile.id ? 'bg-black/[0.05] font-medium text-blue-600 dark:bg-white/[0.08] dark:text-blue-400' : 'text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-white/[0.06]'}`}
                                 >
                                 {dragOverProfileId === profile.id && dragDropPosition === 'before' && draggedProfileId !== profile.id && (
-                                  <div className="absolute -top-[1px] left-0 right-0 h-[2px] bg-blue-500 rounded-full z-40 shadow-sm pointer-events-none" />
+                                  <div className="absolute -top-[1px] left-0 right-0 h-[2px] bg-blue-500 rounded-full z-40 shadow-xs pointer-events-none" />
                                 )}
                                 {dragOverProfileId === profile.id && dragDropPosition === 'after' && draggedProfileId !== profile.id && (
-                                  <div className="absolute -bottom-[1px] left-0 right-0 h-[2px] bg-blue-500 rounded-full z-40 shadow-sm pointer-events-none" />
+                                  <div className="absolute -bottom-[1px] left-0 right-0 h-[2px] bg-blue-500 rounded-full z-40 shadow-xs pointer-events-none" />
                                 )}
                                 <div className="flex min-w-0 flex-1 items-center gap-2 pr-2">
                                   {!presetConfigOnly && (
@@ -1404,7 +1404,7 @@ export default function SettingsModal({ onImportProfile }: { onImportProfile: (s
                   href="https://github.com/H3nryM4/ai-image-studio"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="group flex flex-col items-center outline-none"
+                  className="group flex flex-col items-center outline-hidden"
                 >
                   <div className="mb-5 flex h-[88px] w-[88px] items-center justify-center rounded-full border border-transparent bg-black/[0.04] text-gray-800 transition-colors group-hover:bg-black/[0.07] dark:bg-white/[0.06] dark:text-gray-100 dark:group-hover:bg-white/[0.1]">
                     <GithubIcon className="h-11 w-11" />

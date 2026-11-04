@@ -758,7 +758,7 @@ function LightboxInner({ src, comments, imageId, maskPreviewSrc, onClose, showNa
   const zoomPercent = Math.round(s * 100)
 
   const navBtnClass =
-    'absolute top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/80 text-gray-800 hover:bg-white dark:bg-black/40 dark:text-white dark:hover:bg-black/60 transition-all z-10 backdrop-blur-sm shadow-md border border-gray-200/50 dark:border-transparent'
+    'absolute top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/80 text-gray-800 hover:bg-white dark:bg-black/40 dark:text-white dark:hover:bg-black/60 transition-all z-10 backdrop-blur-xs shadow-md border border-gray-200/50 dark:border-transparent'
 
   return (
     <div
@@ -878,7 +878,7 @@ function LightboxInner({ src, comments, imageId, maskPreviewSrc, onClose, showNa
       {/* 指示器 */}
       {showZoomBadge && isZoomed && zoomPercent !== 100 && (
         <div className="absolute bottom-6 left-1/2 -translate-x-1/2 pointer-events-none">
-          <span className="px-3 py-1.5 bg-white/90 dark:bg-black/50 text-gray-800 dark:text-white/80 text-xs rounded-full backdrop-blur-sm transition-opacity duration-500 border border-gray-200/80 dark:border-transparent">
+          <span className="px-3 py-1.5 bg-white/90 dark:bg-black/50 text-gray-800 dark:text-white/80 text-xs rounded-full backdrop-blur-xs transition-opacity duration-500 border border-gray-200/80 dark:border-transparent">
             {zoomPercent}%
           </span>
         </div>

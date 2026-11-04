@@ -312,7 +312,7 @@ export function FavoriteCollectionPickerModal() {
 
   return createPortal(
     <div data-no-drag-select className="fixed inset-0 z-[105] flex items-center justify-center p-4 sm:p-0" onClick={closePicker}>
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-overlay-in" />
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-xs animate-overlay-in" />
       <div ref={modalRef} className="relative z-10 flex max-h-[85vh] w-full max-w-[400px] flex-col overflow-hidden rounded-3xl bg-white/90 dark:bg-gray-900/90 backdrop-blur-xl border border-white/50 dark:border-white/[0.08] shadow-[0_8px_40px_rgb(0,0,0,0.12)] dark:shadow-[0_8px_40px_rgb(0,0,0,0.4)] ring-1 ring-black/5 dark:ring-white/10 animate-modal-in" onClick={(e) => e.stopPropagation()}>
         <div className="px-6 pt-6 pb-4 shrink-0 relative border-b border-gray-100 dark:border-[#333]">
           <FavoriteActionButton tooltip="关闭" onClick={closePicker} wrapperClassName="absolute right-5 top-5 inline-flex" className="shrink-0 rounded-full p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-white/[0.06] dark:hover:text-gray-200">
@@ -386,7 +386,7 @@ export function FavoriteCollectionPickerModal() {
                   {editingId === collection.id ? (
                     <input
                       type="text"
-                      className="h-6 min-w-0 flex-1 rounded border border-blue-400/50 bg-white px-1.5 py-0 text-[15px] leading-6 text-gray-900 shadow-sm outline-none focus:border-blue-500 dark:border-white/20 dark:bg-black/20 dark:text-white dark:focus:border-white/40"
+                      className="h-6 min-w-0 flex-1 rounded border border-blue-400/50 bg-white px-1.5 py-0 text-[15px] leading-6 text-gray-900 shadow-xs outline-hidden focus:border-blue-500 dark:border-white/20 dark:bg-black/20 dark:text-white dark:focus:border-white/40"
                       value={editingName}
                       onChange={(e) => setEditingName(e.target.value)}
                       onKeyDown={handleRenameKeyDown}
@@ -435,7 +435,7 @@ export function FavoriteCollectionPickerModal() {
               }}
               type="text"
               placeholder="新建收藏夹..."
-              className="min-w-0 flex-1 rounded-xl border border-transparent bg-black/[0.04] px-4 py-2 text-sm outline-none transition focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:bg-white/[0.06] dark:text-white dark:focus:border-white/30 dark:focus:ring-white/30"
+              className="min-w-0 flex-1 rounded-xl border border-transparent bg-black/[0.04] px-4 py-2 text-sm outline-hidden transition focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:bg-white/[0.06] dark:text-white dark:focus:border-white/30 dark:focus:ring-white/30"
             />
             <button 
               type="button" 
@@ -448,7 +448,7 @@ export function FavoriteCollectionPickerModal() {
           </div>
           <div className="mt-5 flex gap-4">
             <button type="button" onClick={closePicker} className="flex-1 rounded-xl border border-transparent bg-black/[0.04] px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-black/[0.07] transition-colors dark:bg-white/[0.06] dark:text-gray-200 dark:hover:bg-white/[0.1]">取消</button>
-            <button type="button" onClick={handleConfirm} className="flex-1 rounded-xl bg-blue-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-600 transition-colors shadow-sm border border-transparent">确认</button>
+            <button type="button" onClick={handleConfirm} className="flex-1 rounded-xl bg-blue-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-600 transition-colors shadow-xs border border-transparent">确认</button>
           </div>
         </div>
       </div>
