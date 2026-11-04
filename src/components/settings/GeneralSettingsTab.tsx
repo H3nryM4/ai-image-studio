@@ -143,8 +143,8 @@ export default function GeneralSettingsTab({
             {draft.retryMode === 'overwriteAll' && <p className="mt-2 text-xs text-amber-600 dark:text-amber-500">重试成功任务也会清空旧结果。</p>}
           </div>
           <SettingSwitch
-            label="任务完成通知"
-            help="图像生成完成时发送系统通知，需要浏览器允许通知权限。"
+            label="任务通知"
+            help="图像生成完成或失败时发送系统通知，需要浏览器允许通知权限。"
             checked={draft.taskCompletionNotification}
             onChange={() => { void toggleTaskCompletionNotification() }}
             className="py-3"

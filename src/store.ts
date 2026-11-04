@@ -87,10 +87,16 @@ function orderImagesWithMaskFirst(images: InputImage[], maskTargetImageId: strin
   return next
 }
 
-function showTaskCompletionNotification(title: string, body: string) {
+function showTaskCompletionNotification(title: string, body: string, tag = 'task-completion') {
   const settings = normalizeSettings(useStore.getState().settings)
   if (!settings.taskCompletionNotification) return
-  showBrowserNotification(title, { body })
+  showBrowserNotification(title, { body, tag })
+}
+
+// 失败通知用独立 tag，避免与成功通知互相覆盖；批量任务在整批结束时汇总失败数量
+function showTaskFailureNotification(task: TaskRecord) {
+  if (batchTaskIds.has(task.id)) return
+  showTaskCompletionNotification('图像生成失败', '请回到应用查看详情。', 'task-failure')
 }
 
 export function getPersistedState(state: AppState) {
@@ -672,6 +678,7 @@ function failOpenAITaskIfStillRunning(taskId: string, error: string, now = Date.
     ...createTaskErrorPatch(task, error, now),
     elapsed: Math.max(0, now - (task.startedAt ?? task.createdAt)),
   })
+  showTaskFailureNotification(task)
   return true
 }
 
@@ -1282,6 +1289,7 @@ async function executeTask(taskId: string) {
       ...createTaskErrorPatch(task, '找不到此任务所使用的 API 配置。', Date.now()),
       customRecoverable: false,
     })
+    showTaskFailureNotification(task)
     taskExecutions.delete(taskId)
     return
   }
@@ -1449,6 +1457,7 @@ async function executeTask(taskId: string) {
         ...getRawErrorPayload(err),
         customRecoverable: false,
       })
+      showTaskFailureNotification(latestTask)
       // 批量任务不自动打开失败详情，避免连续弹窗打断
       if (!batchTaskIds.has(taskId)) useStore.getState().setDetailTaskId(taskId)
     }
@@ -1885,6 +1894,7 @@ async function recoverCustomTask(taskId: string) {
       ...createTaskErrorPatch(task, '异步任务的接入方式已不可用，请重新选择。', Date.now()),
       customRecoverable: false,
     })
+    showTaskFailureNotification(task)
     return
   }
 
@@ -1900,6 +1910,7 @@ async function recoverCustomTask(taskId: string) {
       ...getRawErrorPayload(err),
       customRecoverable: false,
     })
+    showTaskFailureNotification(task)
   }
 }
 

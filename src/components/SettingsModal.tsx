@@ -528,7 +528,7 @@ export default function SettingsModal({ onImportProfile }: { onImportProfile: (s
     const result = await requestBrowserNotificationPermission()
     if (result.ok) {
       commitSettings({ ...draft, taskCompletionNotification: true })
-      showToast('任务完成通知已开启', 'success')
+      showToast('任务通知已开启', 'success')
     } else {
       showNotificationPermissionMessage(result)
     }

@@ -74,6 +74,10 @@ vi.mock('./lib/api', () => ({
     revisedPrompts: [],
   })),
 }))
+vi.mock('./lib/browserNotification', async (importOriginal) => ({
+  ...await importOriginal<typeof import('./lib/browserNotification')>(),
+  showBrowserNotification: vi.fn(() => true),
+}))
 vi.mock('./lib/transparentImage', () => ({
   GREEN_KEY_COLOR: '#00FF00',
   MAGENTA_KEY_COLOR: '#FF00FF',
@@ -91,6 +95,7 @@ vi.mock('./lib/transparentImage', () => ({
 }))
 import { clearImages, clearTasks, commitTaskDeletion, deleteImage as deleteDbImage, getAllImageIds, getAllTasks, getImage, getStoredFreshImageThumbnail, putImage, putImageThumbnail, putTask as putDbTask } from './lib/db'
 import { callImageApi } from './lib/api'
+import { showBrowserNotification } from './lib/browserNotification'
 import { removeKeyedBackgroundFromDataUrl } from './lib/transparentImage'
 import { clearData, clearFailedTasks, deleteFavoriteCollection, editOutputs, getErrorToastMessage, getPersistedState, getTaskApiProfile, importData, initStore, removeMultipleTasks, removeTask, restoreExplicitPresetConfig, retryTask, reuseConfig, submitTask, taskMatchesFilterStatus, taskMatchesSearchQuery, useStore } from './store'
 
@@ -1891,5 +1896,50 @@ describe('reused task API profile', () => {
       cancelText: '放弃提交',
     }))
     expect(state.showSettings).toBe(false)
+  })
+})
+
+describe('task failure notification', () => {
+  beforeEach(async () => {
+    await clearTasks()
+    await clearImages()
+    vi.mocked(callImageApi).mockReset()
+    vi.mocked(showBrowserNotification).mockClear()
+    useStore.setState({
+      settings: normalizeSettings({
+        ...DEFAULT_SETTINGS,
+        profiles: [createDefaultOpenAIProfile({ baseUrl: 'https://api.example.com/v1', apiKey: 'test-key' })],
+        taskCompletionNotification: true,
+      }),
+      tasks: [],
+      showToast: vi.fn(),
+      detailTaskId: null,
+    })
+  })
+
+  it('notifies when a task fails', async () => {
+    const failed = task({ status: 'error', error: '上次失败' })
+    useStore.setState({ tasks: [failed] })
+    vi.mocked(callImageApi).mockRejectedValueOnce(new Error('接口报错'))
+
+    await retryTask(failed)
+    await vi.waitFor(() => expect(useStore.getState().tasks[0]?.status).toBe('error'))
+
+    expect(showBrowserNotification).toHaveBeenCalledOnce()
+    expect(showBrowserNotification).toHaveBeenCalledWith('图像生成失败', { body: '请回到应用查看详情。', tag: 'task-failure' })
+  })
+
+  it('does not notify when the setting is off', async () => {
+    const failed = task({ status: 'error', error: '上次失败' })
+    useStore.setState({
+      settings: { ...useStore.getState().settings, taskCompletionNotification: false },
+      tasks: [failed],
+    })
+    vi.mocked(callImageApi).mockRejectedValueOnce(new Error('接口报错'))
+
+    await retryTask(failed)
+    await vi.waitFor(() => expect(useStore.getState().tasks[0]?.status).toBe('error'))
+
+    expect(showBrowserNotification).not.toHaveBeenCalled()
   })
 })
