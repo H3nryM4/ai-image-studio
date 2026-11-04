@@ -15,6 +15,7 @@ import Lightbox from './components/Lightbox'
 import SettingsModal from './components/SettingsModal'
 import ProfileImportModal from './components/settings/ProfileImportModal'
 import ConfirmDialog from './components/ConfirmDialog'
+import DataProgressDialog from './components/DataProgressDialog'
 import Toast from './components/Toast'
 import MaskEditorModal from './components/MaskEditorModal'
 import SketchBoardModal from './components/SketchBoardModal'
@@ -140,6 +141,7 @@ export default function App() {
       <Lightbox />
       <SettingsModal onImportProfile={(source) => setProfileImportSource(source ?? '')} />
       {profileImportSource !== null && <ProfileImportModal key={profileImportSource} source={profileImportSource} onClose={() => setProfileImportSource(null)} />}
+      <DataProgressDialog />
       <ConfirmDialog />
       <FavoriteCollectionPickerModal />
       <ManageCollectionsModal />

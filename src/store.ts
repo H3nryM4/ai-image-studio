@@ -19,6 +19,8 @@ import { createTransparentOutputMeta, getTransparentRequestParams, removeKeyedBa
 import { blobToDataUrl, fileToDataUrl } from './lib/dataUrl'
 import { cacheImage, cacheThumbnail, clearImageCaches, deleteCachedImage, deleteImageCacheEntry, ensureImageCached, scheduleThumbnailBackfill } from './lib/imageCache'
 import { hasActiveDataOperations } from './lib/dataOperations'
+import { endDataProgress, setDataProgressCancelable, startDataProgress, updateDataProgress } from './lib/dataProgress'
+import { throwIfAborted } from './lib/serverSentEvents'
 import { formatExportFileTime } from './lib/exportFileName'
 import { buildExportZip, createExportBlob, getExportImageEstimatedBytes, getExportZipPlan, MAX_EXPORT_ZIP_BYTES, readExportZip, readExportZipFileAsDataUrl, readExportZipManifest } from './lib/exportZip'
 import { updateInputDraftImages } from './lib/inputDraftState'
@@ -1956,6 +1958,9 @@ export interface ExportOptions {
 
 /** 导出数据为 ZIP */
 export async function exportData(options: ExportOptions = { exportConfig: true, exportTasks: true }) {
+  // 导出全程可取消：取消后放弃后续分片的下载
+  const signal = startDataProgress('export', true)
+  let savedParts = 0
   try {
     const state = useStore.getState()
     if (options.exportTasks && hasActiveDataOperations(state.tasks)) throw new Error('当前有任务正在进行，请完成或停止后再导出。')
@@ -1974,20 +1979,32 @@ export async function exportData(options: ExportOptions = { exportConfig: true, 
       defaultFavoriteCollectionId,
     }
     const imageSizes = []
-    for (const id of imageIds) {
+    for (const [idx, id] of imageIds.entries()) {
+      throwIfAborted(signal)
+      updateDataProgress('统计图片', idx, imageIds.length, 'image')
       const image = await getImage(id)
       if (!image) continue
       const thumbnail = await getImageThumbnail(id)
       imageSizes.push({ id, bytes: getExportImageEstimatedBytes(image, thumbnail) })
     }
+    updateDataProgress('统计图片', imageIds.length, imageIds.length, 'image')
+    throwIfAborted(signal)
     const plan = getExportZipPlan(params, imageSizes)
     const backupId = `${exportedAt}`
+    const imageTotal = plan.reduce((sum, part) => sum + part.imageIds.length, 0)
+    let imagesRead = 0
 
     for (let index = 0; index < plan.length; index++) {
+      const partNumber = index + 1
+      const partLabel = plan.length > 1 ? `（第 ${partNumber} / ${plan.length} 个分片）` : ''
+      throwIfAborted(signal)
       const images: StoredImage[] = []
       const thumbnailsByImageId = new Map<string, StoredImageThumbnail>()
       for (const id of plan[index].imageIds) {
+        throwIfAborted(signal)
+        updateDataProgress(`读取图片${partLabel}`, imagesRead, imageTotal, 'image')
         const image = await getImage(id)
+        imagesRead++
         if (!image) continue
         images.push(image)
         const thumbnail = await getImageThumbnail(id)
@@ -2000,8 +2017,10 @@ export async function exportData(options: ExportOptions = { exportConfig: true, 
           thumbnailVersion: thumbnail.thumbnailVersion,
         })
       }
+      updateDataProgress(`读取图片${partLabel}`, imagesRead, imageTotal, 'image')
+      throwIfAborted(signal)
+      updateDataProgress(`打包${partLabel}`)
 
-      const partNumber = index + 1
       const result = await buildExportZip({
         ...params,
         tasks: plan[index].tasks,
@@ -2010,6 +2029,8 @@ export async function exportData(options: ExportOptions = { exportConfig: true, 
         includeManifestData: plan[index].includeBaseData,
         backupPart: plan.length > 1 ? { id: backupId, index: partNumber, total: plan.length } : undefined,
       })
+      throwIfAborted(signal)
+      updateDataProgress(`保存文件${partLabel}`)
       const blob = createExportBlob(result.bytes)
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
@@ -2019,14 +2040,21 @@ export async function exportData(options: ExportOptions = { exportConfig: true, 
       document.body.appendChild(a)
       a.click()
       a.remove()
+      savedParts++
       setTimeout(() => URL.revokeObjectURL(url), 1000)
       if (partNumber < plan.length) await new Promise((resolve) => setTimeout(resolve, 150))
     }
     useStore.getState().showToast(plan.length > 1 ? `已请求下载 ${plan.length} 个 ZIP，请确认浏览器已允许多文件下载` : '数据已导出', 'success')
   } catch (e) {
+    if (signal.aborted) {
+      useStore.getState().showToast(savedParts ? `已取消导出，已下载的 ${savedParts} 个分片不是完整备份，可以删除` : '已取消导出', 'info')
+      return
+    }
     console.error('exportData failed', e)
     const detail = e instanceof Error ? e.message.trim() : String(e).trim()
     useStore.getState().showToast(detail ? `导出失败，${detail}` : '导出失败，未知错误', 'error')
+  } finally {
+    endDataProgress()
   }
 }
 
@@ -2053,6 +2081,8 @@ export async function restoreExplicitPresetConfig(ids: { connectionIds: string[]
 
 /** 导入 ZIP 数据 */
 export async function importData(input: File | File[], options: ImportOptions = { importConfig: true, importTasks: true }): Promise<boolean> {
+  // 只允许在解析备份阶段取消；开始写入后取消会留下半份数据
+  const signal = startDataProgress('import', true)
   try {
     const state = useStore.getState()
     if (options.importTasks && hasActiveDataOperations(state.tasks)) throw new Error('当前有任务正在进行，请完成或停止后再导入。')
@@ -2063,9 +2093,11 @@ export async function importData(input: File | File[], options: ImportOptions = 
     }
 
     const selected = [] as Array<{ file: File; manifest: Awaited<ReturnType<typeof readExportZipManifest>> }>
-    for (const file of files) {
+    for (const [idx, file] of files.entries()) {
+      updateDataProgress('解析备份', idx, files.length > 1 ? files.length : 0, files.length > 1 ? 'file' : undefined)
       const manifest = await readExportZipManifest(new Uint8Array(await file.arrayBuffer()), options.importTasks)
       selected.push({ file, manifest })
+      throwIfAborted(signal)
     }
     const multipart = selected.some((part) => part.manifest.backupPart != null)
     if (multipart) {
@@ -2088,11 +2120,21 @@ export async function importData(input: File | File[], options: ImportOptions = 
     const importedTasks = selected.flatMap((part) => part.manifest.tasks ?? [])
     const hasTaskData = selected.some((part) => part.manifest.tasks != null || part.manifest.imageFiles != null)
 
+    // 先关闭取消再检查，确保点了取消就不会进入写入阶段
+    setDataProgressCancelable(false)
+    throwIfAborted(signal)
+
     const importedImageIds: string[] = []
     if (options.importTasks && hasTaskData) {
-      for (const part of selected) {
+      // 原图和缩略图合并计数，分片交替写入时进度条也只增不减
+      const fileTotal = selected.reduce((sum, part) => sum + Object.keys(part.manifest.imageFiles ?? {}).length + Object.keys(part.manifest.thumbnailFiles ?? {}).length, 0)
+      let filesDone = 0
+      for (const [idx, part] of selected.entries()) {
+        updateDataProgress(selected.length > 1 ? `读取备份（第 ${idx + 1} / ${selected.length} 个）` : '读取备份', filesDone, fileTotal, 'file')
         const { manifest, files: zipFiles } = await readExportZip(new Uint8Array(await part.file.arrayBuffer()))
         for (const [id, info] of Object.entries(manifest.imageFiles ?? {})) {
+          // 先计入当前文件，写到最后一个时进度到 100%
+          updateDataProgress('写入图片和缩略图', ++filesDone, fileTotal, 'file')
           const dataUrl = readExportZipFileAsDataUrl(zipFiles, info.path)
           if (!dataUrl) continue
           await putImage({
@@ -2113,6 +2155,7 @@ export async function importData(input: File | File[], options: ImportOptions = 
         }
 
         for (const [id, info] of Object.entries(manifest.thumbnailFiles ?? {})) {
+          updateDataProgress('写入图片和缩略图', ++filesDone, fileTotal, 'file')
           const thumbnailDataUrl = readExportZipFileAsDataUrl(zipFiles, info.path)
           if (!thumbnailDataUrl) continue
           await putImageThumbnail({
@@ -2131,6 +2174,7 @@ export async function importData(input: File | File[], options: ImportOptions = 
         }
       }
 
+      updateDataProgress('写入任务和收藏夹')
       for (const task of importedTasks) {
         // startedAt 来自导入文件，非法值会让计时和“重试于”显示异常
         await putTask(Number.isFinite(task.startedAt) || task.startedAt === undefined ? task : { ...task, startedAt: undefined })
@@ -2158,6 +2202,7 @@ export async function importData(input: File | File[], options: ImportOptions = 
     }
 
     if (options.importConfig && settingsManifests.length) {
+      updateDataProgress('写入配置')
       const state = useStore.getState()
       const connectionIds = new Set(settingsManifests.flatMap((part) =>
         part.manifest.settings?.customConnections?.map((connection) => connection.id) ?? [],
@@ -2191,10 +2236,16 @@ export async function importData(input: File | File[], options: ImportOptions = 
     useStore.getState().showToast(msg, 'success')
     return true
   } catch (e) {
+    if (signal.aborted) {
+      useStore.getState().showToast('已取消导入，未写入任何数据', 'info')
+      return false
+    }
     console.error('importData failed', e)
     const detail = e instanceof Error ? e.message.trim() : String(e).trim()
     useStore.getState().showToast(detail ? `导入失败，${detail}` : '导入失败，未知错误', 'error')
     return false
+  } finally {
+    endDataProgress()
   }
 }
 
