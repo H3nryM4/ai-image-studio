@@ -539,7 +539,7 @@ export const useStore = create<AppState>()(
       filterFavorite: false,
       setFilterFavorite: (filterFavorite) => set(filterFavorite ? { filterFavorite, selectionMode: false, selectedTaskIds: [], selectedFavoriteCollectionIds: [] } : { filterFavorite, activeFavoriteCollectionId: null, selectionMode: false, selectedTaskIds: [], selectedFavoriteCollectionIds: [] }),
 
-      // 多选状态仅保存在内存中，清空选择后仍保留模式，直到用户主动完成。
+      // 多选状态仅保存在内存中，直到用户主动完成或退出。
       selectionMode: false,
       setSelectionMode: (selectionMode) => set(selectionMode ? { selectionMode } : { selectionMode, selectedTaskIds: [], selectedFavoriteCollectionIds: [] }),
       selectedTaskIds: [],

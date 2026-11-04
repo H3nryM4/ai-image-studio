@@ -85,10 +85,18 @@ describe('gallery selection', () => {
       document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }))
     })
     expect(useStore.getState().selectedTaskIds).toHaveLength(2)
-    await clickButton('清空选择')
+
+    await act(async () => el.querySelector<HTMLInputElement>('[data-task-id="cabin"] input')!.click())
+    expect(useStore.getState().selectedTaskIds).toEqual(['city'])
     expect(useStore.getState().selectionMode).toBe(true)
     expect(el.querySelector('[aria-label="批量操作"]')).not.toBeNull()
-    expect(Array.from(el.querySelectorAll('button')).find((button) => button.textContent === '下载图片')?.disabled).toBe(true)
+
+    await act(async () => el.querySelector<HTMLInputElement>('[data-task-id="city"] input')!.click())
+    expect(useStore.getState().selectedTaskIds).toEqual([])
+    expect(useStore.getState().selectionMode).toBe(true)
+    expect(el.querySelector('[aria-label="批量操作"]')).not.toBeNull()
+    expect(el.querySelector('[aria-label="批量操作"]')?.textContent).toContain('点击卡片选择任务')
+
     await act(async () => el.querySelector<HTMLButtonElement>('button[aria-label="退出多选"]')!.click())
     expect(useStore.getState().selectionMode).toBe(false)
     expect(el.querySelector('input[type="checkbox"]')).toBeNull()
@@ -161,6 +169,7 @@ describe('gallery selection', () => {
     await clickButton('删除')
     expect(useStore.getState().confirmDialog?.checkbox?.label).toContain('3 张')
     await act(async () => useStore.getState().clearFavoriteCollectionSelection())
+    expect(useStore.getState().selectionMode).toBe(true)
     await act(async () => el.querySelector<HTMLInputElement>('input[aria-label="选择收藏夹「全部」"]')!.click())
     expect(el.querySelector<HTMLButtonElement>('button[aria-label="「全部」是汇总视图，无法删除"]')?.disabled).toBe(true)
     await clickButton('反选')

@@ -23,7 +23,6 @@ export default function InputBatchBars() {
   const selectedCollectionIds = useStore((s) => s.selectedFavoriteCollectionIds)
   const setSelectedTaskIds = useStore((s) => s.setSelectedTaskIds)
   const setSelectedCollectionIds = useStore((s) => s.setSelectedFavoriteCollectionIds)
-  const clearSelection = useStore((s) => s.clearSelection)
   const clearCollectionSelection = useStore((s) => s.clearFavoriteCollectionSelection)
   const openFavoritePicker = useStore((s) => s.openFavoritePicker)
   const setConfirmDialog = useStore((s) => s.setConfirmDialog)
@@ -140,10 +139,10 @@ export default function InputBatchBars() {
         </TooltipButton>
       </div>
       <div className="flex flex-col rounded-3xl border border-gray-200/50 bg-white/90 p-1.5 shadow-[0_8px_30px_rgb(0,0,0,0.12)] backdrop-blur-xl dark:border-white/10 dark:bg-gray-800/90 sm:flex-row sm:items-center sm:justify-center sm:rounded-full">
-        <div className="grid grid-cols-3 sm:flex sm:items-center">
+        <div className="grid grid-cols-2 sm:flex sm:flex-[2] sm:items-center">
           <TooltipButton
             tooltip="全选当前结果"
-            wrapperClassName="relative inline-flex min-w-0"
+            wrapperClassName="relative inline-flex min-w-0 sm:flex-1"
             disabled={visibleIds.length === 0 || count === visibleIds.length}
             onClick={() => inOverview ? setSelectedCollectionIds(visibleIds) : setSelectedTaskIds(visibleIds)}
             className={`${ACTION_CLASS} text-gray-600 hover:bg-blue-50 dark:text-gray-300 dark:hover:bg-blue-500/10`}
@@ -155,7 +154,7 @@ export default function InputBatchBars() {
           </TooltipButton>
           <TooltipButton
             tooltip="反选当前结果"
-            wrapperClassName="relative inline-flex min-w-0"
+            wrapperClassName="relative inline-flex min-w-0 sm:flex-1"
             disabled={visibleIds.length === 0}
             onClick={() => {
               const next = visibleIds.filter((id) => !selectedIds.includes(id))
@@ -169,21 +168,12 @@ export default function InputBatchBars() {
             </svg>
             反选
           </TooltipButton>
-          <TooltipButton
-            tooltip="清空选择"
-            wrapperClassName="relative inline-flex min-w-0"
-            disabled={count === 0}
-            onClick={inOverview ? clearCollectionSelection : clearSelection}
-            className={`${ACTION_CLASS} text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-white/[0.06]`}
-          >
-            <CloseIcon className="h-4 w-4 shrink-0" />清空选择
-          </TooltipButton>
         </div>
         <div aria-hidden="true" className="mx-3 my-1 h-px bg-gray-200/70 dark:bg-white/10 sm:mx-1 sm:my-0 sm:h-5 sm:w-px" />
-        <div className={`grid ${inOverview ? 'grid-cols-2' : 'grid-cols-3'} sm:flex sm:items-center`}>
+        <div className={`grid ${inOverview ? 'grid-cols-2' : 'grid-cols-3'} sm:flex ${inOverview ? 'sm:flex-[2]' : 'sm:flex-[3]'} sm:items-center`}>
           <TooltipButton
             tooltip={downloading ? '正在下载图片' : imageCount > 0 ? `下载 ${imageCount} 张图片` : '请选择包含图片的任务或收藏夹'}
-            wrapperClassName="relative inline-flex min-w-0"
+            wrapperClassName="relative inline-flex min-w-0 sm:flex-1"
             disabled={imageCount === 0 || downloading}
             onClick={() => void downloadSelected()}
             className={`${ACTION_CLASS} text-gray-600 hover:bg-green-50 dark:text-gray-300 dark:hover:bg-green-500/10`}
@@ -194,7 +184,7 @@ export default function InputBatchBars() {
           {!inOverview && (
             <TooltipButton
               tooltip="编辑选中任务的收藏夹"
-              wrapperClassName="relative inline-flex min-w-0"
+              wrapperClassName="relative inline-flex min-w-0 sm:flex-1"
               disabled={count === 0}
               onClick={() => openFavoritePicker(selectedIds)}
               className={`${ACTION_CLASS} text-gray-600 hover:bg-yellow-50 dark:text-gray-300 dark:hover:bg-yellow-500/10`}
@@ -204,7 +194,7 @@ export default function InputBatchBars() {
           )}
           <TooltipButton
             tooltip={inOverview && !canDelete && count > 0 ? deletableCollections.length === 0 ? '「全部」是汇总视图，无法删除' : '至少保留一个收藏夹' : deleteLabel}
-            wrapperClassName="relative inline-flex min-w-0"
+            wrapperClassName="relative inline-flex min-w-0 sm:flex-1"
             disabled={!canDelete}
             onClick={deleteSelected}
             className={`${ACTION_CLASS} text-gray-600 hover:bg-red-50 dark:text-gray-300 dark:hover:bg-red-500/10`}
