@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
+import { getPageScroller, getPageScrollTop } from '../lib/pageScroll'
 
 interface UseDragSelectOptions {
   containerSelector: string
@@ -28,7 +29,7 @@ export function useDragSelect({
 
   const getPagePoint = useCallback((clientX: number, clientY: number) => ({
     pageX: clientX + window.scrollX,
-    pageY: clientY + window.scrollY,
+    pageY: clientY + getPageScrollTop(),
   }), [])
 
   const beginSelection = useCallback((clientX: number, clientY: number) => {
@@ -60,6 +61,7 @@ export function useDragSelect({
     const maxY = Math.max(start.pageY, pageY)
 
     const containers = document.querySelectorAll(containerSelector)
+    const scrollTop = getPageScrollTop()
     const newSelected = new Set(initialSelection.current)
     const initialSelected = new Set(initialSelection.current)
 
@@ -72,8 +74,8 @@ export function useDragSelect({
 
         const itemLeft = rect.left + window.scrollX
         const itemRight = rect.right + window.scrollX
-        const itemTop = rect.top + window.scrollY
-        const itemBottom = rect.bottom + window.scrollY
+        const itemTop = rect.top + scrollTop
+        const itemBottom = rect.bottom + scrollTop
 
         const isIntersecting =
           minX < itemRight && maxX > itemLeft && minY < itemBottom && maxY > itemTop
@@ -107,7 +109,7 @@ export function useDragSelect({
       stopDragScroll()
       dragScrollDirectionRef.current = direction
       dragScrollIntervalRef.current = window.setInterval(() => {
-        window.scrollBy({ top: direction * 15, behavior: 'instant' })
+        getPageScroller().scrollBy({ top: direction * 15, behavior: 'instant' })
       }, 16)
     }
 

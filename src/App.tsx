@@ -146,13 +146,15 @@ export default function App() {
 
   return (
     <>
-      <Header />
-      <main data-home-main data-drag-select-surface className="pb-48">
-        <div className="safe-area-x max-w-7xl mx-auto">
-          <SearchBar />
-          {filterFavorite && !activeFavoriteCollectionId ? <FavoriteCollectionsView /> : <TaskGrid />}
-        </div>
-      </main>
+      <div data-page-scroll>
+        <Header />
+        <main data-home-main data-drag-select-surface className="pb-48">
+          <div className="safe-area-x max-w-7xl mx-auto">
+            <SearchBar />
+            {filterFavorite && !activeFavoriteCollectionId ? <FavoriteCollectionsView /> : <TaskGrid />}
+          </div>
+        </main>
+      </div>
       <InputBar />
       {detailTaskId !== null && (
         <Suspense fallback={null}>

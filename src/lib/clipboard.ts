@@ -19,12 +19,25 @@ export async function copyImageSourceToClipboard(src: string | Promise<string | 
   if (!canCopyImageToClipboard()) {
     throw new Error('Clipboard image API is not available')
   }
+  if (!isClipboardTypeSupported('image/png')) {
+    throw new Error('当前浏览器不支持图像剪贴板写入')
+  }
 
-  const resolvedSrc = await Promise.resolve(src)
-  if (!resolvedSrc) throw new Error('Image source is not available')
-  const res = await fetch(resolvedSrc)
-  const blob = await res.blob()
-  await writeImageBlobToClipboard(blob)
+  // write() 之前不能有 await：Chromium 在调用 write() 时检查用户激活，取图耗时过长会弹出剪贴板权限框并挂起，
+  // 所以把取图和转码放进 ClipboardItem 的 Promise（Safari 也要求这种写法）
+  const png = (async () => {
+    const resolvedSrc = await src
+    if (!resolvedSrc) throw new Error('Image source is not available')
+    const res = await fetch(resolvedSrc)
+    const blob = await res.blob()
+    if (!blob.type.startsWith('image/')) throw new Error('Clipboard item is not an image')
+    return blob.type === 'image/png' ? blob : await imageBlobToPngBlob(blob)
+  })()
+  // write() 先因权限等原因失败时，png 的失败没人接收，避免多出一条 unhandledrejection
+  png.catch(() => {})
+  await navigator.clipboard.write([
+    new ClipboardItem({ 'image/png': png }),
+  ])
 }
 
 export function canCopyImageToClipboard() {
@@ -62,31 +75,6 @@ function copyTextWithExecCommand(text: string) {
   } finally {
     document.body.removeChild(textarea)
   }
-}
-
-async function writeImageBlobToClipboard(blob: Blob) {
-  if (!blob.type.startsWith('image/')) throw new Error('Clipboard item is not an image')
-
-  const clipboardItems: Record<string, Blob | Promise<Blob>> = {}
-  const customType = `web ${blob.type}`
-
-  if (isClipboardTypeSupported(customType)) {
-    clipboardItems[customType] = blob
-  }
-
-  if (blob.type === 'image/png') {
-    clipboardItems['image/png'] = blob
-  } else if (isClipboardTypeSupported('image/png')) {
-    clipboardItems['image/png'] = imageBlobToPngBlob(blob)
-  }
-
-  if (Object.keys(clipboardItems).length === 0) {
-    throw new Error('当前浏览器不支持图像剪贴板写入')
-  }
-
-  await navigator.clipboard.write([
-    new ClipboardItem(clipboardItems),
-  ])
 }
 
 function isClipboardTypeSupported(type: string) {
