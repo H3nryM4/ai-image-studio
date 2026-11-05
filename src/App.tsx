@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { Suspense, lazy, useEffect, useState } from 'react'
 import { initStore, useStore } from './store'
 import { clearUrlSettingParams } from './lib/urlSettings'
 import { hasProfileImportUrl } from './lib/profileSharing'
@@ -11,24 +11,39 @@ import Header from './components/Header'
 import SearchBar from './components/SearchBar'
 import TaskGrid from './components/TaskGrid'
 import InputBar from './components/InputBar'
-import DetailModal from './components/DetailModal'
-import Lightbox from './components/Lightbox'
-import SettingsModal from './components/SettingsModal'
-import ProfileImportModal from './components/settings/ProfileImportModal'
 import ConfirmDialog from './components/ConfirmDialog'
 import DataProgressDialog from './components/DataProgressDialog'
 import Toast from './components/Toast'
-import MaskEditorModal from './components/MaskEditorModal'
-import SketchBoardModal from './components/SketchBoardModal'
 import ImageContextMenu from './components/ImageContextMenu'
-import { FavoriteCollectionPickerModal, FavoriteCollectionsView, ManageCollectionsModal } from './components/FavoriteCollections'
+import { FavoriteCollectionsView } from './components/favorites/FavoriteCollectionsView'
 import { useGlobalClickSuppression } from './lib/clickSuppression'
+
+// 弹窗只在打开时加载，避免把首屏用不到的逻辑打进主包
+const DetailModal = lazy(() => import('./components/DetailModal'))
+const Lightbox = lazy(() => import('./components/Lightbox'))
+const SettingsModal = lazy(() => import('./components/SettingsModal'))
+const ProfileImportModal = lazy(() => import('./components/settings/ProfileImportModal'))
+const MaskEditorModal = lazy(() => import('./components/MaskEditorModal'))
+const SketchBoardModal = lazy(() => import('./components/SketchBoardModal'))
+const FavoriteCollectionPickerModal = lazy(() =>
+  import('./components/favorites/FavoriteCollectionPickerModal').then((m) => ({ default: m.FavoriteCollectionPickerModal })),
+)
+const ManageCollectionsModal = lazy(() =>
+  import('./components/favorites/ManageCollectionsModal').then((m) => ({ default: m.ManageCollectionsModal })),
+)
 
 let defaultConfigImportStarted = false
 
 export default function App() {
   const filterFavorite = useStore((s) => s.filterFavorite)
   const activeFavoriteCollectionId = useStore((s) => s.activeFavoriteCollectionId)
+  const showSettings = useStore((s) => s.showSettings)
+  const detailTaskId = useStore((s) => s.detailTaskId)
+  const lightboxImageId = useStore((s) => s.lightboxImageId)
+  const maskEditorImageId = useStore((s) => s.maskEditorImageId)
+  const sketchBoard = useStore((s) => s.sketchBoard)
+  const favoritePickerTaskIds = useStore((s) => s.favoritePickerTaskIds)
+  const manageCollectionsOpen = useStore((s) => s.isManageCollectionsModalOpen)
   const [settingsReady, setSettingsReady] = useState(false)
   const [profileImportSource, setProfileImportSource] = useState<string | null>(null)
   useDockerApiUrlMigrationNotice()
@@ -139,17 +154,49 @@ export default function App() {
         </div>
       </main>
       <InputBar />
-      <DetailModal />
-      <Lightbox />
-      <SettingsModal onImportProfile={(source) => setProfileImportSource(source ?? '')} />
-      {profileImportSource !== null && <ProfileImportModal key={profileImportSource} source={profileImportSource} onClose={() => setProfileImportSource(null)} />}
+      {detailTaskId !== null && (
+        <Suspense fallback={null}>
+          <DetailModal />
+        </Suspense>
+      )}
+      {lightboxImageId !== null && (
+        <Suspense fallback={null}>
+          <Lightbox />
+        </Suspense>
+      )}
+      {showSettings && (
+        <Suspense fallback={null}>
+          <SettingsModal onImportProfile={(source) => setProfileImportSource(source ?? '')} />
+        </Suspense>
+      )}
+      {profileImportSource !== null && (
+        <Suspense fallback={null}>
+          <ProfileImportModal key={profileImportSource} source={profileImportSource} onClose={() => setProfileImportSource(null)} />
+        </Suspense>
+      )}
       <DataProgressDialog />
       <ConfirmDialog />
-      <FavoriteCollectionPickerModal />
-      <ManageCollectionsModal />
+      {favoritePickerTaskIds?.length ? (
+        <Suspense fallback={null}>
+          <FavoriteCollectionPickerModal />
+        </Suspense>
+      ) : null}
+      {manageCollectionsOpen && (
+        <Suspense fallback={null}>
+          <ManageCollectionsModal />
+        </Suspense>
+      )}
       <Toast />
-      <MaskEditorModal />
-      <SketchBoardModal />
+      {maskEditorImageId !== null && (
+        <Suspense fallback={null}>
+          <MaskEditorModal />
+        </Suspense>
+      )}
+      {sketchBoard !== null && (
+        <Suspense fallback={null}>
+          <SketchBoardModal />
+        </Suspense>
+      )}
       <ImageContextMenu />
     </>
   )

@@ -4,7 +4,7 @@ import { useVersionCheck } from '../hooks/useVersionCheck'
 import { useTooltip } from '../hooks/useTooltip'
 import { dismissAllTooltips } from '../lib/tooltipDismiss'
 import ViewportTooltip from './ViewportTooltip'
-import { useFavoriteCollectionTitle } from './FavoriteCollections'
+import { useFavoriteCollectionTitle } from './favorites/useFavoriteCollectionTitle'
 import { InstallIcon, SettingsIcon } from './icons'
 
 type BeforeInstallPromptEvent = Event & {
