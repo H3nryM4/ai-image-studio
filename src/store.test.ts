@@ -52,7 +52,6 @@ vi.mock('./lib/db', () => {
       images.clear()
       thumbnails.clear()
     },
-    migrateImagesToBlob: vi.fn(async () => {}),
     storeImage: async (dataUrl: string, source: StoredImage['source'] = 'upload') => {
       const id = `stored-image-${++imageSeq}`
       images.set(id, { id, dataUrl, source, createdAt: Date.now() })

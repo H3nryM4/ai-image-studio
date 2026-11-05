@@ -6,7 +6,7 @@ import { DEFAULT_SETTINGS, getActiveApiProfile, isOpenAIConnection, getCustomCon
 import { enforcePresetConfigPolicy, getPresetConfig, getPresetProfileIds, getPresetConnectionIds, isPresetConfigDeletionPrevented, isPresetConfigOnlyEnabled, isPresetConfigParamsLocked, isPresetProfile, isPresetConnectionDeletionPrevented } from './lib/presetConfig'
 import { dismissAllTooltips } from './lib/tooltipDismiss'
 import { getTaskPromptText, remapImageCommentsForOrder } from './lib/promptImageComments'
-import { getAllTasks, putTask, deleteTask as dbDeleteTask, commitTaskDeletion, clearTasks as dbClearTasks, getImage, getStoredImageThumbnail, getImageThumbnail, getAllImageIds, putImage, putImageThumbnail, deleteImage, clearImages, storeImage, storeImageWithSize, migrateImagesToBlob } from './lib/db'
+import { getAllTasks, putTask, deleteTask as dbDeleteTask, commitTaskDeletion, clearTasks as dbClearTasks, getImage, getStoredImageThumbnail, getImageThumbnail, getAllImageIds, putImage, putImageThumbnail, deleteImage, clearImages, storeImage, storeImageWithSize } from './lib/db'
 import { callImageApi } from './lib/api'
 import { showBrowserNotification } from './lib/browserNotification'
 import { IMAGE_FETCH_CORS_HINT, isHttpUrl } from './lib/imageApiShared'
@@ -962,8 +962,6 @@ export async function initStore() {
     useStore.setState({ imageSourceUrls: Object.fromEntries(Object.entries(imageSourceUrls).filter(([id]) => referencedIds.has(id))) })
   }
   scheduleThumbnailBackfill(referencedImageIds)
-  // 首屏加载完成后再在后台把旧版 dataUrl 记录转成 Blob
-  setTimeout(() => void migrateImagesToBlob(), 2_000)
 
   const images: InputImage[] = []
   for (const img of state.inputImages) {
