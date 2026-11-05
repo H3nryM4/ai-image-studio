@@ -34,9 +34,18 @@ const tasks: TaskRecord[] = [
 }))
 let el: HTMLDivElement
 let root: Root
+let resizeCallback: ResizeObserverCallback | null = null
 
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
+  resizeCallback = null
+  vi.stubGlobal('ResizeObserver', class {
+    constructor(callback: ResizeObserverCallback) {
+      resizeCallback = callback
+    }
+    observe() {}
+    disconnect() {}
+  })
   useStore.setState({ ...initial, tasks, prompt: '尚未提交的草稿', showToast: vi.fn() }, true)
   vi.clearAllMocks()
   el = document.createElement('div')
@@ -113,16 +122,31 @@ describe('gallery selection', () => {
     await act(async () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })))
     expect(useStore.getState().selectionMode).toBe(false)
 
-    el.querySelectorAll('.task-card-wrapper').forEach((card, idx) => {
-      card.getBoundingClientRect = () => new DOMRect(20 + idx * 200, 20, 100, 100)
-    })
+    // jsdom 没有布局，按两列、卡片 100px、间距 10px 提供给虚拟列表测量
+    const grid = el.querySelector<HTMLElement>('[data-task-grid-root] > div')!
+    grid.style.gridTemplateColumns = '100px 100px'
+    grid.style.rowGap = '10px'
+    grid.style.columnGap = '10px'
+    Object.defineProperty(grid, 'clientWidth', { configurable: true, value: 210 })
+    grid.firstElementChild!.getBoundingClientRect = () => new DOMRect(0, 0, 100, 100)
+    await act(async () => resizeCallback?.([], {} as ResizeObserver))
     await act(async () => {
       el.querySelector('[data-task-grid-root]')!.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, clientX: 0, clientY: 0 }))
-      document.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: 150, clientY: 150 }))
+      document.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: 50, clientY: 150 }))
       document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }))
     })
     expect(useStore.getState().selectedTaskIds).toEqual(['city'])
     expect(useStore.getState().selectionMode).toBe(true)
+  })
+
+  it('only renders cards near the viewport when there are many tasks', async () => {
+    useStore.setState({
+      tasks: Array.from({ length: 100 }, (_, idx) => ({ ...tasks[0], id: `task-${idx}`, createdAt: 100 - idx })),
+    })
+    await renderGallery()
+    const rendered = el.querySelectorAll('.task-card-wrapper').length
+    expect(rendered).toBeGreaterThan(0)
+    expect(rendered).toBeLessThan(100)
   })
 
   it('keeps select-all and inversion inside the current search results', async () => {

@@ -2,6 +2,7 @@ import { useEffect, useState, useRef, type ReactNode } from 'react'
 import type { TaskRecord } from '../types'
 import { useStore, retryTask } from '../store'
 import { ensureImageThumbnailCached, subscribeImageThumbnail } from '../lib/imageCache'
+import { useNearViewport } from '../hooks/useNearViewport'
 import { formatImageRatio } from '../lib/size'
 import { getParamDisplay, ActualValueBadge } from '../lib/paramDisplay'
 import { DEFAULT_IMAGES_MODEL } from '../lib/apiProfiles'
@@ -90,6 +91,8 @@ export default function TaskCard({
   const swipeDirectionRef = useRef<-1 | 0 | 1>(0)
   const swipeActionActiveRef = useRef(false)
   const cardRef = useRef<HTMLDivElement>(null)
+  // 虚拟列表会多渲染上下各一屏；仍等卡片接近可视区域再读缩略图，快速拖动滚动条时一闪而过的卡片不必读取
+  const nearViewport = useNearViewport(cardRef)
   const swipeOffsetRef = useRef(0)
   const pendingSwipeOffsetRef = useRef(0)
   const swipeFrameRef = useRef<number | null>(null)
@@ -251,6 +254,7 @@ export default function TaskCard({
 
   // 加载缩略图
   useEffect(() => {
+    if (!nearViewport) return
     setCoverRatio('')
     setCoverSize('')
     setThumbSrc('')
@@ -282,7 +286,7 @@ export default function TaskCard({
       cancelled = true
       unsubscribe?.()
     }
-  }, [task.outputImages])
+  }, [nearViewport, task.outputImages])
 
   const duration = (() => {
     let seconds: number
