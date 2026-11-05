@@ -121,8 +121,8 @@ export default function InputBatchBars() {
 
   return (
     <div data-no-drag-select aria-label="批量操作">
-      <div className="mb-1 flex min-h-9 items-center justify-between gap-3 px-3">
-        <p role="status" aria-live="polite" className="flex min-w-0 flex-wrap items-center gap-x-1.5 text-xs text-gray-500 dark:text-gray-400">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <p role="status" aria-live="polite" className="flex min-h-10 min-w-0 flex-wrap items-center gap-x-1.5 rounded-full border border-gray-200/60 bg-white/90 px-4 py-2 text-xs text-gray-500 shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-gray-800/90 dark:text-gray-400">
           {count > 0 ? <>
             <span className="font-medium text-gray-700 dark:text-gray-200">已选 {count} 个{inOverview ? '收藏夹' : '任务'}</span>
             <span>·</span>
@@ -133,7 +133,7 @@ export default function InputBatchBars() {
           tooltip="退出多选"
           wrapperClassName="relative inline-flex shrink-0"
           onClick={() => setSelectionMode(false)}
-          className="flex h-11 w-11 items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-gray-200/60 hover:text-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.06] dark:hover:text-gray-200"
+          className="flex h-10 w-10 items-center justify-center rounded-full border border-gray-200/60 bg-white/90 text-gray-500 shadow-sm backdrop-blur-xl transition-colors hover:bg-white hover:text-gray-800 dark:border-white/10 dark:bg-gray-800/90 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200"
         >
           <CloseIcon className="h-4 w-4" aria-hidden="true" />
         </TooltipButton>
