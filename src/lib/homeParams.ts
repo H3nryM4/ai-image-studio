@@ -43,7 +43,7 @@ export function getHomeParamState(profile: ApiProfile, connection?: CustomConnec
     const mapping = hasInputImages && connection.editSubmit ? connection.editSubmit : connection.submit
     collectTemplateVariables([mapping.method === 'GET' ? undefined : mapping.body, mapping.query], variables)
   }
-  const openAI = profile.connectionId === 'openai-images' || profile.connectionId === 'openai-responses'
+  const openAI = profile.connectionId === 'openai-images'
   const available = keys.filter((key) => {
     if (key === 'quality' && profile.codexCli) return false
     if (openAI) return true

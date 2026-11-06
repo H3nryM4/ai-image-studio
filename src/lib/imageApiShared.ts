@@ -1,4 +1,4 @@
-import type { AppSettings, ResponsesOutputItem, TaskParams } from '../types'
+import type { AppSettings, TaskParams } from '../types'
 import { blobToDataUrl } from './dataUrl'
 
 export const MIME_MAP: Record<string, string> = {
@@ -52,24 +52,6 @@ export function normalizeBase64Image(value: string, fallbackMime: string): strin
   return value.startsWith('data:') ? value : `data:${fallbackMime};base64,${value}`
 }
 
-export function getResponsesImageResultBase64(result: ResponsesOutputItem['result']): string | undefined {
-  const b64 = typeof result === 'string'
-    ? result
-    : result && typeof result === 'object'
-    ? typeof result.b64_json === 'string'
-      ? result.b64_json
-      : typeof result.base64 === 'string'
-      ? result.base64
-      : typeof result.image === 'string'
-      ? result.image
-      : typeof result.data === 'string'
-      ? result.data
-      : ''
-    : ''
-
-  return b64.trim() ? b64 : undefined
-}
-
 function formatMiB(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1)} MiB`
 }
@@ -105,8 +87,6 @@ export function assertMaskEditFileSize(label: string, bytes: number) {
   assertMaxBytes(label, bytes, MAX_MASK_EDIT_FILE_BYTES)
 }
 
-const IMAGE_TOOL_DROPPED_ERROR = /Tool choice 'required' must be specified with 'tools' parameter\./i
-export const IMAGE_TOOL_DROPPED_HINT = '提示：当前使用的 API 可能未正确转发图像生成工具，请尝试更换支持该工具的接口或模型。'
 export const IMAGE_FETCH_CORS_HINT = ' 可点链接按钮复制结果链接，或尝试开启「返回 Base64 图片数据」避免此问题。'
 export const STREAMING_UNSUPPORTED_HINT = '提示：当前使用的 API 可能不支持流式传输，请尝试关闭「流式传输」功能。'
 export const STREAMING_FORMAT_HINT = '提示：API 返回了无法解析的流式数据格式，请尝试关闭「流式传输」功能。'
@@ -125,17 +105,10 @@ export function maybeAppendTransparentBackgroundHint(message: string): string {
   return `${message}\n${TRANSPARENT_BACKGROUND_UNSUPPORTED_HINT}`
 }
 
-/** 部分 API 转发 Responses 请求时会丢弃 image_generation 工具，却保留 tool_choice，服务端因此报错 */
-export function maybeAppendImageToolDroppedHint(message: string): string {
-  if (!IMAGE_TOOL_DROPPED_ERROR.test(message)) return message
-  return `${message}\n${IMAGE_TOOL_DROPPED_HINT}`
-}
-
 /** 排除明确与流式无关的状态码后追加提示 */
 export function maybeAppendStreamingHint(message: string, status: number, streamImages?: boolean): string {
   const transparentMessage = maybeAppendTransparentBackgroundHint(message)
   if (transparentMessage !== message) return transparentMessage
-  if (IMAGE_TOOL_DROPPED_ERROR.test(message)) return message
   if (!streamImages) return message
   if (status === 401 || status === 403 || status === 404 || status === 408 || status === 429 || status >= 500) {
     return message

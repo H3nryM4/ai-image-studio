@@ -99,7 +99,7 @@ export default function GeneralSettingsTab({
           </div>
           <SettingSwitch
             label="附加保留原提示词的要求"
-            help="仅用于 Responses 或 Codex CLI 兼容模式。开启后在请求文字中要求保留原提示词，不能保证模型不改写，也不是 API 的改写开关。"
+            help="仅用于 Codex CLI 兼容模式。开启后在请求文字中要求保留原提示词，不能保证模型不改写，也不是 API 的改写开关。"
             checked={!draft.allowPromptRewrite}
             onChange={() => commitSettings({ ...draft, allowPromptRewrite: !draft.allowPromptRewrite })}
             className="py-3"

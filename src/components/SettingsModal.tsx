@@ -4,7 +4,7 @@ import { normalizeBaseUrl } from '../lib/api'
 import { hasActiveDataOperations } from '../lib/dataOperations'
 import { isApiProxyAvailable, isApiProxyLocked, readClientDevProxyConfig } from '../lib/devProxy'
 import { useStore, exportData, importData, clearData, type SettingsTab } from '../store'
-import { createDefaultOpenAIProfile, DEFAULT_IMAGES_MODEL, DEFAULT_RESPONSES_MODEL, DEFAULT_SETTINGS, getApiConnectionLabel, getActiveApiProfile, isOpenAIConnection, DEFAULT_API_BASE_URL, DEFAULT_API_TIMEOUT, getCustomConnectionDefinition, importCustomConnectionSettingsFromJson, getDefaultApiProfileId, isApiConnectionAvailable, normalizeCustomConnectionDefinition, normalizeSettings, normalizeStreamPartialImages, switchApiProfileConnection } from '../lib/apiProfiles'
+import { createDefaultOpenAIProfile, DEFAULT_IMAGES_MODEL, DEFAULT_SETTINGS, getApiConnectionLabel, getActiveApiProfile, isOpenAIConnection, DEFAULT_API_BASE_URL, DEFAULT_API_TIMEOUT, getCustomConnectionDefinition, importCustomConnectionSettingsFromJson, getDefaultApiProfileId, isApiConnectionAvailable, normalizeCustomConnectionDefinition, normalizeSettings, normalizeStreamPartialImages, switchApiProfileConnection } from '../lib/apiProfiles'
 import {
   getDefaultPresetBaseUrl,
   getDefaultPresetProfileId,
@@ -183,7 +183,7 @@ export default function SettingsModal({ onImportProfile }: { onImportProfile: (s
   const activeProfileApiProxyEligible = isProfileApiProxyEligible(draft, activeProfile)
   const apiProxyChecked = activeProfileApiProxyEligible && (apiProxyLocked || activeProfile.apiProxy)
   const apiProxyEnabled = apiProxyAvailable && activeProfileApiProxyEligible && apiProxyChecked
-  const defaultConnectionOrder = ['openai-images', 'openai-responses', ...draft.customConnections.map((p) => p.id)]
+  const defaultConnectionOrder = ['openai-images', ...draft.customConnections.map((p) => p.id)]
   const connectionOrder = draft.connectionOrder || defaultConnectionOrder
 
   useEffect(() => {
@@ -195,7 +195,6 @@ export default function SettingsModal({ onImportProfile }: { onImportProfile: (s
 
   const unorderedConnectionOptions = [
     { label: 'OpenAI Images API', value: 'openai-images', draggable: true },
-    { label: 'OpenAI Responses API', value: 'openai-responses', draggable: true },
     ...draft.customConnections.map((connection) => {
       const actions = [
         ...(!presetConfigOnly && !isPresetConnectionLocked(connection.id) ? [{ label: '编辑', onClick: () => openEditCustomConnection(connection) }] : []),
@@ -226,9 +225,6 @@ export default function SettingsModal({ onImportProfile }: { onImportProfile: (s
       return validA - validB
     })
   ]
-
-  const getDefaultModelForConnection = (connectionId: ApiProfile['connectionId']) =>
-    connectionId === 'openai-responses' ? DEFAULT_RESPONSES_MODEL : DEFAULT_IMAGES_MODEL
 
   const enabledZipDownloadRouteCount = ZIP_DOWNLOAD_ROUTE_OPTIONS
     .filter((option) => draft.zipDownloadRoutes.includes(option.route))
@@ -348,12 +344,11 @@ export default function SettingsModal({ onImportProfile }: { onImportProfile: (s
         ? getDefaultPresetBaseUrl()
         : DEFAULT_API_BASE_URL
       const normalizedBaseUrl = shouldKeepEmptyBaseUrl ? '' : normalizeBaseUrl(profile.baseUrl.trim() || emptyBaseUrlFallback)
-      const defaultModel = getDefaultModelForConnection(profile.connectionId)
       return {
         ...profile,
         name: profile.name.trim() || (profile.id === defaultProfileId ? '默认' : '新配置'),
         baseUrl: normalizedBaseUrl,
-        model: profile.model.trim() || defaultModel,
+        model: profile.model.trim() || DEFAULT_IMAGES_MODEL,
         timeout: Number(profile.timeout) || DEFAULT_API_TIMEOUT,
         apiProxy: nextApiProxy,
         codexCli: isApiConnectionAvailable(nextDraft, profile.connectionId) ? profile.codexCli : false,
@@ -402,13 +397,11 @@ export default function SettingsModal({ onImportProfile }: { onImportProfile: (s
         url.searchParams.set('apiKey', '{key}')
       }
       url.searchParams.set('connectionId', profile.connectionId)
-      const model = profile.model.trim() || getDefaultModelForConnection(profile.connectionId)
+      const model = profile.model.trim() || DEFAULT_IMAGES_MODEL
       url.searchParams.set('model', !options.includeApiKey && options.useNewApiModel ? '{model}' : model)
-      if (profile.connectionId === 'openai-responses') url.searchParams.set('imageGenerationModel', profile.imageGenerationModel?.trim() ?? '')
       if (profile.name.trim()) url.searchParams.set('profileName', profile.name.trim())
-      if (profile.reasoningEffort) url.searchParams.set('reasoningEffort', profile.reasoningEffort)
       if (profile.codexCli) url.searchParams.set('codexCli', 'true')
-      if (Boolean(profile.streamImages) !== (profile.connectionId === 'openai-responses')) url.searchParams.set('streamImages', String(Boolean(profile.streamImages)))
+      if (profile.streamImages) url.searchParams.set('streamImages', 'true')
       if (profile.streamPartialImages !== DEFAULT_STREAM_PARTIAL_IMAGES) url.searchParams.set('streamPartialImages', String(normalizeStreamPartialImages(profile.streamPartialImages)))
       if (profile.transparentBackgroundMethod !== 'api') url.searchParams.set('transparentBackgroundMethod', profile.transparentBackgroundMethod)
 

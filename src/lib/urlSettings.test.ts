@@ -31,12 +31,6 @@ async function importPresetConfigOnlyUrlSettings(options: { locked?: boolean, mu
 }
 
 describe('URL settings params', () => {
-  it('preserves an existing model when the connection changes', () => {
-    const current = normalizeSettings({ profiles: [createDefaultOpenAIProfile({ id: 'saved', model: 'vendor/model', imageGenerationModel: '' })] })
-    const switched = normalizeSettings(buildSettingsFromUrlParams(current, new URLSearchParams('profileId=saved&connectionId=openai-responses')))
-    expect(switched.profiles[0]).toMatchObject({ connectionId: 'openai-responses', model: 'vendor/model', imageGenerationModel: '' })
-  })
-
   it('reports only IDs explicitly included in URL settings and profileId', () => {
     const params = new URLSearchParams('profileId=preset-query-profile')
     params.set('settings', JSON.stringify({
@@ -92,9 +86,9 @@ describe('URL settings params', () => {
       name: 'Existing OpenAI',
       baseUrl: 'https://old.example.com/v1',
       apiKey: 'existing-key',
-      model: 'existing-responses-model',
+      model: 'existing-image-model',
       timeout: 900,
-      connectionId: 'openai-responses',
+      connectionId: 'openai-images',
       apiProxy: true,
       responseFormatB64Json: true,
     })
@@ -113,9 +107,9 @@ describe('URL settings params', () => {
       name: 'Shared',
       baseUrl: 'https://new.example.com/v1',
       apiKey: 'existing-key',
-      model: 'existing-responses-model',
+      model: 'existing-image-model',
       timeout: 900,
-      connectionId: 'openai-responses',
+      connectionId: 'openai-images',
       apiProxy: true,
       responseFormatB64Json: true,
     })
@@ -154,74 +148,6 @@ describe('URL settings params', () => {
       model: 'custom-image-model',
       connectionId: 'openai-images',
     })
-  })
-
-  it('uses reasoning effort from URL params for Responses profiles', () => {
-    const current = normalizeSettings(DEFAULT_SETTINGS)
-    const next = normalizeSettings({
-      ...current,
-      ...buildSettingsFromUrlParams(current, new URLSearchParams('connectionId=openai-responses&reasoningEffort=max')),
-    })
-
-    expect(next.profiles.find((profile) => profile.id === next.activeProfileId)).toMatchObject({
-      connectionId: 'openai-responses',
-      reasoningEffort: 'max',
-    })
-  })
-
-  it('uses the image generation model from URL params for Responses profiles', () => {
-    const current = normalizeSettings(DEFAULT_SETTINGS)
-    const next = normalizeSettings({
-      ...current,
-      ...buildSettingsFromUrlParams(current, new URLSearchParams('connectionId=openai-responses&imageGenerationModel=gpt-image-2.5-flare')),
-    })
-
-    expect(next.profiles.find((profile) => profile.id === next.activeProfileId)).toMatchObject({
-      connectionId: 'openai-responses',
-      imageGenerationModel: 'gpt-image-2.5-flare',
-    })
-  })
-
-  it.each(['', '   ', ' gpt-image-2.5-flare '])('preserves explicit image generation model %j in new and same-ID URL imports', (model) => {
-    const current = normalizeSettings(DEFAULT_SETTINGS)
-    const params = new URLSearchParams({ connectionId: 'openai-responses', imageGenerationModel: model })
-    const created = normalizeSettings(buildSettingsFromUrlParams(current, params))
-    expect(created.profiles.find((profile) => profile.id === created.activeProfileId)?.imageGenerationModel).toBe(model.trim())
-
-    const profile = createDefaultOpenAIProfile({ id: 'shared-responses', connectionId: 'openai-responses', imageGenerationModel: 'custom-image-model' })
-    const existing = normalizeSettings({ profiles: [profile], activeProfileId: profile.id })
-    params.set('profileId', profile.id)
-    const updated = normalizeSettings(buildSettingsFromUrlParams(existing, params))
-    expect(updated.profiles).toHaveLength(1)
-    expect(updated.profiles[0].imageGenerationModel).toBe(model.trim())
-  })
-
-  it.each(['', '   '])('preserves blank image generation model %j in JSON settings imports', (model) => {
-    const params = new URLSearchParams({ settings: JSON.stringify({ profiles: [
-      createDefaultOpenAIProfile({ id: 'shared-responses', connectionId: 'openai-responses', imageGenerationModel: model }),
-    ] }) })
-    const next = normalizeSettings(buildSettingsFromUrlParams(DEFAULT_SETTINGS, params))
-    expect(next.profiles.find((profile) => profile.id === next.activeProfileId)?.imageGenerationModel).toBe('')
-  })
-
-  it.each(['query', 'json'])('preserves blank image generation models in preset-only %s imports', async (source) => {
-    const { buildSettingsFromUrlParams } = await importPresetConfigOnlyUrlSettings()
-    const profile = createDefaultOpenAIProfile({ connectionId: 'openai-responses', imageGenerationModel: 'custom-image-model' })
-    const current = normalizeSettings({ profiles: [profile], activeProfileId: profile.id })
-    for (const model of ['', '   ']) {
-      const params = new URLSearchParams(source === 'query'
-        ? { imageGenerationModel: model }
-        : { settings: JSON.stringify({ profiles: [{ connectionId: 'openai-responses', imageGenerationModel: model }] }) })
-      const next = normalizeSettings(buildSettingsFromUrlParams(current, params))
-      expect(next.profiles[0].imageGenerationModel).toBe('')
-    }
-  })
-
-  it('preserves an existing image generation model when the URL omits it', () => {
-    const profile = createDefaultOpenAIProfile({ id: 'shared-responses', connectionId: 'openai-responses', imageGenerationModel: 'custom-image-model' })
-    const current = normalizeSettings({ profiles: [profile], activeProfileId: profile.id })
-    const next = normalizeSettings(buildSettingsFromUrlParams(current, new URLSearchParams({ profileId: profile.id, connectionId: 'openai-responses' })))
-    expect(next.profiles[0].imageGenerationModel).toBe('custom-image-model')
   })
 
   it('uses profile name from URL params for OpenAI profiles', () => {
@@ -429,7 +355,7 @@ describe('URL settings params', () => {
   })
 
   it('clears known URL setting params without touching unrelated params', () => {
-    const params = new URLSearchParams('reasoningEffort=high&transparentBackgroundMethod=local&foo=bar')
+    const params = new URLSearchParams('streamImages=true&transparentBackgroundMethod=local&foo=bar')
 
     expect(hasUrlSettingParams(params)).toBe(true)
     clearUrlSettingParams(params)
@@ -587,7 +513,7 @@ describe('URL settings params', () => {
     const current = normalizeSettings(DEFAULT_SETTINGS)
     const next = normalizeSettings({
       ...current,
-      ...buildSettingsFromUrlParams(current, new URLSearchParams('apiUrl=https://api.example.com/v1&apiKey=test-key&model=custom-model&profileName=导入配置&connectionId=openai-responses')),
+      ...buildSettingsFromUrlParams(current, new URLSearchParams('apiUrl=https://api.example.com/v1&apiKey=test-key&model=custom-model&profileName=导入配置&connectionId=openai-images')),
     })
 
     expect(next.profiles).toHaveLength(1)
@@ -750,7 +676,7 @@ describe('URL settings params', () => {
         apiKey: 'openai-key',
         model: 'openai-model',
         timeout: 120,
-        connectionId: 'openai-responses',
+        connectionId: 'openai-images',
         codexCli: true,
         apiProxy: true,
       }, {

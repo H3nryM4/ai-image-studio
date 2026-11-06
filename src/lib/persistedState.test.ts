@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { AppSettings, FavoriteCollection } from '../types'
 import { DEFAULT_PARAMS } from '../types'
-import { DEFAULT_IMAGES_MODEL, DEFAULT_SETTINGS, normalizeSettings, switchApiProfileConnection } from './apiProfiles'
+import { DEFAULT_SETTINGS, normalizeSettings } from './apiProfiles'
 import { createPersistedState, normalizePersistedState } from './persistedState'
 
 const imageA = { id: 'image-a', dataUrl: 'data:image/png;base64,image-a' }
@@ -15,7 +15,6 @@ function source(settings: AppSettings = DEFAULT_SETTINGS) {
     inputImages: [imageA],
     maskDraft: { targetImageId: imageA.id, maskDataUrl: 'data:image/png;base64,mask', updatedAt: 1 },
     maskEditorImageId: imageA.id,
-    dismissedCodexCliPrompts: [],
     favoriteCollections: [collectionA],
     defaultFavoriteCollectionId: collectionA.id,
     imageSourceUrls: { [imageA.id]: 'https://example.com/a.png' },
@@ -26,7 +25,6 @@ function fallback() {
   return {
     settings: DEFAULT_SETTINGS,
     params: { ...DEFAULT_PARAMS },
-    dismissedCodexCliPrompts: ['current'],
     favoriteCollections: [collectionA],
     defaultFavoriteCollectionId: collectionA.id,
   }
@@ -40,32 +38,6 @@ describe('persisted state codec', () => {
     const restored = normalizePersistedState(persisted, fallback())!
     expect(restored.params.quality).toBe('high')
     expect(restored.paramsByProfile['second:openai-images'].quality).toBe('low')
-  })
-
-  it.each([undefined, 'custom-image-model', '', '   '])('restores profile tool model %s without autofilling', (imageGenerationModel) => {
-    const profile = { connectionId: 'openai-responses', model: 'saved-text-model', ...(imageGenerationModel === undefined ? {} : { imageGenerationModel }) }
-    const result = normalizePersistedState({ settings: { profiles: [profile] } }, fallback(), 100)!
-    expect(result.settings.profiles[0]).toMatchObject({
-      model: 'saved-text-model',
-      imageGenerationModel: imageGenerationModel?.trim() ?? '',
-    })
-  })
-
-  it.each([undefined, 'draft-image-model', ''])('restores saved connection tool model %s instead of inheriting the active model', (imageGenerationModel) => {
-    const result = normalizePersistedState({ settings: { profiles: [{
-      connectionId: 'custom-connection',
-      imageGenerationModel: DEFAULT_IMAGES_MODEL,
-      connectionDrafts: { 'openai-responses': { model: 'saved-text-model', ...(imageGenerationModel === undefined ? {} : { imageGenerationModel }) } },
-    }] } }, fallback(), 100)!
-    expect(switchApiProfileConnection(result.settings.profiles[0], 'openai-responses')).toMatchObject({
-      connectionId: 'openai-responses',
-      model: 'saved-text-model',
-      imageGenerationModel: imageGenerationModel ?? '',
-    })
-  })
-
-  it('retains new defaults when no settings were persisted', () => {
-    expect(normalizePersistedState({}, fallback(), 100)!.settings.profiles[0].imageGenerationModel).toBe(DEFAULT_IMAGES_MODEL)
   })
 
   it.each(['xhigh', 'max'] as const)('restores the %s GPT Image 2.5 quality level', (quality) => {

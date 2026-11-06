@@ -1,6 +1,6 @@
 import { DEFAULT_HOME_PARAMS, DEFAULT_PARAMS, type ApiProfile, type CustomConnectionDefinition, type HomeParam } from '../../types'
 import { getHomeParamState, HOME_PARAM_OPTIONS } from '../../lib/homeParams'
-import { getImageGenerationModel, isGptImage25Model } from '../../lib/imageModels'
+import { isGptImage25Model } from '../../lib/imageModels'
 import Select from '../Select'
 import { ChevronDownIcon } from '../icons'
 import SettingLabel from './SettingLabel'
@@ -19,7 +19,7 @@ export default function ProfileParamsEditor({ profile, connection, locked, onCha
   ])
   const defaults = { ...DEFAULT_PARAMS, ...profile.paramDefaults }
   const selected = profile.homeParams ?? DEFAULT_HOME_PARAMS
-  const qualityValues = ['auto', 'low', 'medium', 'high', ...(isGptImage25Model(getImageGenerationModel(profile)) ? ['xhigh', 'max'] : [])]
+  const qualityValues = ['auto', 'low', 'medium', 'high', ...(isGptImage25Model(profile.model) ? ['xhigh', 'max'] : [])]
   const options = {
     quality: qualityValues.map((value) => ({ label: value === 'auto' ? '自动' : value, value })),
     output_format: ['png', 'jpeg', 'webp'].map((value) => ({ label: value.toUpperCase(), value })),

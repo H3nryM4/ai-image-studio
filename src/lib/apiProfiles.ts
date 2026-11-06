@@ -2,7 +2,7 @@ import type { ApiProfile, ApiConnectionId, AppSettings, PresetConfig, CustomConn
 import { DEFAULT_STREAM_PARTIAL_IMAGES, DEFAULT_ZIP_DOWNLOAD_ROUTES, ZIP_DOWNLOAD_ROUTE_VALUES } from '../types'
 import { customConnectionSupportsNativeTransparentBackground } from './customConnectionCapabilities'
 import { shouldUseApiProxy } from './devProxy'
-import { normalizeReasoningEffort, normalizeStreamPartialImages, parseDefaultApiUrl } from './defaultApiUrl'
+import { normalizeStreamPartialImages, parseDefaultApiUrl } from './defaultApiUrl'
 import { readRuntimeEnv } from './runtimeEnv'
 import { isImportableConfigUrl } from './importableConfigUrl'
 import { DEFAULT_IMAGES_MODEL } from './imageModels'
@@ -18,11 +18,10 @@ const DEFAULT_API_URL_PATCH = isImportableConfigUrl(RAW_DEFAULT_API_URL)
   : parseDefaultApiUrl(RAW_DEFAULT_API_URL || (DOCKER_DEPLOYMENT && DEFAULT_OPENAI_API_PROXY ? '' : OPENAI_DEFAULT_API_BASE_URL))
 export const DEFAULT_API_BASE_URL = DEFAULT_API_URL_PATCH?.baseUrl ?? ''
 export { DEFAULT_IMAGES_MODEL } from './imageModels'
-export const DEFAULT_RESPONSES_MODEL = 'gpt-6.1-sol'
 export const DEFAULT_OPENAI_PROFILE_ID = 'default-openai'
 export const DEFAULT_API_TIMEOUT = 600
 
-const BUILT_IN_CONNECTION_IDS = new Set<ApiConnectionId>(['openai-images', 'openai-responses'])
+const BUILT_IN_CONNECTION_IDS = new Set<ApiConnectionId>(['openai-images'])
 const DEFAULT_CUSTOM_CONNECTION_PATHS = {
   generationPath: 'images/generations',
   editPath: 'images/edits',
@@ -52,10 +51,10 @@ const DEFAULT_EDIT_FILES: CustomConnectionFileMapping[] = [
 type ApiProfileConnectionDraft = NonNullable<ApiProfile['connectionDrafts']>[ApiConnectionId]
 
 export function isOpenAIConnection(connectionId: ApiConnectionId): boolean {
-  return connectionId === 'openai-images' || connectionId === 'openai-responses'
+  return connectionId === 'openai-images'
 }
 
-export { normalizeReasoningEffort, normalizeStreamPartialImages } from './defaultApiUrl'
+export { normalizeStreamPartialImages } from './defaultApiUrl'
 
 export function hasDefaultPresetConfig(): boolean {
   return Boolean(RAW_DEFAULT_API_URL) || DEFAULT_OPENAI_API_PROXY
@@ -87,7 +86,7 @@ function normalizeZipDownloadRoutes(value: unknown) {
 function normalizeConnectionOrder(value: unknown, customConnections: CustomConnectionDefinition[]): string[] | undefined {
   if (!Array.isArray(value)) return undefined
 
-  const connectionIds = ['openai-images', 'openai-responses', ...customConnections.map((connection) => connection.id)]
+  const connectionIds = ['openai-images', ...customConnections.map((connection) => connection.id)]
   const knownIds = new Set(connectionIds)
   const ordered = value
     .map(String)
@@ -264,10 +263,8 @@ export function createDefaultOpenAIProfile(overrides: Partial<ApiProfile> = {}):
     name: DEFAULT_API_URL_PATCH?.name ?? '默认',
     baseUrl: DEFAULT_API_BASE_URL,
     apiKey: DEFAULT_API_URL_PATCH?.apiKey ?? '',
-    model: DEFAULT_API_URL_PATCH?.model ?? (connectionId === 'openai-responses' ? DEFAULT_RESPONSES_MODEL : DEFAULT_IMAGES_MODEL),
-    imageGenerationModel: DEFAULT_API_URL_PATCH?.imageGenerationModel ?? DEFAULT_IMAGES_MODEL,
+    model: DEFAULT_API_URL_PATCH?.model ?? DEFAULT_IMAGES_MODEL,
     timeout: DEFAULT_API_TIMEOUT,
-    reasoningEffort: DEFAULT_API_URL_PATCH?.reasoningEffort,
     codexCli: DEFAULT_API_URL_PATCH?.codexCli ?? false,
     apiProxy: DEFAULT_OPENAI_API_PROXY,
     streamPartialImages: DEFAULT_API_URL_PATCH?.streamPartialImages ?? DEFAULT_STREAM_PARTIAL_IMAGES,
@@ -276,7 +273,7 @@ export function createDefaultOpenAIProfile(overrides: Partial<ApiProfile> = {}):
     connectionId,
     homeParams: normalizeHomeParamSelection(overrides.homeParams),
     paramDefaults: normalizeParamDefaults(overrides.paramDefaults),
-    streamImages: overrides.streamImages ?? DEFAULT_API_URL_PATCH?.streamImages ?? connectionId === 'openai-responses',
+    streamImages: overrides.streamImages ?? DEFAULT_API_URL_PATCH?.streamImages ?? false,
   }
 }
 
@@ -287,8 +284,6 @@ export function switchApiProfileConnection(profile: ApiProfile, connectionId: Ap
     [profile.connectionId]: {
       baseUrl: profile.baseUrl,
       model: profile.model,
-      imageGenerationModel: profile.imageGenerationModel,
-      reasoningEffort: profile.reasoningEffort,
       codexCli: profile.codexCli,
       apiProxy: profile.apiProxy,
       responseFormatB64Json: profile.responseFormatB64Json,
@@ -302,21 +297,16 @@ export function switchApiProfileConnection(profile: ApiProfile, connectionId: Ap
   const savedDraft = connectionDrafts[connectionId]
   const openAI = isOpenAIConnection(connectionId)
   const fromOpenAI = isOpenAIConnection(profile.connectionId)
-  const defaultModel = connectionId === 'openai-responses' ? DEFAULT_RESPONSES_MODEL : DEFAULT_IMAGES_MODEL
-  const previousDefaultModel = profile.connectionId === 'openai-responses' ? DEFAULT_RESPONSES_MODEL : DEFAULT_IMAGES_MODEL
-  const model = profile.model && profile.model !== previousDefaultModel ? profile.model : defaultModel
 
   return {
     ...profile,
     connectionId,
     baseUrl: savedDraft?.baseUrl ?? profile.baseUrl,
-    model: savedDraft?.model ?? model,
-    imageGenerationModel: savedDraft?.imageGenerationModel ?? profile.imageGenerationModel,
-    reasoningEffort: savedDraft ? savedDraft.reasoningEffort : openAI && fromOpenAI ? profile.reasoningEffort : undefined,
+    model: savedDraft?.model ?? (profile.model || DEFAULT_IMAGES_MODEL),
     codexCli: savedDraft?.codexCli ?? (openAI && fromOpenAI ? profile.codexCli : false),
     apiProxy: savedDraft?.apiProxy ?? (openAI && (fromOpenAI ? profile.apiProxy : DEFAULT_OPENAI_API_PROXY)),
     responseFormatB64Json: savedDraft?.responseFormatB64Json,
-    streamImages: openAI ? savedDraft?.streamImages ?? connectionId === 'openai-responses' : false,
+    streamImages: openAI ? savedDraft?.streamImages ?? false : false,
     streamPartialImages: savedDraft?.streamPartialImages ?? (openAI && fromOpenAI ? profile.streamPartialImages : DEFAULT_STREAM_PARTIAL_IMAGES),
     transparentBackgroundMethod: customConnection && !customConnectionSupportsNativeTransparentBackground(customConnection)
       ? 'local'
@@ -339,15 +329,12 @@ function normalizeConnectionDraft(
   const fallback = createDefaultOpenAIProfile({ connectionId, transparentBackgroundMethod })
   const baseUrl = typeof input.baseUrl === 'string' ? input.baseUrl : undefined
   const model = (typeof input.model === 'string' && normalizeModelList(input.model)) || undefined
-  const imageGenerationModel = typeof input.imageGenerationModel === 'string' ? input.imageGenerationModel.trim() : ''
   const knownConnection = BUILT_IN_CONNECTION_IDS.has(connectionId) || customConnectionIds.has(connectionId)
   if (!knownConnection) return undefined
 
   return {
     baseUrl,
     model,
-    imageGenerationModel,
-    reasoningEffort: normalizeReasoningEffort(input.reasoningEffort),
     homeParams: normalizeHomeParamSelection(input.homeParams),
     paramDefaults: normalizeParamDefaults(input.paramDefaults),
     codexCli: typeof input.codexCli === 'boolean' ? input.codexCli : fallback.codexCli,
@@ -405,11 +392,7 @@ export function normalizeApiProfile(
     apiKey: typeof record.apiKey === 'string' ? record.apiKey : defaults.apiKey,
     model: (typeof record.model === 'string' && normalizeModelList(record.model)) || defaults.model,
     selectedModel: typeof record.selectedModel === 'string' && record.selectedModel.trim() ? record.selectedModel.trim() : undefined,
-    imageGenerationModel: typeof record.imageGenerationModel === 'string'
-      ? record.imageGenerationModel.trim()
-      : '',
     timeout: typeof record.timeout === 'number' && Number.isFinite(record.timeout) ? record.timeout : defaults.timeout,
-    reasoningEffort: normalizeReasoningEffort(record.reasoningEffort, defaults.reasoningEffort),
     codexCli: Boolean(record.codexCli),
     apiProxy: typeof record.apiProxy === 'boolean' ? record.apiProxy : defaults.apiProxy,
     responseFormatB64Json: record.responseFormatB64Json === true ? true : undefined,
@@ -557,7 +540,6 @@ export function getCustomConnectionDefinition(settings: Partial<AppSettings> | u
 
 export function getApiConnectionLabel(settings: Partial<AppSettings> | unknown, connectionId: ApiConnectionId): string {
   if (connectionId === 'openai-images') return 'OpenAI Images API'
-  if (connectionId === 'openai-responses') return 'OpenAI Responses API'
   return getCustomConnectionDefinition(settings, connectionId)?.name ?? '接入已失效'
 }
 
@@ -676,10 +658,8 @@ function isDefaultOpenAIProfile(profile: ApiProfile): boolean {
     profile.baseUrl === DEFAULT_API_BASE_URL &&
     profile.apiKey === '' &&
     profile.model === DEFAULT_IMAGES_MODEL &&
-    profile.imageGenerationModel === DEFAULT_IMAGES_MODEL &&
     profile.timeout === DEFAULT_API_TIMEOUT &&
     profile.connectionId === 'openai-images' &&
-    profile.reasoningEffort === undefined &&
     profile.codexCli === false &&
     profile.apiProxy === DEFAULT_OPENAI_API_PROXY &&
     profile.streamImages === false &&
@@ -730,8 +710,6 @@ function getApiProfileDedupKey(profile: ApiProfile): string {
     profile.baseUrl.trim().toLowerCase(),
     profile.apiKey.trim(),
     profile.model.trim(),
-    profile.imageGenerationModel?.trim(),
-    profile.reasoningEffort,
   ])
 }
 
@@ -740,8 +718,6 @@ function getApiProfileConnectionKey(profile: ApiProfile): string {
     profile.connectionId,
     profile.baseUrl.trim().toLowerCase(),
     profile.model.trim(),
-    profile.imageGenerationModel?.trim(),
-    profile.reasoningEffort,
   ])
 }
 
@@ -865,9 +841,7 @@ const PRESET_PROFILE_DEPLOYMENT_KEYS = [
   'connectionId',
   'baseUrl',
   'model',
-  'imageGenerationModel',
   'timeout',
-  'reasoningEffort',
   'codexCli',
   'apiProxy',
   'responseFormatB64Json',

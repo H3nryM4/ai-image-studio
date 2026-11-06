@@ -1,5 +1,5 @@
-import type { ApiConnectionId, ApiProfile, ReasoningEffort } from '../types'
-import { DEFAULT_STREAM_PARTIAL_IMAGES, REASONING_EFFORT_VALUES } from '../types'
+import type { ApiConnectionId, ApiProfile } from '../types'
+import { DEFAULT_STREAM_PARTIAL_IMAGES } from '../types'
 
 import { normalizeBaseUrl } from './devProxy'
 
@@ -10,19 +10,11 @@ export function normalizeStreamPartialImages(value: unknown, fallback: number | 
   return Math.min(3, Math.max(0, Math.trunc(numeric)))
 }
 
-export function normalizeReasoningEffort(value: unknown, fallback?: ReasoningEffort): ReasoningEffort | undefined {
-  return typeof value === 'string' && REASONING_EFFORT_VALUES.includes(value as ReasoningEffort)
-    ? value as ReasoningEffort
-    : fallback
-}
-
 export interface DefaultApiUrlPatch {
   baseUrl: string
   apiKey?: string
   connectionId?: ApiConnectionId
   model?: string
-  imageGenerationModel?: string
-  reasoningEffort?: ReasoningEffort
   name?: string
   codexCli?: boolean
   streamImages?: boolean
@@ -46,8 +38,6 @@ export function parseDefaultApiUrl(rawUrl: string): DefaultApiUrlPatch {
     const apiKeyParam = parsed.searchParams.get('apiKey')
     const connectionIdParam = parsed.searchParams.get('connectionId')
     const modelParam = parsed.searchParams.get('model')
-    const imageGenerationModelParam = parsed.searchParams.get('imageGenerationModel')
-    const reasoningEffortParam = parsed.searchParams.get('reasoningEffort')
     const profileNameParam = parsed.searchParams.get('profileName')
     const codexCliParam = parsed.searchParams.get('codexCli')
     const streamImagesParam = parsed.searchParams.get('streamImages')
@@ -56,10 +46,8 @@ export function parseDefaultApiUrl(rawUrl: string): DefaultApiUrlPatch {
 
     if (apiUrlParam !== null) patch.baseUrl = normalizeBaseUrl(apiUrlParam.trim())
     if (apiKeyParam !== null) patch.apiKey = apiKeyParam.trim()
-    if (connectionIdParam === 'openai-images' || connectionIdParam === 'openai-responses') patch.connectionId = connectionIdParam
+    if (connectionIdParam === 'openai-images') patch.connectionId = connectionIdParam
     if (modelParam !== null && modelParam.trim()) patch.model = modelParam.trim()
-    if (imageGenerationModelParam !== null) patch.imageGenerationModel = imageGenerationModelParam.trim()
-    if (reasoningEffortParam !== null) patch.reasoningEffort = normalizeReasoningEffort(reasoningEffortParam)
     if (profileNameParam?.trim()) patch.name = profileNameParam.trim()
     if (codexCliParam !== null) patch.codexCli = codexCliParam.trim().toLowerCase() === 'true'
     if (streamImagesParam !== null) patch.streamImages = streamImagesParam.trim().toLowerCase() === 'true'

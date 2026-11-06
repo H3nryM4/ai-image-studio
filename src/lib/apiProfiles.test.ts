@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   DEFAULT_IMAGES_MODEL,
-  DEFAULT_RESPONSES_MODEL,
   DEFAULT_OPENAI_PROFILE_ID,
   DEFAULT_SETTINGS,
   createDefaultOpenAIProfile,
@@ -59,22 +58,11 @@ describe('validateApiProfile', () => {
 })
 
 describe('normalizeApiProfile', () => {
-  it('uses the mode default and preserves the external model field', () => {
-    expect(normalizeApiProfile({ connectionId: 'openai-responses' }).model).toBe(DEFAULT_RESPONSES_MODEL)
-    expect(normalizeSettings({ profiles: [{ connectionId: 'openai-responses' }] }).profiles[0].model).toBe(DEFAULT_RESPONSES_MODEL)
-    expect(normalizeApiProfile({ connectionId: 'openai-responses', model: 'vendor/text' }).model).toBe('vendor/text')
+  it('uses the default image model and preserves the external model field', () => {
+    expect(normalizeApiProfile({ connectionId: 'openai-images' }).model).toBe(DEFAULT_IMAGES_MODEL)
+    expect(normalizeSettings({ profiles: [{ connectionId: 'openai-images' }] }).profiles[0].model).toBe(DEFAULT_IMAGES_MODEL)
+    expect(normalizeApiProfile({ connectionId: 'openai-images', model: 'vendor/image' }).model).toBe('vendor/image')
     expect(normalizeApiProfile({ model: 'legacy' }).model).toBe('legacy')
-  })
-
-  it('keeps missing restored tool models empty while defaulting newly created profiles', () => {
-    expect(normalizeApiProfile({ connectionId: 'openai-responses' }).imageGenerationModel).toBe('')
-    expect(normalizeApiProfile(createDefaultOpenAIProfile({ connectionId: 'openai-responses' })).imageGenerationModel).toBe(DEFAULT_IMAGES_MODEL)
-    expect(DEFAULT_SETTINGS.profiles[0].imageGenerationModel).toBe(DEFAULT_IMAGES_MODEL)
-    expect(normalizeApiProfile({
-      connectionId: 'openai-responses',
-      imageGenerationModel: 'gpt-image-2.5-flare',
-    }).imageGenerationModel).toBe('gpt-image-2.5-flare')
-    expect(normalizeApiProfile({ connectionId: 'openai-responses', imageGenerationModel: '   ' }).imageGenerationModel).toBe('')
   })
 
   it('uses connection defaults and preserves explicit transparent background methods', () => {
@@ -114,22 +102,9 @@ describe('normalizeSettings', () => {
 })
 
 describe('default API URL env', () => {
-  it.each([undefined, 'runtime-image-model', ''])('uses runtime tool model %s for new defaults and keeps imported omissions empty', async (imageGenerationModel) => {
-    vi.resetModules()
-    const params = new URLSearchParams({ connectionId: 'openai-responses' })
-    if (imageGenerationModel !== undefined) params.set('imageGenerationModel', imageGenerationModel)
-    vi.stubEnv('VITE_DEFAULT_API_URL', `https://api.example.com?${params}`)
-    const apiProfiles = await import('./apiProfiles')
-
-    expect(apiProfiles.createDefaultOpenAIProfile().imageGenerationModel).toBe(imageGenerationModel ?? DEFAULT_IMAGES_MODEL)
-    expect(apiProfiles.DEFAULT_SETTINGS.profiles[0].imageGenerationModel).toBe(imageGenerationModel ?? DEFAULT_IMAGES_MODEL)
-    expect(apiProfiles.normalizeApiProfile({ connectionId: 'openai-responses' }).imageGenerationModel).toBe('')
-    expect(apiProfiles.normalizeSettings({ profiles: [{ connectionId: 'openai-responses' }] }).profiles[0].imageGenerationModel).toBe('')
-  })
-
   it('applies shared URL params from VITE_DEFAULT_API_URL to the default profile', async () => {
     vi.resetModules()
-    vi.stubEnv('VITE_DEFAULT_API_URL', 'https://app.example.com/?apiUrl=https%3A%2F%2Fapi.example.com&connectionId=openai-responses&model=test-image-model&profileName=URL%20Profile&reasoningEffort=xhigh&codexCli=true&streamImages=true&streamPartialImages=3&transparentBackgroundMethod=local')
+    vi.stubEnv('VITE_DEFAULT_API_URL', 'https://app.example.com/?apiUrl=https%3A%2F%2Fapi.example.com&connectionId=openai-images&model=test-image-model&profileName=URL%20Profile&codexCli=true&streamImages=true&streamPartialImages=3&transparentBackgroundMethod=local')
 
     const { DEFAULT_SETTINGS, createDefaultOpenAIProfile } = await import('./apiProfiles')
 
@@ -138,8 +113,7 @@ describe('default API URL env', () => {
       name: 'URL Profile',
       baseUrl: 'https://api.example.com',
       model: 'test-image-model',
-      connectionId: 'openai-responses',
-      reasoningEffort: 'xhigh',
+      connectionId: 'openai-images',
       codexCli: true,
       streamImages: true,
       streamPartialImages: 3,
@@ -150,8 +124,7 @@ describe('default API URL env', () => {
       name: 'URL Profile',
       baseUrl: 'https://api.example.com',
       model: 'test-image-model',
-      connectionId: 'openai-responses',
-      reasoningEffort: 'xhigh',
+      connectionId: 'openai-images',
       codexCli: true,
       streamImages: true,
       streamPartialImages: 3,
@@ -184,7 +157,7 @@ describe('default API URL env', () => {
 
 describe('mergeImportedSettings', () => {
   it('replaces the default OpenAI profile with an imported profile when current settings are untouched', () => {
-    const merged = mergeImportedSettings(DEFAULT_SETTINGS, { profiles: [createDefaultOpenAIProfile({ baseUrl: 'https://api.example.com/v1', apiKey: 'imported-key', model: 'imported-model', timeout: 120, connectionId: 'openai-responses', codexCli: true, apiProxy: true })] })
+    const merged = mergeImportedSettings(DEFAULT_SETTINGS, { profiles: [createDefaultOpenAIProfile({ baseUrl: 'https://api.example.com/v1', apiKey: 'imported-key', model: 'imported-model', timeout: 120, connectionId: 'openai-images', codexCli: true, apiProxy: true })] })
 
     expect(merged.profiles).toHaveLength(1)
     expect(merged.activeProfileId).toBe(DEFAULT_OPENAI_PROFILE_ID)
@@ -194,7 +167,7 @@ describe('mergeImportedSettings', () => {
       apiKey: 'imported-key',
       model: 'imported-model',
       timeout: 120,
-      connectionId: 'openai-responses',
+      connectionId: 'openai-images',
       codexCli: true,
       apiProxy: true,
     })
@@ -1446,11 +1419,9 @@ describe('custom connections', () => {
 
   it('uses connection-specific streaming defaults and preserves partial image count', () => {
     expect(createDefaultOpenAIProfile().streamImages).toBe(false)
-    expect(createDefaultOpenAIProfile({ connectionId: 'openai-responses' }).streamImages).toBe(true)
     expect(createDefaultOpenAIProfile().streamPartialImages).toBe(1)
     expect(DEFAULT_SETTINGS.profiles[0].streamImages).toBe(false)
     expect(DEFAULT_SETTINGS.profiles[0].streamPartialImages).toBe(1)
-    expect(normalizeSettings({ profiles: [{ connectionId: 'openai-responses' }] }).profiles[0].streamImages).toBe(true)
 
     const normalized = normalizeSettings({
       profiles: [
@@ -1468,18 +1439,6 @@ describe('custom connections', () => {
     })
 
     expect(clamped.profiles[0].streamPartialImages).toBe(3)
-  })
-
-  it('normalizes supported reasoning efforts and ignores invalid values', () => {
-    const supported = normalizeSettings({
-      profiles: [createDefaultOpenAIProfile({ connectionId: 'openai-responses', reasoningEffort: 'max' })],
-    })
-    const invalid = normalizeSettings({
-      profiles: [{ ...createDefaultOpenAIProfile({ connectionId: 'openai-responses' }), reasoningEffort: 'extreme' }],
-    })
-
-    expect(supported.profiles[0].reasoningEffort).toBe('max')
-    expect(invalid.profiles[0].reasoningEffort).toBeUndefined()
   })
 
   it('disables unsupported streaming for custom connections', () => {
@@ -1504,14 +1463,14 @@ describe('custom connections', () => {
 
   it('keeps connection order usable when custom connections are added after manual sorting', () => {
     const settings = normalizeSettings({
-      connectionOrder: ['custom-beta', 'openai-responses', 'missing-connection'],
+      connectionOrder: ['custom-beta', 'openai-images', 'missing-connection'],
       customConnections: [
         { id: 'custom-alpha', name: '示例服务商 A', submit: { path: 'images/generations' } },
         { id: 'custom-beta', name: '示例服务商 B', submit: { path: 'images/generations' } },
       ],
     })
 
-    expect(settings.connectionOrder).toEqual(['custom-beta', 'openai-responses', 'openai-images', 'custom-alpha'])
+    expect(settings.connectionOrder).toEqual(['custom-beta', 'openai-images', 'custom-alpha'])
   })
 
   it('reads the active connection from its profile', () => {
@@ -1535,7 +1494,7 @@ describe('custom connections', () => {
 
   it('switches to a custom connection without inheriting native streaming', () => {
     const connection = { id: 'custom-json', name: 'Custom JSON', submit: { path: 'images/generations' } }
-    const openaiProfile = createDefaultOpenAIProfile({ connectionId: 'openai-responses', streamImages: true })
+    const openaiProfile = createDefaultOpenAIProfile({ connectionId: 'openai-images', streamImages: true })
 
     const customProfile = switchApiProfileConnection(openaiProfile, connection.id, connection)
 
@@ -1569,30 +1528,31 @@ describe('model list', () => {
 })
 
 describe('unified API connections', () => {
-  it('restores independent Images and Responses settings after persistence', () => {
-    const images = createDefaultOpenAIProfile({ model: 'vendor/image', streamImages: false, streamPartialImages: 0 })
-    const responses = {
-      ...switchApiProfileConnection(images, 'openai-responses'),
-      model: 'vendor/text',
-      imageGenerationModel: 'vendor/tool',
-      reasoningEffort: 'high' as const,
-      streamImages: true,
-      streamPartialImages: 3,
+  it('restores independent Images and custom connection settings after persistence', () => {
+    const connection = { id: 'custom-image', name: '自定义图片接口', submit: { path: 'generate' } }
+    const images = createDefaultOpenAIProfile({ model: 'vendor/image', streamImages: true, streamPartialImages: 3 })
+    const custom = {
+      ...switchApiProfileConnection(images, connection.id, connection),
+      model: 'custom/model',
+      baseUrl: 'https://custom.example.com/',
+      homeParams: [],
+      paramDefaults: { quality: 'high' as const },
     }
-    const restoredImages = switchApiProfileConnection(responses, 'openai-images')
-    expect(restoredImages).toMatchObject({ model: 'vendor/image', streamImages: false, streamPartialImages: 0, reasoningEffort: undefined })
-    const settings = normalizeSettings(JSON.parse(JSON.stringify({ profiles: [restoredImages] })))
-    expect(switchApiProfileConnection(settings.profiles[0], 'openai-responses')).toMatchObject({
-      connectionId: 'openai-responses',
-      model: 'vendor/text',
-      imageGenerationModel: 'vendor/tool',
-      reasoningEffort: 'high',
-      streamImages: true,
-      streamPartialImages: 3,
+    const restoredImages = switchApiProfileConnection(custom, 'openai-images')
+    const settings = normalizeSettings(JSON.parse(JSON.stringify({ customConnections: [connection], profiles: [restoredImages] })))
+
+    expect(settings.profiles[0]).toMatchObject({ model: images.model, streamImages: true, streamPartialImages: 3 })
+    expect(switchApiProfileConnection(settings.profiles[0], connection.id, connection)).toMatchObject({
+      connectionId: connection.id,
+      model: custom.model,
+      baseUrl: custom.baseUrl,
+      streamImages: false,
+      homeParams: [],
+      paramDefaults: custom.paramDefaults,
     })
   })
 
-  it.each(['openai-images', 'openai-responses'])('reserves the built-in connection ID %s in all imports', (id) => {
+  it.each(['openai-images'])('reserves the built-in connection ID %s in all imports', (id) => {
     for (const deploymentConfig of [false, true]) {
       expect(() => importCustomConnectionSettingsFromJson(JSON.stringify({
         customConnections: [{ id, name: 'Custom', submit: { path: 'generate' } }],

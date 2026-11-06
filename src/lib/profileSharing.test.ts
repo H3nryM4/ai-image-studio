@@ -11,7 +11,7 @@ afterEach(() => {
 
 describe('profile sharing', () => {
   it('round-trips a complete profile through a fragment without including credentials or local identity by default', () => {
-    const profile = { ...saved, name: '中文 & + 配置', responseFormatB64Json: true, streamImages: true, streamPartialImages: 3 as const, timeout: 217, imageGenerationModel: '', connectionDrafts: { openai: { baseUrl: 'https://old.example' } } }
+    const profile = { ...saved, name: '中文 & + 配置', responseFormatB64Json: true, streamImages: true, streamPartialImages: 3 as const, timeout: 217, connectionDrafts: { openai: { baseUrl: 'https://old.example' } } }
     const url = new URL(createProfileShareUrl('https://studio.example/app?old=1#section', profile))
     expect(url.search).toBe('')
     expect(url.hash).toMatch(/^#config=/)
@@ -22,7 +22,7 @@ describe('profile sharing', () => {
     expect(raw.profiles[0]).not.toHaveProperty('isDefault')
     expect(raw.profiles[0]).not.toHaveProperty('connectionDrafts')
     const imported = readProfileImport(url.toString(), current)
-    expect(imported.profiles[0]).toMatchObject({ name: profile.name, apiKey: '', responseFormatB64Json: true, streamImages: true, streamPartialImages: 3, timeout: 217, imageGenerationModel: '' })
+    expect(imported.profiles[0]).toMatchObject({ name: profile.name, apiKey: '', responseFormatB64Json: true, streamImages: true, streamPartialImages: 3, timeout: 217 })
   })
 
   it('includes the key only when explicitly requested and supports JSON file contents', () => {

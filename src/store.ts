@@ -130,8 +130,6 @@ interface AppState {
   dismissedPresetConnectionIds: string[]
   dismissPresetConnection: (id: string) => void
   restorePresetConnection: (id: string) => void
-  dismissedCodexCliPrompts: string[]
-  dismissCodexCliPrompt: (key: string) => void
 
   // 输入
   prompt: string
@@ -395,12 +393,6 @@ export const useStore = create<AppState>()(
           }
         })
       },
-      dismissedCodexCliPrompts: [],
-      dismissCodexCliPrompt: (key) => set((st) => ({
-        dismissedCodexCliPrompts: st.dismissedCodexCliPrompts.includes(key)
-          ? st.dismissedCodexCliPrompts
-          : [...st.dismissedCodexCliPrompts, key],
-      })),
 
       // Input
       prompt: '',
@@ -678,11 +670,6 @@ function genId(): string {
   return Date.now().toString(36) + (++uid).toString(36) + Math.random().toString(36).slice(2, 6)
 }
 
-export function getCodexCliPromptKey(settings: AppSettings): string {
-  const profile = getActiveApiProfile(settings)
-  return `${profile.baseUrl}\n${profile.apiKey}`
-}
-
 function isAsyncCustomConnectionTask(settings: AppSettings, connection: string, hasInputImages: boolean) {
   const customConnection = getCustomConnectionDefinition(settings, connection)
   if (!customConnection?.poll) return false
@@ -727,8 +714,7 @@ function usesConcurrentImageRequests(settings: AppSettings, profile: ApiProfile,
   const n = params.n > 0 ? params.n : 1
   if (n <= 1) return false
   if (isOpenAIConnection(profile.connectionId)) {
-    if (profile.connectionId === 'openai-responses') return true
-    return profile.connectionId === 'openai-images' && (profile.codexCli || profile.streamImages)
+    return profile.codexCli || profile.streamImages
   }
   return profile.codexCli && !isAsyncCustomConnectionTask(settings, profile.connectionId, hasInputImages)
 }
@@ -750,30 +736,6 @@ export function taskMatchesSearchQuery(task: TaskRecord, query: string) {
   const paramStr = JSON.stringify(task.params).toLowerCase()
   const errorStr = [task.error, ...(task.outputErrors ?? []).map((item) => item.error)].filter(Boolean).join('\n').toLowerCase()
   return prompt.includes(q) || paramStr.includes(q) || errorStr.includes(q)
-}
-
-export function showCodexCliPrompt(force = false, reason = '接口返回的提示词已被改写') {
-  const state = useStore.getState()
-  const settings = state.settings
-  const promptKey = getCodexCliPromptKey(settings)
-  if (!force && (getActiveApiProfile(settings).codexCli || state.dismissedCodexCliPrompts.includes(promptKey))) return
-  const promptRewriteGuardMessage = settings.allowPromptRewrite
-    ? '当前已允许模型改写优化提示词，因此不会额外加入不改写要求。'
-    : '同时，提示词文本开头会加入简短的不改写要求，避免模型重写提示词，偏离原意。'
-
-  state.setConfirmDialog({
-    title: '检测到 Codex CLI API',
-    message: `${reason}，当前 API 来源很可能是 Codex CLI。\n\n是否开启 Codex CLI 兼容模式？开启后会禁用在此处无效的质量参数，并在 Images API 多图生成时使用并发请求，解决该 API 数量参数无效的问题。${promptRewriteGuardMessage}`,
-    confirmText: '开启',
-    action: () => {
-      const state = useStore.getState()
-      state.dismissCodexCliPrompt(promptKey)
-      state.setSettings({
-        profiles: state.settings.profiles.map((profile) => profile.id === state.settings.activeProfileId ? { ...profile, codexCli: true } : profile),
-      })
-    },
-    cancelAction: () => useStore.getState().dismissCodexCliPrompt(promptKey),
-  })
 }
 
 function getCustomRecoveryProfile(settings: AppSettings, task: TaskRecord) {
@@ -838,7 +800,7 @@ function getApiRequestNetworkErrorHint(
       return '提示：请求立即失败，请检查 API 代理服务是否正常运行。'
     }
     const unsupportedApiHint = profile && isOpenAIConnection(profile.connectionId)
-      ? `\n· API 不支持 ${profile.connectionId === 'openai-responses' ? 'Responses API' : 'Images API'}`
+      ? '\n· API 不支持 Images API'
       : ''
     return `提示：请求立即失败，可能原因：\n· API 服务器不可达或地址有误，请检查 API URL 是否正确、服务是否正常运行${unsupportedApiHint}\n· 接口不支持浏览器跨域请求，可使用 Docker 部署版或本地运行版并配置 API 代理解决`
   }
@@ -1877,7 +1839,6 @@ export async function clearData(options: ClearOptions = { clearConfig: true, cle
     useStore.setState({
       dismissedPresetProfileIds: [],
       dismissedPresetConnectionIds: [],
-      dismissedCodexCliPrompts: [],
     })
     if (presetConfig) {
       useStore.setState({ settings: { ...DEFAULT_SETTINGS } })

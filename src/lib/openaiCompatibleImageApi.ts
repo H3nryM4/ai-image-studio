@@ -1,4 +1,4 @@
-import { DEFAULT_STREAM_PARTIAL_IMAGES, type ApiProfile, type CustomConnectionDefinition, type CustomConnectionPollMapping, type CustomConnectionResultMapping, type CustomConnectionSubmitMapping, type ImageApiResponse, type ImageResponseItem, type ResponsesApiResponse, type ResponsesOutputItem, type TaskParams } from '../types'
+import { DEFAULT_STREAM_PARTIAL_IMAGES, type ApiProfile, type CustomConnectionDefinition, type CustomConnectionPollMapping, type CustomConnectionResultMapping, type CustomConnectionSubmitMapping, type ImageApiResponse, type ImageResponseItem, type TaskParams } from '../types'
 import { dataUrlToBlob, imageDataUrlToPngBlob, maskDataUrlToPngBlob } from './canvasImage'
 import { buildApiUrl, readClientDevProxyConfig, shouldUseApiProxy } from './devProxy'
 import {
@@ -10,20 +10,16 @@ import {
   type CallApiResult,
   fetchImageUrlAsDataUrl,
   getApiErrorMessage,
-  getDataUrlDecodedByteSize,
   getDataUrlEncodedByteSize,
-  getResponsesImageResultBase64,
   isDataUrl,
   isHttpUrl,
   mergeActualParams,
   maybeAppendTransparentBackgroundHint,
-  maybeAppendImageToolDroppedHint,
   MIME_MAP,
   normalizeBase64Image,
   pickActualParams,
   PROMPT_REWRITE_GUARD_PREFIX,
 } from './imageApiShared'
-import { getImageGenerationModel } from './imageModels'
 import { isEventStreamResponse, readJsonServerSentEvents } from './serverSentEvents'
 import { prependCodexCliSizePrompt } from './size'
 
@@ -124,105 +120,6 @@ function getStreamEventErrorMessage(event: Record<string, unknown>): string | nu
     return getStringValue(event, 'message') ?? '流式请求失败'
   }
   return null
-}
-
-function createResponsesImageTool(
-  params: TaskParams,
-  isEdit: boolean,
-  profile: ApiProfile,
-  maskDataUrl?: string,
-  nativeTransparentBackground?: boolean,
-): Record<string, unknown> {
-  const tool: Record<string, unknown> = {
-    type: 'image_generation',
-    action: isEdit ? 'edit' : 'generate',
-    output_format: params.output_format,
-    moderation: params.moderation,
-  }
-  const imageModel = getImageGenerationModel(profile)
-  if (imageModel) tool.model = imageModel
-
-  if (!profile.codexCli) {
-    tool.size = params.size
-  }
-
-  if (profile.streamImages) {
-    tool.partial_images = getStreamPartialImages(profile)
-  }
-
-  if (!profile.codexCli) {
-    tool.quality = params.quality
-  }
-
-  if (params.output_format !== 'png' && params.output_compression != null) {
-    tool.output_compression = params.output_compression
-  }
-
-  if (nativeTransparentBackground) {
-    tool.background = 'transparent'
-  }
-
-  if (maskDataUrl) {
-    tool.input_image_mask = {
-      image_url: maskDataUrl,
-    }
-  }
-
-  return tool
-}
-
-function createResponsesInput(prompt: string, inputImageDataUrls: string[], allowPromptRewrite: boolean): unknown {
-  const text = allowPromptRewrite ? prompt : `${PROMPT_REWRITE_GUARD_PREFIX}\n${prompt}`
-  if (!inputImageDataUrls.length) return text
-
-  return [
-    {
-      role: 'user',
-      content: [
-        { type: 'input_text', text },
-        ...inputImageDataUrls.map((dataUrl) => ({
-          type: 'input_image',
-          image_url: dataUrl,
-        })),
-      ],
-    },
-  ]
-}
-
-function parseResponsesImageResults(payload: ResponsesApiResponse, fallbackMime: string): Array<{
-  image: string
-  actualParams?: Partial<TaskParams>
-  revisedPrompt?: string
-}> {
-  const output = payload.output
-  if (!Array.isArray(output) || !output.length) {
-    const err = new Error('接口未返回图片数据')
-    ;(err as any).rawResponsePayload = JSON.stringify(payload, null, 2)
-    throw err
-  }
-
-  const results: Array<{ image: string; actualParams?: Partial<TaskParams>; revisedPrompt?: string }> = []
-
-  for (const item of output) {
-    if (item?.type !== 'image_generation_call') continue
-
-    const b64 = getResponsesImageResultBase64(item.result)
-    if (b64) {
-      results.push({
-        image: normalizeBase64Image(b64, fallbackMime),
-        actualParams: mergeActualParams(pickActualParams(item)),
-        revisedPrompt: typeof item.revised_prompt === 'string' ? item.revised_prompt : undefined,
-      })
-    }
-  }
-
-  if (!results.length) {
-    const err = new Error('接口没有返回可识别的图片数据，请查看原始响应内容确认服务商实际返回的数据结构。如果使用的是中转或兼容接口，建议创建并使用「自定义服务商」配置。')
-    ;(err as any).rawResponsePayload = JSON.stringify(payload, null, 2)
-    throw err
-  }
-
-  return results
 }
 
 async function parseImagesApiResponse(payload: ImageApiResponse, mime: string, signal?: AbortSignal): Promise<CallApiResult> {
@@ -367,80 +264,7 @@ async function parseImagesApiStreamResponse(
   }
 }
 
-function getResponsesStreamPayload(event: Record<string, unknown>): ResponsesApiResponse | null {
-  const response = event.response
-  if (isRecordValue(response)) return response as ResponsesApiResponse
-
-  const item = event.item
-  if (isRecordValue(item) && item.type === 'image_generation_call') {
-    return { output: [item as ResponsesOutputItem] }
-  }
-
-  return null
-}
-
-async function parseResponsesApiStreamResponse(
-  response: Response,
-  mime: string,
-  onPartialImage?: CallApiOptions['onPartialImage'],
-): Promise<CallApiResult> {
-  let completedPayload: ResponsesApiResponse | null = null
-  const outputItems: ResponsesOutputItem[] = []
-
-  await readJsonServerSentEvents(response, (event) => {
-    const type = getStringValue(event, 'type')
-    if (type === 'response.image_generation_call.partial_image') {
-      const b64 = getStringValue(event, 'partial_image_b64')
-      if (b64) {
-        onPartialImage?.({
-          image: normalizeBase64Image(b64, mime),
-          partialImageIndex: getNumberValue(event, 'partial_image_index'),
-        })
-      }
-      return
-    }
-
-    const payload = getResponsesStreamPayload(event)
-    if (!payload) return
-
-    if (type === 'response.output_item.done' && Array.isArray(payload.output)) {
-      outputItems.push(...payload.output)
-      return
-    }
-
-    completedPayload = payload
-  }, {
-    formatErrorMessage: appendStreamingFormatHint,
-    getEventErrorMessage: getStreamEventErrorMessage,
-  })
-
-  const payload = completedPayload ?? (outputItems.length ? { output: outputItems } : null)
-  if (!payload) throw new Error('流式接口未返回最终图片数据')
-
-  let imageResults: ReturnType<typeof parseResponsesImageResults>
-  try {
-    imageResults = parseResponsesImageResults(payload, mime)
-  } catch (err) {
-    const collectedImageItems = outputItems.filter((item) => getResponsesImageResultBase64(item.result))
-    if (collectedImageItems.length === 0) throw err
-    imageResults = parseResponsesImageResults({ output: collectedImageItems }, mime)
-  }
-  const actualParams = mergeActualParams(imageResults[0]?.actualParams ?? {})
-  return {
-    images: imageResults.map((result) => result.image),
-    actualParams,
-    actualParamsList: imageResults.map((result) => mergeActualParams(result.actualParams ?? {})),
-    revisedPrompts: imageResults.map((result) => result.revisedPrompt),
-  }
-}
-
 export async function callOpenAICompatibleImageApi(opts: CallApiOptions, profile: ApiProfile): Promise<CallApiResult> {
-  return profile.connectionId === 'openai-responses'
-    ? callResponsesImageApi(opts, profile)
-    : callImagesApi(opts, profile)
-}
-
-async function callImagesApi(opts: CallApiOptions, profile: ApiProfile): Promise<CallApiResult> {
   const n = opts.params.n > 0 ? opts.params.n : 1
   if ((profile.codexCli || (profile.streamImages && n > 1)) && n > 1) {
     return callImagesApiConcurrent(opts, profile, n)
@@ -993,91 +817,4 @@ async function callCustomHttpImageApiConcurrent(
     params: { ...opts.params, n: 1 },
   }, profile, customConnection)))
   return mergeConcurrentApiResults(results)
-}
-
-async function callResponsesImageApi(opts: CallApiOptions, profile: ApiProfile): Promise<CallApiResult> {
-  const n = opts.params.n > 0 ? opts.params.n : 1
-  if (n === 1) {
-    return callResponsesImageApiSingle(opts, profile)
-  }
-
-  const promises = Array.from({ length: n }).map((_, requestIndex) => callResponsesImageApiSingle({
-    ...opts,
-    onPartialImage: opts.onPartialImage
-      ? (partial) => opts.onPartialImage?.({ ...partial, requestIndex })
-      : undefined,
-  }, profile))
-  const results = await Promise.allSettled(promises)
-  return mergeConcurrentApiResults(results)
-}
-
-async function callResponsesImageApiSingle(opts: CallApiOptions, profile: ApiProfile): Promise<CallApiResult> {
-  const { prompt, params, inputImageDataUrls } = opts
-  const requestPrompt = profile.codexCli
-    ? prependCodexCliSizePrompt(prompt, params.size)
-    : prompt
-  const mime = MIME_MAP[params.output_format] || 'image/png'
-  const proxyConfig = readClientDevProxyConfig()
-  const useApiProxy = shouldUseApiProxy(profile.apiProxy, proxyConfig)
-  const requestHeaders = createRequestHeaders(profile)
-  const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), profile.timeout * 1000)
-
-  try {
-    if (opts.maskDataUrl) {
-      assertMaskEditFileSize('遮罩主图文件', getDataUrlDecodedByteSize(inputImageDataUrls[0] ?? ''))
-      assertMaskEditFileSize('遮罩文件', getDataUrlDecodedByteSize(opts.maskDataUrl))
-    }
-    assertImageInputPayloadSize(
-      inputImageDataUrls.reduce((sum, dataUrl) => sum + getDataUrlEncodedByteSize(dataUrl), 0) +
-        (opts.maskDataUrl ? getDataUrlEncodedByteSize(opts.maskDataUrl) : 0),
-    )
-
-    const body: Record<string, unknown> = {
-      model: profile.model,
-      input: createResponsesInput(requestPrompt, inputImageDataUrls, opts.settings.allowPromptRewrite),
-      tools: [createResponsesImageTool(params, inputImageDataUrls.length > 0, profile, opts.maskDataUrl, opts.nativeTransparentBackground)],
-      tool_choice: 'required',
-    }
-    if (profile.reasoningEffort) body.reasoning = { effort: profile.reasoningEffort }
-    if (profile.streamImages) {
-      body.stream = true
-    }
-
-    const response = await fetch(buildApiUrl(profile.baseUrl, 'responses', proxyConfig, useApiProxy), {
-      method: 'POST',
-      headers: {
-        ...requestHeaders,
-        'Content-Type': 'application/json',
-      },
-      cache: 'no-store',
-      body: JSON.stringify(body),
-      signal: controller.signal,
-    })
-
-    if (!response.ok) {
-      const errorMessage = await getApiErrorMessage(response)
-      throw new Error(maybeAppendStreamingHint(maybeAppendImageToolDroppedHint(errorMessage), response.status, profile.streamImages))
-    }
-
-    if (profile.streamImages && isEventStreamResponse(response)) {
-      return parseResponsesApiStreamResponse(response, mime, opts.onPartialImage)
-    }
-
-    const payload = await response.json() as ResponsesApiResponse
-    const imageResults = parseResponsesImageResults(payload, mime)
-    const actualParams = mergeActualParams(
-      imageResults[0]?.actualParams ?? {},
-    )
-    return {
-      images: imageResults.map((result) => result.image),
-      actualParams,
-      actualParamsList: imageResults.map((result) =>
-        mergeActualParams(result.actualParams ?? {}),
-      ),
-      revisedPrompts: imageResults.map((result) => result.revisedPrompt),
-    }
-  } finally {
-    clearTimeout(timeoutId)
-  }
 }

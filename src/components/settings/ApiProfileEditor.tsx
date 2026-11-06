@@ -1,6 +1,6 @@
 import { useState, type ComponentProps, type Ref } from 'react'
-import { DEFAULT_STREAM_PARTIAL_IMAGES, REASONING_EFFORT_VALUES, type ApiProfile, type CustomConnectionDefinition, type ReasoningEffort } from '../../types'
-import { DEFAULT_IMAGES_MODEL, DEFAULT_RESPONSES_MODEL, DEFAULT_API_BASE_URL, isOpenAIConnection, normalizeStreamPartialImages } from '../../lib/apiProfiles'
+import { DEFAULT_STREAM_PARTIAL_IMAGES, type ApiProfile, type CustomConnectionDefinition } from '../../types'
+import { DEFAULT_IMAGES_MODEL, DEFAULT_API_BASE_URL, isOpenAIConnection, normalizeStreamPartialImages } from '../../lib/apiProfiles'
 import { customConnectionSupportsNativeTransparentBackground } from '../../lib/customConnectionCapabilities'
 import Select from '../Select'
 import { ChevronDownIcon } from '../icons'
@@ -35,7 +35,6 @@ export default function ApiProfileEditor(props: ApiProfileEditorProps) {
   const [showKey, setShowKey] = useState(false)
   const profile = props.profile
   const nativeTransparent = !props.customConnection || customConnectionSupportsNativeTransparentBackground(props.customConnection)
-  const model = profile.connectionId === 'openai-responses' ? DEFAULT_RESPONSES_MODEL : DEFAULT_IMAGES_MODEL
   const connectionOptions = props.presetOnly
     ? props.connectionOptions.filter((option) => option.value === profile.connectionId)
     : props.connectionOptions
@@ -73,24 +72,16 @@ export default function ApiProfileEditor(props: ApiProfileEditorProps) {
         </div>
       </div>
       <div>
-        <SettingLabel label={profile.connectionId === 'openai-responses' ? '请求模型' : '模型 ID'} help={profile.connectionId === 'openai-responses' ? '对应 Responses 请求的 model。官方接口需使用支持生图工具的文本模型；兼容接口按服务商提供的模型 ID 填写。' : '填写服务商提供的模型 ID。'} />
-        <input aria-label={profile.connectionId === 'openai-responses' ? '请求模型' : '模型 ID'} value={profile.model} onChange={(e) => props.onChange({ model: e.target.value })} onBlur={(e) => props.onCommit({ model: e.target.value })} disabled={props.locked} placeholder={model} className={INPUT_CLASS_NAME} />
+        <SettingLabel label="模型 ID" help="填写服务商提供的模型 ID。" />
+        <input aria-label="模型 ID" value={profile.model} onChange={(e) => props.onChange({ model: e.target.value })} onBlur={(e) => props.onCommit({ model: e.target.value })} disabled={props.locked} placeholder={DEFAULT_IMAGES_MODEL} className={INPUT_CLASS_NAME} />
         <p className="mt-1.5 text-xs text-gray-400">多个模型用逗号分隔，可在首页切换。</p>
       </div>
       <ProfileParamsEditor profile={profile} connection={props.customConnection} locked={props.locked} onChange={props.onChange} />
       <details className="group border-t border-gray-100 pt-4 dark:border-white/[0.08]">
         <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-medium text-gray-600 dark:text-gray-300 [&::-webkit-details-marker]:hidden">连接与兼容设置<ChevronDownIcon className="h-4 w-4 transition-transform group-open:rotate-180" /></summary>
         <div className="mt-5 space-y-5">
-          {profile.connectionId === 'openai-responses' && <div>
-            <SettingLabel label="图像生成模型（可选）" help="指定生图工具使用的模型。留空时不发送工具模型 ID，由接口决定。" />
-            <input aria-label="图像生成模型" value={profile.imageGenerationModel ?? ''} onChange={(e) => props.onChange({ imageGenerationModel: e.target.value })} onBlur={(e) => props.onCommit({ imageGenerationModel: e.target.value })} disabled={props.locked} placeholder="留空使用 API 默认值" className={INPUT_CLASS_NAME} />
-          </div>}
-          {profile.connectionId === 'openai-responses' && <div>
-            <SettingLabel label="文本模型推理强度" help="仅 Responses：设置外层文本模型的 reasoning.effort，不是图片质量。留空不发送；填写时需确认文本模型支持该档位。" />
-            <Select value={profile.reasoningEffort ?? ''} onChange={(value) => props.onChange({ reasoningEffort: value ? value as ReasoningEffort : undefined }, true)} options={[{ label: '默认', value: '' }, ...REASONING_EFFORT_VALUES.map((value) => ({ label: value, value }))]} disabled={props.locked} className={INPUT_CLASS_NAME} />
-          </div>}
           {isOpenAIConnection(profile.connectionId) && <>
-            <SettingSwitch label="流式传输" help="逐步接收结果，需要接口支持。开启后，本应用会将多图拆成并发单图请求；Responses 多图始终拆分。" checked={!!profile.streamImages} disabled={props.locked} onChange={() => props.onChange({ streamImages: !profile.streamImages }, true)} />
+            <SettingSwitch label="流式传输" help="逐步接收结果，需要接口支持。开启后，本应用会将多图拆成并发单图请求。" checked={!!profile.streamImages} disabled={props.locked} onChange={() => props.onChange({ streamImages: !profile.streamImages }, true)} />
             {profile.streamImages && <div>
               <SettingLabel label="中间预览图" help="请求 0–3 张生成中的预览图，实际数量由接口决定。预览图可能额外计费，不能保证避免连接超时。" />
               <Select value={normalizeStreamPartialImages(profile.streamPartialImages)} onChange={(value) => props.onChange({ streamPartialImages: normalizeStreamPartialImages(value, DEFAULT_STREAM_PARTIAL_IMAGES) }, true)} options={[{ label: '不请求', value: 0 }, { label: '1 张', value: 1 }, { label: '2 张', value: 2 }, { label: '3 张', value: 3 }]} disabled={props.locked} className={INPUT_CLASS_NAME} />
@@ -102,7 +93,7 @@ export default function ApiProfileEditor(props: ApiProfileEditorProps) {
             {!nativeTransparent && <p className="mt-1.5 text-xs text-gray-400">此服务商未配置原生透明背景，使用本地后处理。</p>}
           </div>
           {props.connectionAvailable && <>
-            {profile.connectionId !== 'openai-responses' && <SettingSwitch label="兼容选项：请求 Base64" help="额外添加 response_format: b64_json（自定义接口仅 POST 生效）。官方 GPT Image 无需此字段；只在服务商要求时启用。自定义模板中的同名字段会被覆盖。" checked={!!profile.responseFormatB64Json} disabled={props.locked} onChange={() => props.onChange({ responseFormatB64Json: !profile.responseFormatB64Json }, true)} />}
+            <SettingSwitch label="兼容选项：请求 Base64" help="额外添加 response_format: b64_json（自定义接口仅 POST 生效）。官方 GPT Image 无需此字段；只在服务商要求时启用。自定义模板中的同名字段会被覆盖。" checked={!!profile.responseFormatB64Json} disabled={props.locked} onChange={() => props.onChange({ responseFormatB64Json: !profile.responseFormatB64Json }, true)} />
             <SettingSwitch label="Codex CLI 兼容模式" help="省略 size 和 quality，并将尺寸写入提示词。仅在渠道明确要求时开启；此模式不能保证任意 Codex 转发服务兼容。" checked={profile.codexCli} disabled={props.locked} onChange={() => props.onChange({ codexCli: !profile.codexCli }, true)} />
             <label className="block">
               <SettingLabel label="请求超时（秒）" />

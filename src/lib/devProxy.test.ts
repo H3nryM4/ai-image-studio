@@ -31,7 +31,7 @@ describe('buildApiUrl', () => {
     expect(
       buildApiUrl(
         'http://api.example.com/v1',
-        'responses',
+        'images/generations',
         {
           enabled: true,
           prefix: '/openai-proxy',
@@ -41,12 +41,12 @@ describe('buildApiUrl', () => {
         },
         true,
       ),
-    ).toBe('/openai-proxy/responses')
+    ).toBe('/openai-proxy/images/generations')
   })
 
   it('uses the configured API URL directly when API proxy is disabled', () => {
-    expect(buildApiUrl('http://api.example.com/v1', 'responses', null, false)).toBe(
-      'http://api.example.com/v1/responses',
+    expect(buildApiUrl('http://api.example.com/v1', 'images/generations', null, false)).toBe(
+      'http://api.example.com/v1/images/generations',
     )
   })
 
@@ -63,14 +63,14 @@ describe('buildApiUrl', () => {
   })
 
   it('normalizes an API URL before directly joining an endpoint', () => {
-    expect(buildApiUrl('https://user:password@api.example.com/', 'responses', null, false)).toBe(
-      'https://api.example.com/responses',
+    expect(buildApiUrl('https://user:password@api.example.com/', 'images/generations', null, false)).toBe(
+      'https://api.example.com/images/generations',
     )
   })
 
   it('directly joins an OpenAI endpoint when its API URL ends with a slash', () => {
-    expect(buildApiUrl('https://api.example.com/', 'responses', null, false)).toBe(
-      'https://api.example.com/responses',
+    expect(buildApiUrl('https://api.example.com/', 'images/generations', null, false)).toBe(
+      'https://api.example.com/images/generations',
     )
   })
 })

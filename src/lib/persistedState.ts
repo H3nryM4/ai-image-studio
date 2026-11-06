@@ -14,7 +14,6 @@ export interface PersistedAppState {
   inputImages?: InputImage[]
   maskDraft?: MaskDraft | null
   maskEditorImageId?: string | null
-  dismissedCodexCliPrompts: string[]
   favoriteCollections: FavoriteCollection[]
   defaultFavoriteCollectionId: string | null
   imageSourceUrls?: Record<string, string>
@@ -29,7 +28,7 @@ type PersistedStateSource = PersistedAppState & {
 }
 
 type PersistedStateFallback = Pick<PersistedAppState,
-  'settings' | 'params' | 'dismissedPresetProfileIds' | 'dismissedPresetConnectionIds' | 'dismissedCodexCliPrompts' | 'favoriteCollections' | 'defaultFavoriteCollectionId'
+  'settings' | 'params' | 'dismissedPresetProfileIds' | 'dismissedPresetConnectionIds' | 'favoriteCollections' | 'defaultFavoriteCollectionId'
 >
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -80,7 +79,6 @@ export function createPersistedState(state: PersistedStateSource): Partial<Persi
       maskDraft: state.maskDraft,
       maskEditorImageId: state.maskEditorImageId,
     } : {}),
-    dismissedCodexCliPrompts: state.dismissedCodexCliPrompts,
     favoriteCollections: state.favoriteCollections,
     defaultFavoriteCollectionId: state.defaultFavoriteCollectionId,
     imageSourceUrls: state.imageSourceUrls,
@@ -125,7 +123,6 @@ export function normalizePersistedState(persistedState: unknown, fallback: Persi
         .filter(([key]) => settings.profiles.some((profile) => key.startsWith(`${profile.id}:`)))
         .map(([key, value]) => [key, normalizeParams(value, fallback.params)]))
       : {},
-    dismissedCodexCliPrompts: normalizeStringArray(persistedState.dismissedCodexCliPrompts, fallback.dismissedCodexCliPrompts),
     favoriteCollections,
     defaultFavoriteCollectionId: resolveDefaultFavoriteCollectionId(favoriteCollections, preferredDefaultFavoriteCollectionId),
     imageSourceUrls: isRecord(persistedState.imageSourceUrls)

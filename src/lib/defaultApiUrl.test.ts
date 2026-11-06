@@ -3,28 +3,17 @@ import { buildApiUrl } from './devProxy'
 import { parseDefaultApiUrl } from './defaultApiUrl'
 
 describe('parseDefaultApiUrl', () => {
-  it.each(['', '   ', ' gpt-image-2.5-flare '])('preserves and trims an explicit image generation model %j', (model) => {
-    const params = new URLSearchParams({ connectionId: 'openai-responses', imageGenerationModel: model })
-    const parsed = parseDefaultApiUrl(`https://api.example.com?${params}`)
-
-    expect(parsed).toMatchObject({ connectionId: 'openai-responses', imageGenerationModel: model.trim() })
-  })
-
-  it('leaves an omitted image generation model unset', () => {
-    expect(parseDefaultApiUrl('https://api.example.com?connectionId=openai-responses')).not.toHaveProperty('imageGenerationModel')
-  })
-
   it('keeps automatic v1 routing for a root URL without a trailing slash', () => {
     const parsed = parseDefaultApiUrl('https://api.example.com')
 
     expect(parsed.baseUrl).toBe('https://api.example.com')
-    expect(buildApiUrl(parsed.baseUrl, 'responses')).toBe('https://api.example.com/v1/responses')
+    expect(buildApiUrl(parsed.baseUrl, 'images/generations')).toBe('https://api.example.com/v1/images/generations')
   })
 
   it('preserves a trailing slash for direct endpoint joining', () => {
     const parsed = parseDefaultApiUrl('https://api.example.com/')
 
     expect(parsed.baseUrl).toBe('https://api.example.com/')
-    expect(buildApiUrl(parsed.baseUrl, 'responses')).toBe('https://api.example.com/responses')
+    expect(buildApiUrl(parsed.baseUrl, 'images/generations')).toBe('https://api.example.com/images/generations')
   })
 })

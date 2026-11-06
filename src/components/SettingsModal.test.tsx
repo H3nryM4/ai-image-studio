@@ -3,7 +3,7 @@ import { act, type ComponentProps } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useStore } from '../store'
-import { createDefaultOpenAIProfile, DEFAULT_IMAGES_MODEL, DEFAULT_RESPONSES_MODEL, DEFAULT_SETTINGS, normalizeSettings } from '../lib/apiProfiles'
+import { createDefaultOpenAIProfile, DEFAULT_IMAGES_MODEL, DEFAULT_SETTINGS, normalizeSettings } from '../lib/apiProfiles'
 import * as presetConfig from '../lib/presetConfig'
 import type Select from './Select'
 import SettingsModal from './SettingsModal'
@@ -150,36 +150,28 @@ describe('settings modal', () => {
     expect(el.querySelector<HTMLInputElement>('input[aria-label="API 地址"]')?.value).toBe(profile.baseUrl)
   })
 
-  it('switches connection modes and connections while preserving credentials, custom models and connection drafts', async () => {
-    const connection = { id: 'vendor:responses', name: '自定义接入', submit: { path: '/generate' } }
-    const profile = createDefaultOpenAIProfile({ id: 'saved', apiKey: 'local-key', baseUrl: 'https://vendor.example/v1', model: DEFAULT_IMAGES_MODEL })
+  it('switches connections while preserving credentials, models and connection drafts', async () => {
+    const connection = { id: 'vendor:images', name: '自定义接入', submit: { path: '/generate' } }
+    const profile = createDefaultOpenAIProfile({ id: 'saved', apiKey: 'local-key', baseUrl: 'https://vendor.example/v1', model: DEFAULT_IMAGES_MODEL, streamImages: true })
     const settings = normalizeSettings({ ...DEFAULT_SETTINGS, customConnections: [connection], profiles: [profile], activeProfileId: profile.id })
     await openSettings(settings)
     expect(Array.from(el.querySelector('select')!.options).map((option) => option.value)).toEqual([
-      '__add_custom_connection__', 'openai-images', 'openai-responses', 'vendor:responses',
+      '__add_custom_connection__', 'openai-images', 'vendor:images',
     ])
-    expect(el.textContent).toContain('接入方式')
-    expect(el.textContent).not.toContain('API 接口')
-    expect(el.textContent).not.toContain('服务商类型')
+    expect(el.querySelector('input[aria-label="模型 ID"]')).not.toBeNull()
 
-    await selectConnection('openai-responses')
-    expect(useStore.getState().settings.profiles[0]).toMatchObject({ connectionId: 'openai-responses', model: DEFAULT_RESPONSES_MODEL, apiKey: profile.apiKey, baseUrl: profile.baseUrl })
-    expect(el.textContent).toContain('请求模型')
-    expect(el.querySelector('input[aria-label="请求模型"]')).not.toBeNull()
-    expect(el.querySelector('input[aria-label="图像生成模型"]')).not.toBeNull()
+    await selectConnection(connection.id)
+    expect(useStore.getState().settings.profiles[0]).toMatchObject({ connectionId: connection.id, model: DEFAULT_IMAGES_MODEL, apiKey: profile.apiKey, baseUrl: profile.baseUrl, streamImages: false })
+    const input = el.querySelector<HTMLInputElement>('input[aria-label="模型 ID"]')!
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, 'vendor/model')
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await act(async () => input.dispatchEvent(new FocusEvent('focusout', { bubbles: true })))
     await selectConnection('openai-images')
-    expect(useStore.getState().settings.profiles[0].model).toBe(DEFAULT_IMAGES_MODEL)
-
-    await act(async () => useStore.setState({ showSettings: false }))
-    await act(async () => useStore.setState({ settings: normalizeSettings({ ...settings, profiles: [{ ...profile, model: 'vendor/model' }] }), showSettings: true }))
-    await selectConnection('openai-responses')
-    expect(useStore.getState().settings.profiles[0].model).toBe('vendor/model')
-    await selectConnection('vendor:responses')
-    expect(useStore.getState().settings.profiles[0]).toMatchObject({ connectionId: connection.id, model: 'vendor/model' })
-    await selectConnection('openai-responses')
-    expect(useStore.getState().settings.profiles[0]).toMatchObject({ connectionId: 'openai-responses', model: 'vendor/model', apiKey: profile.apiKey, baseUrl: profile.baseUrl })
-    await selectConnection('vendor:responses')
-    expect(useStore.getState().settings.profiles[0]).toMatchObject({ connectionId: connection.id, apiKey: profile.apiKey })
+    expect(useStore.getState().settings.profiles[0]).toMatchObject({ connectionId: 'openai-images', model: DEFAULT_IMAGES_MODEL, apiKey: profile.apiKey, baseUrl: profile.baseUrl, streamImages: true })
+    await selectConnection(connection.id)
+    expect(useStore.getState().settings.profiles[0]).toMatchObject({ connectionId: connection.id, model: 'vendor/model', apiKey: profile.apiKey, streamImages: false })
   })
 
   it('keeps the connection fixed in preset-only mode', async () => {
@@ -187,7 +179,7 @@ describe('settings modal', () => {
     await openSettings()
     expect(Array.from(el.querySelector('select')!.options).map((option) => option.value)).toEqual(['openai-images'])
     expect(el.querySelector('select')!.disabled).toBe(true)
-    await selectConnection('openai-responses')
+    await selectConnection('custom-connection')
     expect(useStore.getState().settings.profiles[0].connectionId).toBe('openai-images')
   })
 })

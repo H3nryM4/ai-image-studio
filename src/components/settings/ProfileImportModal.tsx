@@ -101,8 +101,7 @@ export default function ProfileImportModal({ source, onClose }: ProfileImportMod
                 </div>
                 <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 text-xs">
                   <dt className="text-gray-400">API 地址</dt><dd className="break-all text-gray-600 dark:text-gray-300">{profile.baseUrl || '使用部署代理'}</dd>
-                  <dt className="text-gray-400">{profile.connectionId === 'openai-responses' ? '请求模型' : '模型 ID'}</dt><dd className="break-all text-gray-600 dark:text-gray-300">{profile.model}</dd>
-                  {profile.connectionId === 'openai-responses' && <><dt className="text-gray-400">图像生成模型</dt><dd className="break-all text-gray-600 dark:text-gray-300">{profile.imageGenerationModel || 'API 默认'}</dd></>}
+                  <dt className="text-gray-400">模型 ID</dt><dd className="break-all text-gray-600 dark:text-gray-300">{profile.model}</dd>
                 </dl>
                 {mode !== 'reuse' && <label className="block text-xs text-gray-500 dark:text-gray-400">
                   API Key

@@ -36,17 +36,6 @@ describe('home parameters', () => {
     expect(normalizeHomeParams({ ...DEFAULT_PARAMS, transparent_output: true }, profile, connection)).toMatchObject({ output_format: 'webp', output_compression: 0, transparent_output: false })
   })
 
-  it('sends hidden defaults inside the Responses image tool, without legacy response_format', async () => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ output: [{ type: 'image_generation_call', result: 'aW1hZ2U=' }] })))
-    const profile = createDefaultOpenAIProfile({ connectionId: 'openai-responses', streamImages: false, responseFormatB64Json: true, homeParams: [], paramDefaults: { output_format: 'webp', output_compression: 65, quality: 'high' } })
-    const settings = normalizeSettings({ profiles: [profile] })
-    await callImageApi({ settings, prompt: '画猫', inputImageDataUrls: [], params: normalizeHomeParams(DEFAULT_PARAMS, profile) })
-    const body = JSON.parse(String(fetchMock.mock.calls[0][1]!.body))
-    expect(body.tools[0]).toMatchObject({ quality: 'high', output_format: 'webp', output_compression: 65 })
-    expect(body.response_format).toBeUndefined()
-    expect(body.quality).toBeUndefined()
-  })
-
   it('defaults old profiles to quality and preserves an explicit empty selection through sharing', () => {
     const settings = normalizeSettings({ profiles: [{ ...createDefaultOpenAIProfile(), homeParams: undefined }] })
     expect(settings.profiles[0].homeParams).toEqual(['quality'])

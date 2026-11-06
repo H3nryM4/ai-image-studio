@@ -1,7 +1,5 @@
 // ===== 设置 =====
 
-export const REASONING_EFFORT_VALUES = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'] as const
-export type ReasoningEffort = typeof REASONING_EFFORT_VALUES[number]
 export const ZIP_DOWNLOAD_ROUTE_VALUES = [
   'task-selection',
   'favorite-collection-selection',
@@ -78,9 +76,7 @@ export interface ApiProfile {
   model: string
   /** 首页选中的模型；不在列表中时回退到第一个 */
   selectedModel?: string
-  imageGenerationModel?: string
   timeout: number
-  reasoningEffort?: ReasoningEffort
   codexCli: boolean
   apiProxy: boolean
   responseFormatB64Json?: boolean
@@ -91,7 +87,7 @@ export interface ApiProfile {
   homeParams?: HomeParam[]
   /** 首页隐藏的参数使用此配置的默认值。 */
   paramDefaults?: Partial<Pick<TaskParams, HomeParam>>
-  connectionDrafts?: Partial<Record<ApiConnectionId, Partial<Pick<ApiProfile, 'baseUrl' | 'model' | 'imageGenerationModel' | 'reasoningEffort' | 'codexCli' | 'apiProxy' | 'responseFormatB64Json' | 'streamImages' | 'streamPartialImages' | 'transparentBackgroundMethod' | 'homeParams' | 'paramDefaults'>>>>
+  connectionDrafts?: Partial<Record<ApiConnectionId, Partial<Pick<ApiProfile, 'baseUrl' | 'model' | 'codexCli' | 'apiProxy' | 'responseFormatB64Json' | 'streamImages' | 'streamPartialImages' | 'transparentBackgroundMethod' | 'homeParams' | 'paramDefaults'>>>>
 }
 
 export interface PresetConfig {
@@ -313,38 +309,6 @@ export interface ImageApiResponse {
   output_compression?: number
   moderation?: string
   n?: number
-}
-
-export interface ResponsesOutputItem {
-  id?: string
-  type?: string
-  status?: string
-  result?: string | null | {
-    b64_json?: string
-    base64?: string
-    image?: string
-    data?: string
-  }
-  size?: string
-  quality?: string
-  output_format?: string
-  output_compression?: number
-  moderation?: string
-  revised_prompt?: string
-}
-
-export interface ResponsesApiResponse {
-  id?: string
-  output?: ResponsesOutputItem[]
-  tools?: Array<{
-    type?: string
-    size?: string
-    quality?: string
-    output_format?: string
-    output_compression?: number
-    moderation?: string
-    n?: number
-  }>
 }
 
 export interface ExportData {

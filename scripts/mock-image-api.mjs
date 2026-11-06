@@ -11,7 +11,6 @@ const pathModes = new Set([
   'api-no-cors',
   'alternating-http-error',
   'b64',
-  'drop-image-tool',
   'empty',
   'http-error',
   'invalid-json',
@@ -181,10 +180,6 @@ function isOpenAIImagesPath(pathname) {
   return pathname.endsWith('/v1/images/generations') || pathname.endsWith('/v1/images/edits')
 }
 
-function isOpenAIResponsesPath(pathname) {
-  return pathname.endsWith('/v1/responses')
-}
-
 function isCustomPath(pathname) {
   return pathname === '/custom/random-image' || pathname === '/custom/generate'
 }
@@ -229,62 +224,6 @@ function createImagesStreamEvents(req, mode, n, isEdit) {
     }]
   }
   return [...partials, ...completed]
-}
-
-function createResponsesPayload(mode) {
-  if (mode === 'empty') return { output: [] }
-  if (mode === 'no-recognizable' || mode === 'wrong-shape') {
-    return {
-      output: [{
-        type: 'message',
-        status: 'completed',
-        content: [{ type: 'output_text', text: 'mock response without image data' }],
-      }],
-    }
-  }
-  if (mode === 'stream-no-usable') {
-    return {
-      output: [{
-        type: 'image_generation_call',
-        status: 'completed',
-        result: '',
-      }],
-    }
-  }
-
-  return {
-    output: [{
-      type: 'image_generation_call',
-      status: 'completed',
-      revised_prompt: `mock ${mode} response image`,
-      result: tinyPngBase64,
-      output_format: 'png',
-      quality: 'auto',
-      size: '1024x1024',
-    }],
-  }
-}
-
-function createResponsesStreamEvents(mode) {
-  const partials = mode === 'empty'
-    ? []
-    : [0, 1].map((index) => ({
-        type: 'response.image_generation_call.partial_image',
-        output_index: 0,
-        item_id: 'mock-image-generation',
-        partial_image_index: index,
-        partial_image_b64: tinyPngBase64,
-      }))
-
-  if (mode === 'stream-no-final') return partials
-
-  return [
-    ...partials,
-    {
-      type: 'response.completed',
-      response: createResponsesPayload(mode),
-    },
-  ]
 }
 
 async function maybeSendStreamFailure(res, mode, prefix = 'image_generation') {
@@ -351,35 +290,6 @@ async function handleApi(req, res, url) {
   }
 
   sendJson(res, 200, createOpenAIResponse(req, mode, n))
-}
-
-async function handleResponses(req, res, url) {
-  const body = req.method === 'GET' ? { json: null } : await readBody(req)
-  const mode = getMode(url, body.json)
-
-  if (shouldFailAlternating(mode, url.pathname)) {
-    sendJson(res, 500, { error: { message: 'Mock alternating HTTP failure' } })
-    return
-  }
-
-  if (mode === 'http-error') {
-    sendJson(res, 500, { error: { message: 'Mock Responses API failure' } })
-    return
-  }
-
-  // 模拟中转丢弃 image_generation 工具但保留 tool_choice，用于验证应用的报错提示
-  if (mode === 'drop-image-tool') {
-    sendJson(res, 400, { error: { message: "Tool choice 'required' must be specified with 'tools' parameter." } })
-    return
-  }
-
-  if (body.json && typeof body.json === 'object' && body.json.stream === true) {
-    if (await maybeSendStreamFailure(res, mode, 'response')) return
-    await sendSse(res, createResponsesStreamEvents(mode))
-    return
-  }
-
-  sendJson(res, 200, createResponsesPayload(mode))
 }
 
 async function handleCustom(req, res, url) {
@@ -512,11 +422,6 @@ const server = http.createServer(async (req, res) => {
   try {
     if (isOpenAIImagesPath(url.pathname)) {
       await handleApi(req, res, url)
-      return
-    }
-
-    if (isOpenAIResponsesPath(url.pathname)) {
-      await handleResponses(req, res, url)
       return
     }
 

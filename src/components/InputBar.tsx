@@ -4,7 +4,7 @@ import { useStore, submitTask, stopBatchPrompts, addImageFromFile } from '../sto
 import { DEFAULT_PARAMS, MAX_INPUT_IMAGES } from '../types'
 import { getActiveApiProfile, getCustomConnectionDefinition, isApiConnectionAvailable, normalizeSettings, resolveApiProfileModel, splitModelList } from '../lib/apiProfiles'
 import { getHomeParamState, normalizeHomeParams } from '../lib/homeParams'
-import { getImageGenerationModel, isGptImage25Model } from '../lib/imageModels'
+import { isGptImage25Model } from '../lib/imageModels'
 import { ensureImageCached } from '../lib/imageCache'
 import { splitBatchPrompts } from '../lib/batchPrompts'
 import { getChangedParams, MAX_OPENAI_OUTPUT_IMAGES, normalizeParamsForSettings } from '../lib/paramCompatibility'
@@ -222,7 +222,7 @@ export default function InputBar() {
   const outputImageLimit = MAX_OPENAI_OUTPUT_IMAGES
   const nDraftValue = Number(nInput)
   const effectiveNValue = Number.isNaN(nDraftValue) ? params.n : nDraftValue
-  const streamConcurrentByN = (activeProfile.connectionId === 'openai-images' || activeProfile.connectionId === 'openai-responses') && activeProfile.streamImages === true && effectiveNValue > 1
+  const streamConcurrentByN = activeProfile.connectionId === 'openai-images' && activeProfile.streamImages === true && effectiveNValue > 1
   const nLimitHintText = `最大请求数量为 ${outputImageLimit}`
   const displaySize = (activeProfile.codexCli ? normalizeCodexCliImageSize(params.size) : normalizeImageSize(params.size)) || DEFAULT_PARAMS.size
 
@@ -231,7 +231,7 @@ export default function InputBar() {
     { label: 'low', value: 'low' },
     { label: 'medium', value: 'medium' },
     { label: 'high', value: 'high' },
-    ...(isGptImage25Model(getImageGenerationModel(activeProfile))
+    ...(isGptImage25Model(activeProfile.model)
       ? [
           { label: 'xhigh', value: 'xhigh' },
           { label: 'max', value: 'max' },

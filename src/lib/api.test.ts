@@ -1,9 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { DEFAULT_PARAMS } from '../types'
-import { createDefaultOpenAIProfile, DEFAULT_IMAGES_MODEL, DEFAULT_SETTINGS } from './apiProfiles'
-import { normalizePersistedState } from './persistedState'
+import { createDefaultOpenAIProfile, DEFAULT_SETTINGS } from './apiProfiles'
 import { callImageApi } from './api'
-import { maybeAppendImageToolDroppedHint, maybeAppendStreamingHint } from './imageApiShared'
+import { maybeAppendStreamingHint } from './imageApiShared'
 
 describe('API error hints', () => {
   it.each([false, true])('uses the transparent background hint when streaming is %s', (streamImages) => {
@@ -14,10 +13,6 @@ describe('API error hints', () => {
     )
   })
 
-  it('leaves other tool choice errors unchanged', () => {
-    const message = 'The combination of tool_choice and tools is not supported.'
-    expect(maybeAppendImageToolDroppedHint(message)).toBe(message)
-  })
 })
 
 describe('callImageApi', () => {
@@ -38,124 +33,6 @@ describe('callImageApi', () => {
       inputImageDataUrls: [],
     })).rejects.toThrow('接入方式已不可用，请重新选择')
     expect(fetchMock).not.toHaveBeenCalled()
-  })
-
-  it.each([false, true])(
-    'adds the prompt rewrite guard on Responses API when Codex CLI mode is %s',
-    async (codexCli) => {
-      const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
-        output: [{
-          type: 'image_generation_call',
-          result: 'aW1hZ2U=',
-        }],
-      }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      }))
-
-      await callImageApi({
-        settings: {
-          ...DEFAULT_SETTINGS,
-          profiles: (DEFAULT_SETTINGS.profiles.map((profile) => ({ ...profile, reasoningEffort: 'high' as const }))).map((profile) => ({ ...profile, apiKey: 'test-key', connectionId: 'openai-responses', codexCli })),
-        },
-        prompt: 'prompt',
-        params: { ...DEFAULT_PARAMS },
-        inputImageDataUrls: [],
-      })
-
-      const [, init] = fetchMock.mock.calls[0]
-      const body = JSON.parse(String((init as RequestInit).body))
-      expect(body.input).toBe('Treat everything after this line as one complete image-generation prompt, including the resolution instruction. Follow it exactly without rewriting or omitting anything:\nprompt')
-      expect(body.reasoning).toEqual({ effort: 'high' })
-    },
-  )
-
-  it('does not add the prompt rewrite guard on Responses API when prompt rewrite is allowed', async () => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
-      output: [{
-        type: 'image_generation_call',
-        result: 'aW1hZ2U=',
-      }],
-    }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    }))
-
-    await callImageApi({
-      settings: {
-        ...DEFAULT_SETTINGS,
-        allowPromptRewrite: true,
-        profiles: [createDefaultOpenAIProfile({ apiKey: 'test-key', connectionId: 'openai-responses', codexCli: true })],
-      },
-      prompt: 'prompt',
-      params: { ...DEFAULT_PARAMS },
-      inputImageDataUrls: [],
-    })
-
-    const [, init] = fetchMock.mock.calls[0]
-    const body = JSON.parse(String((init as RequestInit).body))
-    expect(body.input).toBe('prompt')
-  })
-
-  it('sends the selected GPT Image 2.5 model and max quality to the Responses image tool', async () => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
-      output: [{ type: 'image_generation_call', result: 'aW1hZ2U=' }],
-    }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    }))
-
-    await callImageApi({
-      settings: {
-        ...DEFAULT_SETTINGS,
-        profiles: (DEFAULT_SETTINGS.profiles.map((profile) => ({
-          ...profile,
-          connectionId: 'openai-responses' as const,
-          imageGenerationModel: 'gpt-image-2.5-flare',
-        }))).map((profile) => ({ ...profile, apiKey: 'test-key', connectionId: 'openai-responses' })),
-      },
-      prompt: 'prompt',
-      params: { ...DEFAULT_PARAMS, quality: 'max' },
-      inputImageDataUrls: [],
-    })
-
-    const body = JSON.parse(String((fetchMock.mock.calls[0][1] as RequestInit).body))
-    expect(body.tools[0]).toMatchObject({
-      type: 'image_generation',
-      model: 'gpt-image-2.5-flare',
-      quality: 'max',
-    })
-  })
-
-  it.each([undefined, '', 'custom-image-model', DEFAULT_IMAGES_MODEL])('sends the restored Responses tool model %s without autofilling', async (imageGenerationModel) => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
-      output: [{ type: 'image_generation_call', result: 'aW1hZ2U=' }],
-    }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    }))
-
-    const profile = imageGenerationModel === DEFAULT_IMAGES_MODEL
-      ? createDefaultOpenAIProfile({ connectionId: 'openai-responses', apiKey: 'test-key', streamImages: false })
-      : { connectionId: 'openai-responses', apiKey: 'test-key', model: 'legacy-text-model', streamImages: false, ...(imageGenerationModel === undefined ? {} : { imageGenerationModel }) }
-    const restored = normalizePersistedState({ settings: { profiles: [profile] } }, {
-      settings: DEFAULT_SETTINGS,
-      params: DEFAULT_PARAMS,
-      dismissedCodexCliPrompts: [],
-      favoriteCollections: [],
-      defaultFavoriteCollectionId: null,
-    })!
-
-    await callImageApi({
-      settings: restored.settings,
-      prompt: 'prompt',
-      params: DEFAULT_PARAMS,
-      inputImageDataUrls: [],
-    })
-
-    const body = JSON.parse(String((fetchMock.mock.calls[0][1] as RequestInit).body))
-    if (imageGenerationModel) expect(body.tools[0].model).toBe(imageGenerationModel)
-    else expect(body.tools[0]).not.toHaveProperty('model')
   })
 
   it('sends a GPT Image 2.5 model and xhigh quality to the Images API', async () => {
@@ -187,49 +64,6 @@ describe('callImageApi', () => {
       quality: 'xhigh',
     })
     expect(result.actualParams).toMatchObject({ quality: 'xhigh' })
-  })
-
-  it.each([false, true])('explains the image tool dropped error without retrying when streaming is %s', async (streamImages) => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
-      error: { message: "Tool choice 'required' must be specified with 'tools' parameter." },
-    }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    }))
-
-    await expect(callImageApi({
-      settings: {
-        ...DEFAULT_SETTINGS,
-        profiles: (DEFAULT_SETTINGS.profiles.map((profile) => ({ ...profile, connectionId: 'openai-responses' as const, streamImages }))).map((profile) => ({ ...profile, apiKey: 'test-key', connectionId: 'openai-responses' })),
-      },
-      prompt: 'prompt',
-      params: { ...DEFAULT_PARAMS },
-      inputImageDataUrls: [],
-    })).rejects.toThrow(/^Tool choice 'required' must be specified with 'tools' parameter\.\n提示：当前使用的 API 可能未正确转发图像生成工具，请尝试更换支持该工具的接口或模型。$/)
-
-    expect(fetchMock).toHaveBeenCalledTimes(1)
-    expect(JSON.parse(String((fetchMock.mock.calls[0][1] as RequestInit).body)).tool_choice).toBe('required')
-  })
-
-  it('keeps the original Responses error when the relay reports an unrelated failure', async () => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
-      error: { message: 'model not found' },
-    }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    }))
-
-    await expect(callImageApi({
-      settings: {
-        ...DEFAULT_SETTINGS,
-        profiles: (DEFAULT_SETTINGS.profiles.map((profile) => ({ ...profile, connectionId: 'openai-responses' as const }))).map((profile) => ({ ...profile, apiKey: 'test-key', connectionId: 'openai-responses' })),
-      },
-      prompt: 'prompt',
-      params: { ...DEFAULT_PARAMS },
-      inputImageDataUrls: [],
-    })).rejects.toThrow('model not found')
-
-    expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
   it('does not add the prompt rewrite guard on Codex CLI Images API when prompt rewrite is allowed', async () => {
@@ -303,30 +137,6 @@ describe('callImageApi', () => {
     const [, init] = fetchMock.mock.calls.find(([, request]) => (request as RequestInit | undefined)?.body instanceof FormData)!
     const body = (init as RequestInit).body as FormData
     expect(body.get('background')).toBe('transparent')
-  })
-
-  it('requests a transparent background from the Responses API image tool', async () => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
-      output: [{ type: 'image_generation_call', result: 'aW1hZ2U=' }],
-    }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    }))
-
-    await callImageApi({
-      settings: {
-        ...DEFAULT_SETTINGS,
-        profiles: [createDefaultOpenAIProfile({ apiKey: 'test-key', connectionId: 'openai-responses' })],
-      },
-      prompt: 'prompt',
-      params: { ...DEFAULT_PARAMS, transparent_output: true },
-      nativeTransparentBackground: true,
-      inputImageDataUrls: [],
-    })
-
-    const [, init] = fetchMock.mock.calls[0]
-    const body = JSON.parse(String((init as RequestInit).body))
-    expect(body.tools[0].background).toBe('transparent')
   })
 
   it('uses prompt engineering instead of the size parameter in Codex CLI mode', async () => {
@@ -767,147 +577,6 @@ describe('callImageApi', () => {
     ])
     expect(result.failedRequests).toEqual([{ requestIndex: 1, error: 'Failed to fetch' }])
     expect(result.actualParams).toMatchObject({ n: 2 })
-  })
-
-  it('streams Responses API partial images and resolves the completed response image', async () => {
-    const streamBody = [
-      'data: {"type":"response.image_generation_call.partial_image","partial_image_index":0,"partial_image_b64":"cGFydGlhbA=="}',
-      '',
-      'data: {"type":"response.completed","response":{"output":[{"type":"image_generation_call","result":"ZmluYWw=","revised_prompt":"rewritten","size":"1024x1024"}]}}',
-      '',
-      'data: [DONE]',
-      '',
-    ].join('\n')
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(streamBody, {
-      status: 200,
-      headers: { 'Content-Type': 'text/event-stream' },
-    }))
-    const partialImages: string[] = []
-
-    const result = await callImageApi({
-      settings: {
-        ...DEFAULT_SETTINGS,
-        profiles: (DEFAULT_SETTINGS.profiles.map((profile) => ({
-          ...profile,
-          apiKey: 'test-key',
-          connectionId: 'openai-responses',
-          streamImages: true,
-          streamPartialImages: 1,
-        }))).map((profile) => ({ ...profile, apiKey: 'test-key', connectionId: 'openai-responses', streamImages: true, streamPartialImages: 1 })),
-      },
-      prompt: 'prompt',
-      params: { ...DEFAULT_PARAMS },
-      inputImageDataUrls: [],
-      onPartialImage: (partial: { image: string }) => partialImages.push(partial.image),
-    } as any)
-
-    const [, init] = fetchMock.mock.calls[0]
-    const body = JSON.parse(String((init as RequestInit).body))
-    expect(body.stream).toBe(true)
-    expect(body.tools[0].partial_images).toBe(1)
-    expect(partialImages).toEqual(['data:image/png;base64,cGFydGlhbA=='])
-    expect(result).toMatchObject({
-      images: ['data:image/png;base64,ZmluYWw='],
-      actualParams: { size: '1024x1024' },
-      actualParamsList: [{ size: '1024x1024' }],
-      revisedPrompts: ['rewritten'],
-    })
-  })
-
-  it('keeps successful Responses API concurrent results when one request fails', async () => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => {
-      const callIndex = fetchMock.mock.calls.length
-      if (callIndex === 3) throw new TypeError('Failed to fetch')
-      return new Response(JSON.stringify({
-        output: [{ type: 'image_generation_call', result: `aW1hZ2Ut${callIndex}` }],
-      }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      })
-    })
-
-    const result = await callImageApi({
-      settings: {
-        ...DEFAULT_SETTINGS,
-        profiles: [createDefaultOpenAIProfile({ apiKey: 'test-key', connectionId: 'openai-responses' })],
-      },
-      prompt: 'prompt',
-      params: { ...DEFAULT_PARAMS, n: 3 },
-      inputImageDataUrls: [],
-    })
-
-    expect(fetchMock).toHaveBeenCalledTimes(3)
-    expect(result.images).toEqual([
-      'data:image/png;base64,aW1hZ2Ut1',
-      'data:image/png;base64,aW1hZ2Ut2',
-    ])
-    expect(result.failedRequests).toEqual([{ requestIndex: 2, error: 'Failed to fetch' }])
-    expect(result.actualParams).toMatchObject({ n: 2 })
-  })
-
-  it('parses Responses API image result objects in gallery mode', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
-      output: [{
-        type: 'image_generation_call',
-        result: { b64_json: 'ZmluYWw=' },
-        size: '1024x1024',
-      }],
-    }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    }))
-
-    const result = await callImageApi({
-      settings: {
-        ...DEFAULT_SETTINGS,
-        profiles: [createDefaultOpenAIProfile({ apiKey: 'test-key', connectionId: 'openai-responses' })],
-      },
-      prompt: 'prompt',
-      params: { ...DEFAULT_PARAMS },
-      inputImageDataUrls: [],
-    })
-
-    expect(result).toMatchObject({
-      images: ['data:image/png;base64,ZmluYWw='],
-      actualParams: { size: '1024x1024' },
-      actualParamsList: [{ size: '1024x1024' }],
-    })
-  })
-
-  it('keeps Responses API stream output item images when completed response omits result', async () => {
-    const streamBody = [
-      'data: {"type":"response.output_item.done","item":{"id":"img-call-1","type":"image_generation_call","status":"generating","action":"generate","result":"ZmluYWw=","size":"1024x1024"},"output_index":0}',
-      '',
-      'data: {"type":"response.completed","response":{"output":[{"type":"image_generation_call","status":"completed","result":""}]}}',
-      '',
-      'data: [DONE]',
-      '',
-    ].join('\n')
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(streamBody, {
-      status: 200,
-      headers: { 'Content-Type': 'text/event-stream' },
-    }))
-
-    const result = await callImageApi({
-      settings: {
-        ...DEFAULT_SETTINGS,
-        profiles: (DEFAULT_SETTINGS.profiles.map((profile) => ({
-          ...profile,
-          apiKey: 'test-key',
-          connectionId: 'openai-responses',
-          streamImages: true,
-        }))).map((profile) => ({ ...profile, apiKey: 'test-key', connectionId: 'openai-responses', streamImages: true })),
-      },
-      prompt: 'prompt',
-      params: { ...DEFAULT_PARAMS },
-      inputImageDataUrls: [],
-    } as any)
-
-    expect(result).toMatchObject({
-      images: ['data:image/png;base64,ZmluYWw='],
-      actualParams: { size: '1024x1024' },
-      actualParamsList: [{ size: '1024x1024' }],
-    })
   })
 
   it('uses the same-origin API proxy path when API proxy is enabled', async () => {

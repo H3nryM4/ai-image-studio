@@ -3,18 +3,16 @@ import { normalizeBaseUrl } from './devProxy'
 import {
   createDefaultOpenAIProfile,
   DEFAULT_IMAGES_MODEL,
-  DEFAULT_RESPONSES_MODEL,
   findEquivalentApiProfile,
   mergeImportedSettings,
   normalizeModelList,
   normalizeSettings,
-  normalizeReasoningEffort,
   normalizeStreamPartialImages,
   isApiConnectionAvailable,
 } from './apiProfiles'
 import { isPresetConfigOnlyEnabled, isPresetConfigParamsLocked, isPresetProfile } from './presetConfig'
 
-const URL_SETTING_KEYS = ['settings', 'profileId', 'apiUrl', 'apiKey', 'codexCli', 'connectionId', 'model', 'imageGenerationModel', 'profileName', 'reasoningEffort', 'streamImages', 'streamPartialImages', 'transparentBackgroundMethod']
+const URL_SETTING_KEYS = ['settings', 'profileId', 'apiUrl', 'apiKey', 'codexCli', 'connectionId', 'model', 'profileName', 'streamImages', 'streamPartialImages', 'transparentBackgroundMethod']
 
 function getProfileDedupKey(profile: ApiProfile) {
   return JSON.stringify([
@@ -23,8 +21,6 @@ function getProfileDedupKey(profile: ApiProfile) {
     profile.apiKey.trim(),
     // URL 新建的配置尚未规整，按规整后的模型列表比较才能命中已保存的配置
     normalizeModelList(profile.model),
-    profile.imageGenerationModel?.trim(),
-    profile.reasoningEffort,
     profile.codexCli === true,
     profile.streamImages === true,
     profile.streamPartialImages ?? 0,
@@ -142,9 +138,7 @@ function readUrlProfilePatch(searchParams: URLSearchParams): Partial<ApiProfile>
   const baseUrl = searchParams.get('apiUrl')
   const apiKey = searchParams.get('apiKey')
   const model = searchParams.get('model')?.trim()
-  const imageGenerationModel = searchParams.get('imageGenerationModel')
   const name = searchParams.get('profileName')?.trim()
-  const reasoningEffort = searchParams.get('reasoningEffort')
   const codexCli = searchParams.get('codexCli')
   const streamImages = searchParams.get('streamImages')
   const streamPartialImages = searchParams.get('streamPartialImages')
@@ -153,9 +147,7 @@ function readUrlProfilePatch(searchParams: URLSearchParams): Partial<ApiProfile>
   if (baseUrl !== null) patch.baseUrl = normalizeBaseUrl(baseUrl.trim())
   if (apiKey !== null) patch.apiKey = apiKey.trim()
   if (model) patch.model = model
-  if (imageGenerationModel !== null) patch.imageGenerationModel = imageGenerationModel.trim()
   if (name) patch.name = name
-  if (reasoningEffort !== null) patch.reasoningEffort = normalizeReasoningEffort(reasoningEffort)
   if (codexCli !== null) patch.codexCli = codexCli.trim().toLowerCase() === 'true'
   if (streamImages !== null) patch.streamImages = streamImages.trim().toLowerCase() === 'true'
   if (streamPartialImages !== null) patch.streamPartialImages = normalizeStreamPartialImages(streamPartialImages)
@@ -233,7 +225,7 @@ function buildRegularSettingsFromUrlParams(currentSettings: Partial<AppSettings>
     id: requestedId || createUrlProfileId(new Set(settings.profiles.map((profile) => profile.id))),
     name: 'URL 参数配置',
     connectionId,
-    model: connectionId === 'openai-responses' ? DEFAULT_RESPONSES_MODEL : DEFAULT_IMAGES_MODEL,
+    model: DEFAULT_IMAGES_MODEL,
     ...patch,
   })
   const existing = settings.profiles.find((item) => getProfileDedupKey(item) === getProfileDedupKey(profile) && (!patch.name || item.name.trim() === patch.name))

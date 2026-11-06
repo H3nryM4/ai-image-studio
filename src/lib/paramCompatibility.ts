@@ -1,6 +1,6 @@
 import { DEFAULT_PARAMS, type AppSettings, type TaskParams } from '../types'
 import { getActiveApiProfile, isApiConnectionAvailable } from './apiProfiles'
-import { getImageGenerationModel, isGptImage25Model } from './imageModels'
+import { isGptImage25Model } from './imageModels'
 import { normalizeCodexCliImageSize, normalizeImageSize } from './size'
 
 export const MAX_OPENAI_OUTPUT_IMAGES = 10
@@ -21,7 +21,7 @@ export function normalizeParamsForSettings(
     nextParams.quality = DEFAULT_PARAMS.quality
   }
 
-  if ((nextParams.quality === 'xhigh' || nextParams.quality === 'max') && !isGptImage25Model(getImageGenerationModel(activeProfile))) {
+  if ((nextParams.quality === 'xhigh' || nextParams.quality === 'max') && !isGptImage25Model(activeProfile.model)) {
     nextParams.quality = 'high'
   }
 

@@ -408,7 +408,7 @@ describe('task retry', () => {
     await vi.waitFor(() => expect(useStore.getState().tasks[0].status).toBe('done'))
   })
 
-  it('does not show the Codex CLI prompt for a replaced attempt', async () => {
+  it('ignores postprocessing results from a replaced attempt', async () => {
     const postProcess = deferred<string>()
     const newRequest = deferred<Awaited<ReturnType<typeof callImageApi>>>()
     const setConfirmDialog = vi.fn()
@@ -419,12 +419,11 @@ describe('task retry', () => {
     useStore.setState({
       settings: {
         ...useStore.getState().settings,
-        profiles: useStore.getState().settings.profiles.map((profile) => ({ ...profile, connectionId: 'openai-responses', codexCli: false, transparentBackgroundMethod: 'local' as const })),
+        profiles: useStore.getState().settings.profiles.map((profile) => ({ ...profile, connectionId: 'openai-images', codexCli: false, transparentBackgroundMethod: 'local' as const })),
       },
       prompt: 'prompt',
       inputImages: [],
       params: { ...DEFAULT_PARAMS, output_format: 'png', transparent_output: true },
-      dismissedCodexCliPrompts: [],
       setConfirmDialog,
     })
     useStore.getState().setSettings({ profiles: useStore.getState().settings.profiles.map((profile) => ({ ...profile, homeParams: [...HOME_PARAM_KEYS] })) })
@@ -893,7 +892,6 @@ describe('input persistence setting', () => {
       settings: { ...DEFAULT_SETTINGS },
       prompt: 'prompt',
       inputImages: [imageA],
-      dismissedCodexCliPrompts: [],
     })
   })
 
@@ -1003,7 +1001,6 @@ describe('preset deletion state', () => {
       }),
       dismissedPresetProfileIds: [profile.id],
       dismissedPresetConnectionIds: [connection.id],
-      dismissedCodexCliPrompts: ['prompt-a'],
     })
 
     await clearData({ clearConfig: true, clearTasks: false })
@@ -1011,7 +1008,6 @@ describe('preset deletion state', () => {
     const state = useStore.getState()
     expect(state.dismissedPresetProfileIds).toEqual([])
     expect(state.dismissedPresetConnectionIds).toEqual([])
-    expect(state.dismissedCodexCliPrompts).toEqual([])
     expect(state.settings.customConnections).toEqual([expect.objectContaining({ id: connection.id })])
     expect(state.settings.profiles).toEqual([expect.objectContaining({ id: profile.id, connectionId: connection.id })])
   })
