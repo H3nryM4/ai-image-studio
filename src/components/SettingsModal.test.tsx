@@ -70,6 +70,22 @@ async function selectConnection(value: string) {
 }
 
 describe('settings modal', () => {
+  it('saves home visibility separately from the profile default value', async () => {
+    await openSettings()
+    const toggle = el.querySelector<HTMLButtonElement>('button[aria-label="首页显示图片格式"]')!
+    expect(toggle.getAttribute('aria-checked')).toBe('false')
+    await act(async () => toggle.click())
+    expect(useStore.getState().settings.profiles[0].homeParams).toContain('output_format')
+    const select = toggle.parentElement!.querySelector('select')!
+    await act(async () => {
+      select.value = 'webp'
+      select.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+    await act(async () => toggle.click())
+    expect(useStore.getState().settings.profiles[0].homeParams).not.toContain('output_format')
+    expect(useStore.getState().settings.profiles[0].paramDefaults?.output_format).toBe('webp')
+  })
+
   it('shares, copies and deletes the chosen dropdown entry without acting on another profile', async () => {
     const primary = createDefaultOpenAIProfile({ isDefault: true })
     const source = createDefaultOpenAIProfile({ id: 'secondary', name: '备用配置', baseUrl: 'https://secondary.example/v1', model: 'vendor-image' })

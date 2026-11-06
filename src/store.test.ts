@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { strToU8, zipSync } from 'fflate'
-import { DEFAULT_PARAMS } from './types'
+import { DEFAULT_PARAMS, HOME_PARAM_KEYS } from './types'
 import { createDefaultOpenAIProfile, DEFAULT_SETTINGS, normalizeSettings } from './lib/apiProfiles'
 import type { ExportData, StoredImage, StoredImageThumbnail, TaskRecord } from './types'
 import { getImageCommentToken } from './lib/promptImageComments'
@@ -427,6 +427,7 @@ describe('task retry', () => {
       dismissedCodexCliPrompts: [],
       setConfirmDialog,
     })
+    useStore.getState().setSettings({ profiles: useStore.getState().settings.profiles.map((profile) => ({ ...profile, homeParams: [...HOME_PARAM_KEYS] })) })
     await submitTask()
     // 旧请求已通过成功前检查，正在做透明背景后处理时被判定失败并重试
     await vi.waitFor(() => expect(removeKeyedBackgroundFromDataUrl).toHaveBeenCalledOnce())
@@ -674,6 +675,7 @@ describe('mask draft lifecycle in store actions', () => {
       },
     })
 
+    useStore.getState().setSettings({ profiles: useStore.getState().settings.profiles.map((profile) => ({ ...profile, homeParams: [...HOME_PARAM_KEYS] })) })
     await submitTask()
     await vi.waitFor(() => expect(useStore.getState().tasks[0]?.status).toBe('done'))
 
@@ -720,6 +722,7 @@ describe('mask draft lifecycle in store actions', () => {
       },
     })
 
+    useStore.getState().setSettings({ profiles: useStore.getState().settings.profiles.map((profile) => ({ ...profile, homeParams: [...HOME_PARAM_KEYS] })) })
     await submitTask()
     await vi.waitFor(() => expect(useStore.getState().tasks[0]?.status).toBe('done'))
 
@@ -763,6 +766,7 @@ describe('mask draft lifecycle in store actions', () => {
       },
     })
 
+    useStore.getState().setSettings({ profiles: useStore.getState().settings.profiles.map((profile) => ({ ...profile, homeParams: [...HOME_PARAM_KEYS] })) })
     await submitTask()
     await vi.waitFor(() => expect(useStore.getState().tasks[0]?.status).toBe('done'))
 
@@ -802,6 +806,7 @@ describe('mask draft lifecycle in store actions', () => {
       },
     })
 
+    useStore.getState().setSettings({ profiles: useStore.getState().settings.profiles.map((profile) => ({ ...profile, homeParams: [...HOME_PARAM_KEYS] })) })
     await submitTask()
     await vi.waitFor(() => expect(useStore.getState().tasks[0]?.status).toBe('done'))
 
@@ -845,6 +850,7 @@ describe('mask draft lifecycle in store actions', () => {
       },
     })
 
+    useStore.getState().setSettings({ profiles: useStore.getState().settings.profiles.map((profile) => ({ ...profile, homeParams: [...HOME_PARAM_KEYS] })) })
     await submitTask()
     await vi.waitFor(() => expect(useStore.getState().tasks[0]?.status).toBe('done'))
 
@@ -1658,6 +1664,7 @@ describe('task deletion', () => {
       params: { ...DEFAULT_PARAMS, output_format: 'png', transparent_output: true },
     })
 
+    useStore.getState().setSettings({ profiles: useStore.getState().settings.profiles.map((profile) => ({ ...profile, homeParams: [...HOME_PARAM_KEYS] })) })
     await submitTask()
     await vi.waitFor(() => expect(removeKeyedBackgroundFromDataUrl).toHaveBeenCalledTimes(1))
     const runningTask = useStore.getState().tasks[0]

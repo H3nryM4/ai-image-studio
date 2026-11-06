@@ -7,6 +7,7 @@ import { readRuntimeEnv } from './runtimeEnv'
 import { isImportableConfigUrl } from './importableConfigUrl'
 import { DEFAULT_IMAGES_MODEL } from './imageModels'
 import { normalizeBatchPromptConcurrency } from './batchPrompts'
+import { normalizeHomeParamSelection, normalizeParamDefaults } from './homeParams'
 
 const OPENAI_DEFAULT_API_BASE_URL = 'https://api.openai.com/v1'
 const RAW_DEFAULT_API_URL = readRuntimeEnv(import.meta.env.VITE_DEFAULT_API_URL)
@@ -273,6 +274,8 @@ export function createDefaultOpenAIProfile(overrides: Partial<ApiProfile> = {}):
     transparentBackgroundMethod: DEFAULT_API_URL_PATCH?.transparentBackgroundMethod ?? 'api',
     ...overrides,
     connectionId,
+    homeParams: normalizeHomeParamSelection(overrides.homeParams),
+    paramDefaults: normalizeParamDefaults(overrides.paramDefaults),
     streamImages: overrides.streamImages ?? DEFAULT_API_URL_PATCH?.streamImages ?? connectionId === 'openai-responses',
   }
 }
@@ -292,6 +295,8 @@ export function switchApiProfileConnection(profile: ApiProfile, connectionId: Ap
       streamImages: profile.streamImages,
       streamPartialImages: profile.streamPartialImages,
       transparentBackgroundMethod: profile.transparentBackgroundMethod,
+      homeParams: profile.homeParams,
+      paramDefaults: profile.paramDefaults,
     },
   }
   const savedDraft = connectionDrafts[connectionId]
@@ -316,6 +321,8 @@ export function switchApiProfileConnection(profile: ApiProfile, connectionId: Ap
     transparentBackgroundMethod: customConnection && !customConnectionSupportsNativeTransparentBackground(customConnection)
       ? 'local'
       : savedDraft?.transparentBackgroundMethod ?? 'api',
+    homeParams: normalizeHomeParamSelection(savedDraft?.homeParams),
+    paramDefaults: normalizeParamDefaults(savedDraft?.paramDefaults),
     connectionDrafts,
   }
 }
@@ -341,6 +348,8 @@ function normalizeConnectionDraft(
     model,
     imageGenerationModel,
     reasoningEffort: normalizeReasoningEffort(input.reasoningEffort),
+    homeParams: normalizeHomeParamSelection(input.homeParams),
+    paramDefaults: normalizeParamDefaults(input.paramDefaults),
     codexCli: typeof input.codexCli === 'boolean' ? input.codexCli : fallback.codexCli,
     apiProxy: typeof input.apiProxy === 'boolean' ? input.apiProxy : fallback.apiProxy,
     responseFormatB64Json: input.responseFormatB64Json === true ? true : undefined,
@@ -409,6 +418,8 @@ export function normalizeApiProfile(
     transparentBackgroundMethod: !nativeTransparentBackgroundUnavailable && (record.transparentBackgroundMethod === 'api' || record.transparentBackgroundMethod === 'local')
       ? record.transparentBackgroundMethod
       : defaults.transparentBackgroundMethod,
+    homeParams: normalizeHomeParamSelection(record.homeParams),
+    paramDefaults: normalizeParamDefaults(record.paramDefaults),
     connectionDrafts: normalizeConnectionDrafts(record.connectionDrafts, customConnectionIds, nativeTransparentConnectionIds),
   }
 }
@@ -673,7 +684,9 @@ function isDefaultOpenAIProfile(profile: ApiProfile): boolean {
     profile.apiProxy === DEFAULT_OPENAI_API_PROXY &&
     profile.streamImages === false &&
     profile.streamPartialImages === DEFAULT_STREAM_PARTIAL_IMAGES &&
-    profile.transparentBackgroundMethod === 'api'
+    profile.transparentBackgroundMethod === 'api' &&
+    JSON.stringify(profile.homeParams) === JSON.stringify(normalizeHomeParamSelection(undefined)) &&
+    Object.keys(profile.paramDefaults ?? {}).length === 0
 }
 
 function hasOnlyDefaultProfiles(settings: AppSettings): boolean {
@@ -862,6 +875,8 @@ const PRESET_PROFILE_DEPLOYMENT_KEYS = [
   'streamPartialImages',
   'transparentBackgroundMethod',
   'connectionDrafts',
+  'homeParams',
+  'paramDefaults',
 ] as const
 
 function getPresetDeploymentFields(input: unknown, id: string, source: object) {

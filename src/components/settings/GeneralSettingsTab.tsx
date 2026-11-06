@@ -3,8 +3,7 @@ import Select from '../Select'
 import { ChevronRightIcon } from '../icons'
 import SettingLabel from './SettingLabel'
 import SettingSwitch from './SettingSwitch'
-
-const SELECT_CLASS_NAME = 'w-full rounded-xl border border-transparent bg-black/[0.04] px-3 py-1.5 text-xs text-gray-700 outline-hidden transition hover:bg-black/[0.07] dark:bg-white/[0.06] dark:text-gray-200 dark:hover:bg-white/[0.1]'
+import { SETTING_CONTROL_CLASS_NAME } from './settingStyles'
 
 interface GeneralSettingsTabProps {
   draft: AppSettings
@@ -38,7 +37,7 @@ export default function GeneralSettingsTab({
                   { label: submitShortcut, value: 'ctrl-enter' },
                   { label: 'Enter', value: 'enter' },
                 ]}
-                className={SELECT_CLASS_NAME}
+                className={SETTING_CONTROL_CLASS_NAME}
               />
             </div>
           </div>
@@ -52,7 +51,7 @@ export default function GeneralSettingsTab({
                   { label: '发送按钮', value: 'button' },
                   { label: '回车或按钮', value: 'enter' },
                 ]}
-                className={SELECT_CLASS_NAME}
+                className={SETTING_CONTROL_CLASS_NAME}
               />
             </div>
           </div>
@@ -94,14 +93,14 @@ export default function GeneralSettingsTab({
                   { label: '画板', value: 'sketch' },
                   { label: '遮罩', value: 'mask' },
                 ]}
-                className={SELECT_CLASS_NAME}
+                className={SETTING_CONTROL_CLASS_NAME}
               />
             </div>
           </div>
           <SettingSwitch
-            label="允许优化提示词"
-            help="用于 Responses API 和启用 Codex CLI 兼容模式的 Images API。开启后不再附加防改写提示词，允许模型按服务商策略优化提示词。"
-            checked={draft.allowPromptRewrite}
+            label="附加保留原提示词的要求"
+            help="仅用于 Responses 或 Codex CLI 兼容模式。开启后在请求文字中要求保留原提示词，不能保证模型不改写，也不是 API 的改写开关。"
+            checked={!draft.allowPromptRewrite}
             onChange={() => commitSettings({ ...draft, allowPromptRewrite: !draft.allowPromptRewrite })}
             className="py-3"
           />
@@ -136,7 +135,7 @@ export default function GeneralSettingsTab({
                     { label: '覆盖失败任务', value: 'overwriteFailed' },
                     ...(draft.alwaysShowRetryButton ? [{ label: '覆盖任何任务', value: 'overwriteAll' }] : []),
                   ]}
-                  className={SELECT_CLASS_NAME}
+                  className={SETTING_CONTROL_CLASS_NAME}
                 />
               </div>
             </div>

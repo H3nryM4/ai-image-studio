@@ -1,5 +1,5 @@
-import type { AppSettings, FavoriteCollection, InputImage, MaskDraft, PresetConfig, TaskParams } from '../types'
-import { normalizeSettings } from './apiProfiles'
+import { DEFAULT_PARAMS, type AppSettings, type FavoriteCollection, type InputImage, type MaskDraft, type PresetConfig, type TaskParams } from '../types'
+import { getActiveApiProfile, normalizeSettings } from './apiProfiles'
 import { ensureDefaultFavoriteCollection, normalizeFavoriteCollections, resolveDefaultFavoriteCollectionId } from './favoriteState'
 import { isHttpUrl } from './imageApiShared'
 
@@ -9,6 +9,7 @@ export interface PersistedAppState {
   dismissedPresetProfileIds?: string[]
   dismissedPresetConnectionIds?: string[]
   params: TaskParams
+  paramsByProfile?: Record<string, TaskParams>
   prompt?: string
   inputImages?: InputImage[]
   maskDraft?: MaskDraft | null
@@ -20,6 +21,7 @@ export interface PersistedAppState {
 }
 
 type PersistedStateSource = PersistedAppState & {
+  reusedTaskApiProfileId?: string | null
   prompt: string
   inputImages: InputImage[]
   maskDraft: MaskDraft | null
@@ -60,12 +62,18 @@ function normalizeParams(value: unknown, fallback: TaskParams): TaskParams {
 
 export function createPersistedState(state: PersistedStateSource): Partial<PersistedAppState> {
   const settings = normalizeSettings(state.settings)
+  const activeProfile = getActiveApiProfile(settings)
+  const effectiveProfile = settings.profiles.find((profile) => profile.id === state.reusedTaskApiProfileId) ?? activeProfile
   return {
     settings,
     previousPresetConfig: state.previousPresetConfig ?? null,
     dismissedPresetProfileIds: state.dismissedPresetProfileIds ?? [],
     dismissedPresetConnectionIds: state.dismissedPresetConnectionIds ?? [],
-    params: state.params,
+    params: effectiveProfile.id === activeProfile.id ? state.params : state.paramsByProfile?.[`${activeProfile.id}:${activeProfile.connectionId}`] ?? { ...DEFAULT_PARAMS, ...activeProfile.paramDefaults },
+    paramsByProfile: {
+      ...Object.fromEntries(Object.entries(state.paramsByProfile ?? {}).filter(([key]) => settings.profiles.some((profile) => key.startsWith(`${profile.id}:`)))),
+      [`${effectiveProfile.id}:${effectiveProfile.connectionId}`]: state.params,
+    },
     ...(settings.persistInputOnRestart ? {
       prompt: state.prompt,
       inputImages: state.inputImages.map((img) => ({ id: img.id, dataUrl: '' })),
@@ -112,6 +120,11 @@ export function normalizePersistedState(persistedState: unknown, fallback: Persi
     dismissedPresetProfileIds: normalizeStringArray(persistedState.dismissedPresetProfileIds, fallback.dismissedPresetProfileIds ?? []),
     dismissedPresetConnectionIds: normalizeStringArray(persistedState.dismissedPresetConnectionIds, fallback.dismissedPresetConnectionIds ?? []),
     params: normalizeParams(persistedState.params, fallback.params),
+    paramsByProfile: isRecord(persistedState.paramsByProfile)
+      ? Object.fromEntries(Object.entries(persistedState.paramsByProfile)
+        .filter(([key]) => settings.profiles.some((profile) => key.startsWith(`${profile.id}:`)))
+        .map(([key, value]) => [key, normalizeParams(value, fallback.params)]))
+      : {},
     dismissedCodexCliPrompts: normalizeStringArray(persistedState.dismissedCodexCliPrompts, fallback.dismissedCodexCliPrompts),
     favoriteCollections,
     defaultFavoriteCollectionId: resolveDefaultFavoriteCollectionId(favoriteCollections, preferredDefaultFavoriteCollectionId),

@@ -2,7 +2,8 @@ import { useRef, useEffect, useCallback, useState, useMemo, useLayoutEffect } fr
 import { createPortal } from 'react-dom'
 import { useStore, submitTask, stopBatchPrompts, addImageFromFile } from '../store'
 import { DEFAULT_PARAMS, MAX_INPUT_IMAGES } from '../types'
-import { getActiveApiProfile, isApiConnectionAvailable, normalizeSettings, resolveApiProfileModel, splitModelList } from '../lib/apiProfiles'
+import { getActiveApiProfile, getCustomConnectionDefinition, isApiConnectionAvailable, normalizeSettings, resolveApiProfileModel, splitModelList } from '../lib/apiProfiles'
+import { getHomeParamState, normalizeHomeParams } from '../lib/homeParams'
 import { getImageGenerationModel, isGptImage25Model } from '../lib/imageModels'
 import { ensureImageCached } from '../lib/imageCache'
 import { splitBatchPrompts } from '../lib/batchPrompts'
@@ -245,7 +246,6 @@ export default function InputBar() {
   }, [transparentOutputHint.hide])
   const compressionHint = useHintTooltip({ enabled: () => compressionDisabled })
   const sizeHint = useHintTooltip({ enabled: () => activeProfile.codexCli })
-  const qualityHint = useHintTooltip({ enabled: () => activeProfile.codexCli })
   const nLimitHint = useHintTooltip({ autoHideMs: 2000 })
   const streamConcurrentHint = useHintTooltip({ enabled: () => streamConcurrentByN })
   const maskTargetImage = maskDraft
@@ -300,7 +300,7 @@ export default function InputBar() {
   }, [params.n])
 
   useEffect(() => {
-    const normalizedParams = normalizeParamsForSettings(params, effectiveSettings)
+    const normalizedParams = normalizeParamsForSettings(normalizeHomeParams(params, activeProfile, getCustomConnectionDefinition(effectiveSettings, activeProfile.connectionId), inputImages.length > 0), effectiveSettings)
     const patch = getChangedParams(params, normalizedParams)
     if (Object.keys(patch).length) {
       setParams(patch)
@@ -1245,7 +1245,7 @@ export default function InputBar() {
       streamConcurrentByN={streamConcurrentByN}
       streamConcurrentHint={streamConcurrentHint}
       sizeHint={sizeHint}
-      qualityHint={qualityHint}
+      homeParamState={getHomeParamState(activeProfile, getCustomConnectionDefinition(effectiveSettings, activeProfile.connectionId), inputImages.length > 0)}
       onOpenSizePicker={() => setShowSizePicker(true)}
       showBatch={showBatch}
       batchEnabled={batchEnabled}

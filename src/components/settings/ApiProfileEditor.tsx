@@ -6,6 +6,7 @@ import Select from '../Select'
 import { ChevronDownIcon } from '../icons'
 import SettingLabel from './SettingLabel'
 import SettingSwitch from './SettingSwitch'
+import ProfileParamsEditor from './ProfileParamsEditor'
 
 const INPUT_CLASS_NAME = 'w-full rounded-xl border border-transparent bg-black/[0.04] px-3 py-2.5 text-sm text-gray-700 outline-hidden transition focus:border-blue-300 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white/[0.06] dark:text-gray-200 dark:focus:border-blue-500/50'
 
@@ -47,7 +48,7 @@ export default function ApiProfileEditor(props: ApiProfileEditorProps) {
           <input ref={props.nameInputRef} aria-label="配置名称" value={profile.name} onChange={(e) => props.onChange({ name: e.target.value })} onBlur={(e) => props.onCommit({ name: e.target.value })} disabled={props.locked} className={INPUT_CLASS_NAME} />
         </label>
         <div className="min-w-0">
-          <SettingLabel label="接入方式" help="Images API 直接生图；Responses API 通过文本模型调用生图工具。两者均支持官方及兼容接口。" />
+          <SettingLabel label="接入方式" help="内置接入按 OpenAI 官方协议发送参数。第三方需兼容相应字段；字段有差异时可使用自定义 HTTP 接口。" />
           <Select
             value={!props.connectionAvailable ? '接入已失效，请重新选择' : profile.connectionId}
             onChange={props.onConnectionChange}
@@ -76,32 +77,33 @@ export default function ApiProfileEditor(props: ApiProfileEditorProps) {
         <input aria-label={profile.connectionId === 'openai-responses' ? '请求模型' : '模型 ID'} value={profile.model} onChange={(e) => props.onChange({ model: e.target.value })} onBlur={(e) => props.onCommit({ model: e.target.value })} disabled={props.locked} placeholder={model} className={INPUT_CLASS_NAME} />
         <p className="mt-1.5 text-xs text-gray-400">多个模型用逗号分隔，可在首页切换。</p>
       </div>
+      <ProfileParamsEditor profile={profile} connection={props.customConnection} locked={props.locked} onChange={props.onChange} />
       <details className="group border-t border-gray-100 pt-4 dark:border-white/[0.08]">
-        <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-medium text-gray-600 dark:text-gray-300 [&::-webkit-details-marker]:hidden">高级设置<ChevronDownIcon className="h-4 w-4 transition-transform group-open:rotate-180" /></summary>
+        <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-medium text-gray-600 dark:text-gray-300 [&::-webkit-details-marker]:hidden">连接与兼容设置<ChevronDownIcon className="h-4 w-4 transition-transform group-open:rotate-180" /></summary>
         <div className="mt-5 space-y-5">
           {profile.connectionId === 'openai-responses' && <div>
             <SettingLabel label="图像生成模型（可选）" help="指定生图工具使用的模型。留空时不发送工具模型 ID，由接口决定。" />
             <input aria-label="图像生成模型" value={profile.imageGenerationModel ?? ''} onChange={(e) => props.onChange({ imageGenerationModel: e.target.value })} onBlur={(e) => props.onCommit({ imageGenerationModel: e.target.value })} disabled={props.locked} placeholder="留空使用 API 默认值" className={INPUT_CLASS_NAME} />
           </div>}
           {profile.connectionId === 'openai-responses' && <div>
-            <SettingLabel label="推理强度" help="更高档位可能增加等待时间。可用档位取决于所选模型。" />
+            <SettingLabel label="文本模型推理强度" help="仅 Responses：设置外层文本模型的 reasoning.effort，不是图片质量。留空不发送；填写时需确认文本模型支持该档位。" />
             <Select value={profile.reasoningEffort ?? ''} onChange={(value) => props.onChange({ reasoningEffort: value ? value as ReasoningEffort : undefined }, true)} options={[{ label: '默认', value: '' }, ...REASONING_EFFORT_VALUES.map((value) => ({ label: value, value }))]} disabled={props.locked} className={INPUT_CLASS_NAME} />
           </div>}
           {isOpenAIConnection(profile.connectionId) && <>
-            <SettingSwitch label="流式传输" help="逐步接收生成结果，需要服务商支持。官方接口生成多图时会拆成并发单图请求。" checked={!!profile.streamImages} disabled={props.locked} onChange={() => props.onChange({ streamImages: !profile.streamImages }, true)} />
+            <SettingSwitch label="流式传输" help="逐步接收结果，需要接口支持。开启后，本应用会将多图拆成并发单图请求；Responses 多图始终拆分。" checked={!!profile.streamImages} disabled={props.locked} onChange={() => props.onChange({ streamImages: !profile.streamImages }, true)} />
             {profile.streamImages && <div>
-              <SettingLabel label="中间预览图" help="设为 2 或 3 可减少长时间无数据导致的断连。中间预览图可能产生额外费用；设为 0 时连接可能因长时间无数据而超时。" />
+              <SettingLabel label="中间预览图" help="请求 0–3 张生成中的预览图，实际数量由接口决定。预览图可能额外计费，不能保证避免连接超时。" />
               <Select value={normalizeStreamPartialImages(profile.streamPartialImages)} onChange={(value) => props.onChange({ streamPartialImages: normalizeStreamPartialImages(value, DEFAULT_STREAM_PARTIAL_IMAGES) }, true)} options={[{ label: '不请求', value: 0 }, { label: '1 张', value: 1 }, { label: '2 张', value: 2 }, { label: '3 张', value: 3 }]} disabled={props.locked} className={INPUT_CLASS_NAME} />
             </div>}
           </>}
           <div>
-            <SettingLabel label="透明背景" help="API 原生需要接口支持；本地后处理会在浏览器中移除生成图的纯色背景。" />
+            <SettingLabel label="透明背景实现方式" help="首页或默认值开启透明背景后生效。API 原生发送 background: transparent；本地后处理会添加纯色背景提示词，再在浏览器中去除背景。" />
             <Select value={profile.transparentBackgroundMethod} onChange={(value) => props.onChange({ transparentBackgroundMethod: value as ApiProfile['transparentBackgroundMethod'] }, true)} options={[{ label: 'API 原生', value: 'api' }, { label: '本地后处理', value: 'local' }]} disabled={props.locked || !nativeTransparent} className={INPUT_CLASS_NAME} />
             {!nativeTransparent && <p className="mt-1.5 text-xs text-gray-400">此服务商未配置原生透明背景，使用本地后处理。</p>}
           </div>
           {props.connectionAvailable && <>
-            <SettingSwitch label="返回 Base64 图片" help="在请求中添加 response_format: b64_json。部分服务商不支持，请按需开启。" checked={!!profile.responseFormatB64Json} disabled={props.locked} onChange={() => props.onChange({ responseFormatB64Json: !profile.responseFormatB64Json }, true)} />
-            <SettingSwitch label="Codex CLI 兼容模式" help="仅发送 Codex CLI 支持的参数，适用于对应的兼容服务。" checked={profile.codexCli} disabled={props.locked} onChange={() => props.onChange({ codexCli: !profile.codexCli }, true)} />
+            {profile.connectionId !== 'openai-responses' && <SettingSwitch label="兼容选项：请求 Base64" help="额外添加 response_format: b64_json（自定义接口仅 POST 生效）。官方 GPT Image 无需此字段；只在服务商要求时启用。自定义模板中的同名字段会被覆盖。" checked={!!profile.responseFormatB64Json} disabled={props.locked} onChange={() => props.onChange({ responseFormatB64Json: !profile.responseFormatB64Json }, true)} />}
+            <SettingSwitch label="Codex CLI 兼容模式" help="省略 size 和 quality，并将尺寸写入提示词。仅在渠道明确要求时开启；此模式不能保证任意 Codex 转发服务兼容。" checked={profile.codexCli} disabled={props.locked} onChange={() => props.onChange({ codexCli: !profile.codexCli }, true)} />
             <label className="block">
               <SettingLabel label="请求超时（秒）" />
               <input aria-label="请求超时（秒）" value={props.timeoutInput} onChange={(e) => props.onTimeoutChange(e.target.value)} onBlur={props.onTimeoutBlur} type="number" min={10} max={600} disabled={props.locked} className={INPUT_CLASS_NAME} />

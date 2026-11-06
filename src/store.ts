@@ -13,6 +13,7 @@ import { IMAGE_FETCH_CORS_HINT, isHttpUrl } from './lib/imageApiShared'
 import { getCustomQueuedImageResult } from './lib/openaiCompatibleImageApi'
 import { validateMaskMatchesImage } from './lib/canvasImage'
 import { orderInputImagesForMask } from './lib/mask'
+import { normalizeHomeParams, switchHomeParams } from './lib/homeParams'
 import { getChangedParams, normalizeParamsForSettings } from './lib/paramCompatibility'
 import { runWithConcurrency, splitBatchPrompts } from './lib/batchPrompts'
 import { createTransparentOutputMeta, getTransparentRequestParams, removeKeyedBackgroundFromDataUrl } from './lib/transparentImage'
@@ -158,6 +159,7 @@ interface AppState {
 
   // 参数
   params: TaskParams
+  paramsByProfile: Record<string, TaskParams>
   setParams: (p: Partial<TaskParams>) => void
   reusedTaskApiProfileId: string | null
   reusedTaskApiProfileName: string | null
@@ -350,6 +352,7 @@ export const useStore = create<AppState>()(
         const shouldClearReusedProfile = st.reusedTaskApiProfileId && settings.activeProfileId === st.reusedTaskApiProfileId
         return {
           settings,
+          ...switchHomeParams(st.params, st.paramsByProfile, previous.profiles.find((profile) => profile.id === st.reusedTaskApiProfileId) ?? getActiveApiProfile(previous), settings.profiles.find((profile) => profile.id === st.reusedTaskApiProfileId) ?? getActiveApiProfile(settings)),
           ...(shouldClearReusedProfile
             ? { reusedTaskApiProfileId: null, reusedTaskApiProfileName: null, reusedTaskApiProfileMissing: false, reusedTaskApiModel: null }
             : {}),
@@ -381,6 +384,7 @@ export const useStore = create<AppState>()(
           const shouldClearReusedProfile = state.reusedTaskApiProfileId && settings.activeProfileId === state.reusedTaskApiProfileId
           return {
             settings,
+            ...switchHomeParams(state.params, state.paramsByProfile, state.settings.profiles.find((profile) => profile.id === state.reusedTaskApiProfileId) ?? getActiveApiProfile(state.settings), settings.profiles.find((profile) => profile.id === state.reusedTaskApiProfileId) ?? getActiveApiProfile(settings)),
             previousPresetConfig: getPresetConfig() ? merged.presetConfig : null,
             dismissedPresetProfileIds,
             dismissedPresetConnectionIds,
@@ -483,17 +487,24 @@ export const useStore = create<AppState>()(
 
       // Params
       params: { ...DEFAULT_PARAMS },
+      paramsByProfile: {},
       setParams: (p) => set((s) => ({ params: { ...s.params, ...p } })),
       reusedTaskApiProfileId: null,
       reusedTaskApiProfileName: null,
       reusedTaskApiProfileMissing: false,
       reusedTaskApiModel: null,
-      setReusedTaskApiProfile: (profileId, missing = false, profileName = null, model = null) => set({
+      setReusedTaskApiProfile: (profileId, missing = false, profileName = null, model = null) => set((state) => ({
+        ...switchHomeParams(
+          state.params,
+          state.paramsByProfile,
+          state.settings.profiles.find((profile) => profile.id === state.reusedTaskApiProfileId) ?? getActiveApiProfile(state.settings),
+          state.settings.profiles.find((profile) => profile.id === profileId) ?? getActiveApiProfile(state.settings),
+        ),
         reusedTaskApiProfileId: profileId,
         reusedTaskApiProfileName: profileName,
         reusedTaskApiProfileMissing: missing,
         reusedTaskApiModel: profileId ? model : null,
-      }),
+      })),
       setReusedTaskApiModel: (reusedTaskApiModel) => set({ reusedTaskApiModel }),
       batchProgress: null,
       setBatchProgress: (batchProgress) => set({ batchProgress }),
@@ -1068,7 +1079,7 @@ export async function submitTask(options: { allowFullMask?: boolean; useCurrentA
     return
   }
 
-  const normalizedParams = normalizeParamsForSettings(params, requestSettings)
+  const normalizedParams = normalizeParamsForSettings(normalizeHomeParams(params, activeProfile, getCustomConnectionDefinition(requestSettings, activeProfile.connectionId), orderedInputImages.length > 0), requestSettings)
   const shouldUseTransparentOutput = (normalizedParams.output_format === 'png' || normalizedParams.output_format === 'webp') && normalizedParams.transparent_output
   const taskParams = shouldUseTransparentOutput
     ? getTransparentRequestParams(normalizedParams)
@@ -1399,17 +1410,6 @@ async function executeTask(taskId: string) {
       ? result.revisedPrompts?.map((prompt) => prompt == null ? prompt : stripInjectedCodexCliSizePrompt(prompt, requestPrompt, task.params.size))
       : result.revisedPrompts
     const revisedPromptByImage = shouldStoreRevisedPrompts ? mapRevisedPromptsByImage(outputIds, revisedPrompts) : undefined
-    const promptWasRevised = shouldStoreRevisedPrompts && revisedPrompts?.some(
-      (revisedPrompt) => revisedPrompt?.trim() && revisedPrompt.trim() !== requestPrompt.trim(),
-    )
-    const hasRevisedPromptValue = shouldStoreRevisedPrompts && revisedPrompts?.some((revisedPrompt) => revisedPrompt?.trim())
-    if (taskExecutions.get(taskId) === execution && taskConnection === 'openai-responses' && !activeProfile.codexCli) {
-      if (promptWasRevised) {
-        showCodexCliPrompt()
-      } else if (!hasRevisedPromptValue) {
-        showCodexCliPrompt(false, '接口没有返回官方 API 会返回的部分信息')
-      }
-    }
 
     // 更新任务
     const latestBeforeUpdate = useStore.getState().tasks.find((t) => t.id === taskId)
@@ -1699,13 +1699,13 @@ export async function reuseConfig(task: TaskRecord) {
   const reuseSettings = normalizeSettings(useStore.getState().settings)
   const paramsSettings = shouldTemporarilyReuseProfile && matchedProfile ? createSettingsForApiProfile(reuseSettings, matchedProfile) : reuseSettings
 
-  setParams(normalizeParamsForSettings(task.params, paramsSettings))
   setReusedTaskApiProfile(
     shouldTemporarilyReuseProfile && matchedProfile ? matchedProfile.id : null,
     missingReusedProfile,
     taskProfileName,
     shouldTemporarilyReuseProfile && matchedProfile ? matchedProfile.model : null,
   )
+  setParams(normalizeParamsForSettings(task.params, paramsSettings))
   clearMaskDraft()
 
   // 恢复输入图片
@@ -1886,6 +1886,7 @@ export async function clearData(options: ClearOptions = { clearConfig: true, cle
       setSettings({ ...DEFAULT_SETTINGS })
     }
     setParams({ ...DEFAULT_PARAMS })
+    useStore.setState({ paramsByProfile: {} })
   }
 
   showToast('所选数据已清空', 'success')

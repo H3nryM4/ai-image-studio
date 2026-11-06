@@ -33,6 +33,15 @@ function fallback() {
 }
 
 describe('persisted state codec', () => {
+  it('keeps temporary task reuse from overwriting the active profile parameters on reload', () => {
+    const settings = normalizeSettings({ profiles: [{ ...DEFAULT_SETTINGS.profiles[0], id: 'first' }, { ...DEFAULT_SETTINGS.profiles[0], id: 'second' }], activeProfileId: 'first' })
+    const state = source(settings)
+    const persisted = createPersistedState({ ...state, reusedTaskApiProfileId: 'second', params: { ...DEFAULT_PARAMS, quality: 'low' }, paramsByProfile: { 'first:openai-images': { ...DEFAULT_PARAMS, quality: 'high' } } })
+    const restored = normalizePersistedState(persisted, fallback())!
+    expect(restored.params.quality).toBe('high')
+    expect(restored.paramsByProfile['second:openai-images'].quality).toBe('low')
+  })
+
   it.each([undefined, 'custom-image-model', '', '   '])('restores profile tool model %s without autofilling', (imageGenerationModel) => {
     const profile = { connectionId: 'openai-responses', model: 'saved-text-model', ...(imageGenerationModel === undefined ? {} : { imageGenerationModel }) }
     const result = normalizePersistedState({ settings: { profiles: [profile] } }, fallback(), 100)!

@@ -1,11 +1,11 @@
 import { useTooltip } from '../../hooks/useTooltip'
 import ViewportTooltip from '../ViewportTooltip'
 
-export default function SettingLabel({ label, help, className = 'mb-1.5' }: { label: string, help?: string, className?: string }) {
+export default function SettingLabel({ label, help, className = 'mb-1.5', small = false }: { label: string, help?: string, className?: string, small?: boolean }) {
   const tip = useTooltip()
 
   return (
-    <div className={`flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-300 ${className}`}>
+    <div className={`flex items-center gap-1.5 ${small ? 'text-xs text-gray-400' : 'text-sm text-gray-600 dark:text-gray-300'} ${className}`}>
       <span>{label}</span>
       {help && (
         <span className="relative inline-flex shrink-0" {...tip.handlers}>

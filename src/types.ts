@@ -87,7 +87,11 @@ export interface ApiProfile {
   streamImages?: boolean
   streamPartialImages?: number
   transparentBackgroundMethod: 'api' | 'local'
-  connectionDrafts?: Partial<Record<ApiConnectionId, Partial<Pick<ApiProfile, 'baseUrl' | 'model' | 'imageGenerationModel' | 'reasoningEffort' | 'codexCli' | 'apiProxy' | 'responseFormatB64Json' | 'streamImages' | 'streamPartialImages' | 'transparentBackgroundMethod'>>>>
+  /** 可在首页“更多设置”中调整的参数。 */
+  homeParams?: HomeParam[]
+  /** 首页隐藏的参数使用此配置的默认值。 */
+  paramDefaults?: Partial<Pick<TaskParams, HomeParam>>
+  connectionDrafts?: Partial<Record<ApiConnectionId, Partial<Pick<ApiProfile, 'baseUrl' | 'model' | 'imageGenerationModel' | 'reasoningEffort' | 'codexCli' | 'apiProxy' | 'responseFormatB64Json' | 'streamImages' | 'streamPartialImages' | 'transparentBackgroundMethod' | 'homeParams' | 'paramDefaults'>>>>
 }
 
 export interface PresetConfig {
@@ -167,6 +171,10 @@ export const DEFAULT_PARAMS: TaskParams = {
   n: 1,
   transparent_output: false,
 }
+
+export const HOME_PARAM_KEYS = ['quality', 'output_format', 'transparent_output', 'output_compression', 'moderation'] as const
+export type HomeParam = typeof HOME_PARAM_KEYS[number]
+export const DEFAULT_HOME_PARAMS: HomeParam[] = ['quality']
 
 // ===== 输入图片（UI 层面） =====
 

@@ -1,7 +1,6 @@
 import type { AppSettings } from '../../types'
 import Select from '../Select'
-
-const SELECT_CLASS_NAME = 'w-full rounded-xl border border-transparent bg-black/[0.04] px-3 py-1.5 text-xs text-gray-700 outline-hidden transition hover:bg-black/[0.07] dark:bg-white/[0.06] dark:text-gray-200 dark:hover:bg-white/[0.1]'
+import { SETTING_CONTROL_CLASS_NAME } from './settingStyles'
 
 interface AppearanceSettingsTabProps {
   draft: AppSettings
@@ -25,7 +24,7 @@ export default function AppearanceSettingsTab({ draft, commitSettings }: Appeara
                   { label: '浅色', value: 'light' },
                   { label: '深色', value: 'dark' },
                 ]}
-                className={SELECT_CLASS_NAME}
+                className={SETTING_CONTROL_CLASS_NAME}
               />
             </div>
           </div>
