@@ -1419,9 +1419,9 @@ describe('custom connections', () => {
 
   it('uses connection-specific streaming defaults and preserves partial image count', () => {
     expect(createDefaultOpenAIProfile().streamImages).toBe(false)
-    expect(createDefaultOpenAIProfile().streamPartialImages).toBe(1)
+    expect(createDefaultOpenAIProfile().streamPartialImages).toBe(0)
     expect(DEFAULT_SETTINGS.profiles[0].streamImages).toBe(false)
-    expect(DEFAULT_SETTINGS.profiles[0].streamPartialImages).toBe(1)
+    expect(DEFAULT_SETTINGS.profiles[0].streamPartialImages).toBe(0)
 
     const normalized = normalizeSettings({
       profiles: [
@@ -1470,7 +1470,7 @@ describe('custom connections', () => {
       ],
     })
 
-    expect(settings.connectionOrder).toEqual(['custom-beta', 'openai-images', 'custom-alpha'])
+    expect(settings.connectionOrder).toEqual(['custom-beta', 'openai-images', 'gemini-generate-content', 'custom-alpha'])
   })
 
   it('reads the active connection from its profile', () => {

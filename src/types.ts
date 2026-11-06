@@ -11,7 +11,7 @@ export type ZipDownloadRoute = typeof ZIP_DOWNLOAD_ROUTE_VALUES[number]
 export const DEFAULT_ZIP_DOWNLOAD_ROUTES: ZipDownloadRoute[] = ['task-selection', 'favorite-collection-selection']
 export type ApiConnectionId = string
 export type CustomConnectionTemplate = 'http-image'
-export const DEFAULT_STREAM_PARTIAL_IMAGES = 1
+export const DEFAULT_STREAM_PARTIAL_IMAGES = 0
 /** 接口允许的参考图数量上限 */
 export const MAX_INPUT_IMAGES = 16
 
@@ -86,7 +86,7 @@ export interface ApiProfile {
   /** 可在首页“更多设置”中调整的参数。 */
   homeParams?: HomeParam[]
   /** 首页隐藏的参数使用此配置的默认值。 */
-  paramDefaults?: Partial<Pick<TaskParams, HomeParam>>
+  paramDefaults?: Partial<Pick<TaskParams, HomeParam | 'size' | 'background'>>
   connectionDrafts?: Partial<Record<ApiConnectionId, Partial<Pick<ApiProfile, 'baseUrl' | 'model' | 'codexCli' | 'apiProxy' | 'responseFormatB64Json' | 'streamImages' | 'streamPartialImages' | 'transparentBackgroundMethod' | 'homeParams' | 'paramDefaults'>>>>
 }
 
@@ -150,27 +150,34 @@ export interface AppSettings {
 
 export interface TaskParams {
   size: string
-  quality: 'auto' | 'low' | 'medium' | 'high' | 'xhigh' | 'max'
-  output_format: 'png' | 'jpeg' | 'webp'
+  /** Gemini 的比例和分辨率独立于 Images API 的像素尺寸。 */
+  aspect_ratio?: string
+  image_size?: string
+  thinking_level?: 'default' | 'minimal' | 'medium' | 'high'
+  background?: 'default' | 'auto' | 'opaque' | 'transparent'
+  quality: 'default' | 'auto' | 'low' | 'medium' | 'high' | 'xhigh' | 'max'
+  output_format: 'default' | 'png' | 'jpeg' | 'webp'
   output_compression: number | null
-  moderation: 'auto' | 'low'
+  moderation: 'default' | 'auto' | 'low'
   n: number
   transparent_output: boolean
 }
 
 export const DEFAULT_PARAMS: TaskParams = {
-  size: 'auto',
-  quality: 'auto',
-  output_format: 'png',
+  size: 'default',
+  quality: 'default',
+  output_format: 'default',
   output_compression: null,
-  moderation: 'auto',
+  moderation: 'default',
+  background: 'default',
+  thinking_level: 'default',
   n: 1,
   transparent_output: false,
 }
 
-export const HOME_PARAM_KEYS = ['quality', 'output_format', 'transparent_output', 'output_compression', 'moderation'] as const
+export const HOME_PARAM_KEYS = ['quality', 'output_format', 'transparent_output', 'output_compression', 'moderation', 'thinking_level', 'n'] as const
 export type HomeParam = typeof HOME_PARAM_KEYS[number]
-export const DEFAULT_HOME_PARAMS: HomeParam[] = ['quality']
+export const DEFAULT_HOME_PARAMS: HomeParam[] = ['quality', 'n']
 
 // ===== 输入图片（UI 层面） =====
 

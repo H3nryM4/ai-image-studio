@@ -51,8 +51,10 @@ it('keeps the default toolbar compact and exposes quality only after opening mor
   expect(el.textContent).not.toContain('gpt-image')
   expect(el.textContent).not.toContain('质量')
   expect(el.textContent).not.toContain('PNG')
+  expect(el.textContent).not.toContain('数量')
   await act(async () => [...el.querySelectorAll('button')].find((button) => button.textContent === '更多设置')!.click())
   expect(el.textContent).toContain('质量')
+  expect(el.textContent).toContain('数量')
   expect(el.textContent).not.toContain('内容审核级别')
 })
 
@@ -67,6 +69,6 @@ it('shows WebP compression and transparency together', async () => {
     params: { ...DEFAULT_PARAMS, output_format: 'webp' }, compressionDisabled: false,
   })
   await act(async () => [...el.querySelectorAll('button')].find((button) => button.textContent === '更多设置')!.click())
-  expect(el.textContent).toContain('透明背景')
+  expect(el.textContent).toContain('背景')
   expect(el.textContent).toContain('压缩参数')
 })

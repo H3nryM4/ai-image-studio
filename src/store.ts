@@ -12,6 +12,7 @@ import { showBrowserNotification } from './lib/browserNotification'
 import { IMAGE_FETCH_CORS_HINT, isHttpUrl } from './lib/imageApiShared'
 import { getCustomQueuedImageResult } from './lib/openaiCompatibleImageApi'
 import { validateMaskMatchesImage } from './lib/canvasImage'
+import { GEMINI_CONNECTION_ID } from './lib/gemini'
 import { orderInputImagesForMask } from './lib/mask'
 import { normalizeHomeParams, switchHomeParams } from './lib/homeParams'
 import { getChangedParams, normalizeParamsForSettings } from './lib/paramCompatibility'
@@ -473,12 +474,18 @@ export const useStore = create<AppState>()(
       clearMaskDraft: () => set({ maskDraft: null }),
       maskEditorImageId: null,
       setMaskEditorImageId: (maskEditorImageId) => {
+        const state = useStore.getState()
+        const profile = state.settings.profiles.find((item) => item.id === state.reusedTaskApiProfileId) ?? getActiveApiProfile(state.settings)
+        if (maskEditorImageId && profile.connectionId === GEMINI_CONNECTION_ID) {
+          state.showToast('Gemini 暂不支持蒙版编辑，请使用画板或文字描述修改区域', 'info')
+          return
+        }
         if (maskEditorImageId) dismissAllTooltips()
         set({ maskEditorImageId })
       },
 
       // Params
-      params: { ...DEFAULT_PARAMS },
+      params: { ...DEFAULT_PARAMS, ...getActiveApiProfile(DEFAULT_SETTINGS).paramDefaults },
       paramsByProfile: {},
       setParams: (p) => set((s) => ({ params: { ...s.params, ...p } })),
       reusedTaskApiProfileId: null,
@@ -713,6 +720,7 @@ function scheduleOpenAIWatchdog(taskId: string, timeoutSeconds: number, profile?
 function usesConcurrentImageRequests(settings: AppSettings, profile: ApiProfile, params: TaskParams, hasInputImages: boolean) {
   const n = params.n > 0 ? params.n : 1
   if (n <= 1) return false
+  if (profile.connectionId === GEMINI_CONNECTION_ID) return true
   if (isOpenAIConnection(profile.connectionId)) {
     return profile.codexCli || profile.streamImages
   }
@@ -1042,7 +1050,7 @@ export async function submitTask(options: { allowFullMask?: boolean; useCurrentA
   }
 
   const normalizedParams = normalizeParamsForSettings(normalizeHomeParams(params, activeProfile, getCustomConnectionDefinition(requestSettings, activeProfile.connectionId), orderedInputImages.length > 0), requestSettings)
-  const shouldUseTransparentOutput = (normalizedParams.output_format === 'png' || normalizedParams.output_format === 'webp') && normalizedParams.transparent_output
+  const shouldUseTransparentOutput = (normalizedParams.output_format === 'default' || normalizedParams.output_format === 'png' || normalizedParams.output_format === 'webp') && normalizedParams.transparent_output
   const taskParams = shouldUseTransparentOutput
     ? getTransparentRequestParams(normalizedParams)
     : { ...normalizedParams, transparent_output: false }
@@ -1331,7 +1339,6 @@ async function executeTask(taskId: string) {
       settings: requestSettings,
       prompt: getTaskPromptText(requestPrompt),
       params: task.params,
-      nativeTransparentBackground: task.params.transparent_output && !task.transparentOutput,
       inputImageDataUrls: inputDataUrls,
       inputImageUrls: task.inputImageIds.map((id) => useStore.getState().imageSourceUrls[id] ?? null),
       maskDataUrl,
@@ -1569,7 +1576,7 @@ export async function retryTask(task: TaskRecord) {
   if (!source || source.status === 'running' || source.customRecoverable) return
   const activeProfile = getActiveApiProfile(settings)
   const normalizedParams = normalizeParamsForSettings(source.params, settings)
-  const shouldUseTransparentOutput = (normalizedParams.output_format === 'png' || normalizedParams.output_format === 'webp') && normalizedParams.transparent_output
+  const shouldUseTransparentOutput = (normalizedParams.output_format === 'default' || normalizedParams.output_format === 'png' || normalizedParams.output_format === 'webp') && normalizedParams.transparent_output
   const taskParams = shouldUseTransparentOutput
     ? getTransparentRequestParams(normalizedParams)
     : { ...normalizedParams, transparent_output: false }
@@ -1846,7 +1853,7 @@ export async function clearData(options: ClearOptions = { clearConfig: true, cle
     } else {
       setSettings({ ...DEFAULT_SETTINGS })
     }
-    setParams({ ...DEFAULT_PARAMS })
+    setParams({ ...DEFAULT_PARAMS, ...getActiveApiProfile(useStore.getState().settings).paramDefaults })
     useStore.setState({ paramsByProfile: {} })
   }
 

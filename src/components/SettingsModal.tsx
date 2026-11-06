@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { normalizeBaseUrl } from '../lib/api'
+import { GEMINI_CONNECTION_ID, DEFAULT_GEMINI_MODEL, normalizeGeminiBaseUrl } from '../lib/gemini'
 import { hasActiveDataOperations } from '../lib/dataOperations'
 import { isApiProxyAvailable, isApiProxyLocked, readClientDevProxyConfig } from '../lib/devProxy'
 import { useStore, exportData, importData, clearData, type SettingsTab } from '../store'
@@ -183,7 +184,7 @@ export default function SettingsModal({ onImportProfile }: { onImportProfile: (s
   const activeProfileApiProxyEligible = isProfileApiProxyEligible(draft, activeProfile)
   const apiProxyChecked = activeProfileApiProxyEligible && (apiProxyLocked || activeProfile.apiProxy)
   const apiProxyEnabled = apiProxyAvailable && activeProfileApiProxyEligible && apiProxyChecked
-  const defaultConnectionOrder = ['openai-images', ...draft.customConnections.map((p) => p.id)]
+  const defaultConnectionOrder = ['openai-images', GEMINI_CONNECTION_ID, ...draft.customConnections.map((p) => p.id)]
   const connectionOrder = draft.connectionOrder || defaultConnectionOrder
 
   useEffect(() => {
@@ -195,6 +196,7 @@ export default function SettingsModal({ onImportProfile }: { onImportProfile: (s
 
   const unorderedConnectionOptions = [
     { label: 'OpenAI Images API', value: 'openai-images', draggable: true },
+    { label: 'Gemini generateContent', value: GEMINI_CONNECTION_ID, draggable: true },
     ...draft.customConnections.map((connection) => {
       const actions = [
         ...(!presetConfigOnly && !isPresetConnectionLocked(connection.id) ? [{ label: '编辑', onClick: () => openEditCustomConnection(connection) }] : []),
@@ -343,12 +345,12 @@ export default function SettingsModal({ onImportProfile }: { onImportProfile: (s
       const emptyBaseUrlFallback = profile.id === defaultProfileId
         ? getDefaultPresetBaseUrl()
         : DEFAULT_API_BASE_URL
-      const normalizedBaseUrl = shouldKeepEmptyBaseUrl ? '' : normalizeBaseUrl(profile.baseUrl.trim() || emptyBaseUrlFallback)
+      const normalizedBaseUrl = shouldKeepEmptyBaseUrl ? '' : profile.connectionId === GEMINI_CONNECTION_ID ? normalizeGeminiBaseUrl(profile.baseUrl) : normalizeBaseUrl(profile.baseUrl.trim() || emptyBaseUrlFallback)
       return {
         ...profile,
         name: profile.name.trim() || (profile.id === defaultProfileId ? '默认' : '新配置'),
         baseUrl: normalizedBaseUrl,
-        model: profile.model.trim() || DEFAULT_IMAGES_MODEL,
+        model: profile.model.trim() || (profile.connectionId === GEMINI_CONNECTION_ID ? DEFAULT_GEMINI_MODEL : DEFAULT_IMAGES_MODEL),
         timeout: Number(profile.timeout) || DEFAULT_API_TIMEOUT,
         apiProxy: nextApiProxy,
         codexCli: isApiConnectionAvailable(nextDraft, profile.connectionId) ? profile.codexCli : false,

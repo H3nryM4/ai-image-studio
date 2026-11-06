@@ -5,6 +5,7 @@ import { usePreventBackgroundScroll } from '../hooks/usePreventBackgroundScroll'
 import { useTooltip } from '../hooks/useTooltip'
 import { ensureImageCached, getCachedImage } from '../lib/imageCache'
 import { formatImageRatio } from '../lib/size'
+import { GEMINI_CONNECTION_ID } from '../lib/gemini'
 import { ActualValueBadge, DetailParamValue } from '../lib/paramDisplay'
 import { copyImageSourceToClipboard, copyTextToClipboard, getClipboardFailureMessage } from '../lib/clipboard'
 import { createMaskPreviewDataUrl } from '../lib/canvasImage'
@@ -259,8 +260,8 @@ export default function DetailModal() {
   const streamPreviewLen = streamPreviewItems.length
   const currentStreamPreviewSrc = activeStreamPreviewSrc
   const streamPartialImageIds = task.streamPartialImageIds ?? []
-  const supportsTransparentOutput = task.params.output_format === 'png' || task.params.output_format === 'webp'
-  const transparentOutputText = task.transparentOutput || task.params.transparent_output ? 'true' : 'false'
+  const supportsTransparentOutput = task.params.output_format === 'default' || task.params.output_format === 'png' || task.params.output_format === 'webp'
+  const transparentOutputText = task.transparentOutput ? '本地去背景' : currentActualParams?.background === 'opaque' ? '不透明' : currentActualParams?.background === 'transparent' ? '透明' : task.params.background === 'opaque' ? '不透明' : task.params.background === 'transparent' ? '透明' : '接口默认'
   const currentTransparentOutputFailed = Boolean(currentOutputImageId && task.transparentOutput && task.transparentOriginalImages?.[currentOutputImageIndex] === '')
   const outputCompressionText = task.params.output_compression == null ? '未设置' : String(task.params.output_compression)
 
@@ -929,10 +930,10 @@ export default function DetailModal() {
                 </div>
               </div>
               <div className="bg-gray-50 dark:bg-white/[0.03] rounded-lg px-3 py-2 min-w-0 overflow-hidden">
-                <span className="text-gray-400 dark:text-gray-500">质量</span>
+                <span className="text-gray-400 dark:text-gray-500">{task.apiConnectionId === GEMINI_CONNECTION_ID ? '比例与分辨率' : '质量'}</span>
                 <br />
                 <div className="mt-0.5 overflow-x-auto hide-scrollbar whitespace-nowrap mask-edge-r pr-2">
-                  <DetailParamValue task={task} paramKey="quality" className="font-medium" actualParams={currentActualParams} />
+                  {task.apiConnectionId === GEMINI_CONNECTION_ID ? <span className="font-medium text-gray-700 dark:text-gray-300">{task.params.aspect_ratio === 'auto' || !task.params.aspect_ratio ? '自动' : task.params.aspect_ratio} · {task.params.image_size === 'auto' || !task.params.image_size ? '默认' : task.params.image_size}</span> : <DetailParamValue task={task} paramKey="quality" className="font-medium" actualParams={currentActualParams} />}
                 </div>
               </div>
               <div className="bg-gray-50 dark:bg-white/[0.03] rounded-lg px-3 py-2 min-w-0 overflow-hidden">
@@ -944,7 +945,7 @@ export default function DetailModal() {
               </div>
               {supportsTransparentOutput && (
                 <div className="bg-gray-50 dark:bg-white/[0.03] rounded-lg px-3 py-2 min-w-0 overflow-hidden">
-                  <span className="text-gray-400 dark:text-gray-500">透明背景</span>
+                  <span className="text-gray-400 dark:text-gray-500">背景</span>
                   <br />
                   <div className="mt-0.5 overflow-x-auto hide-scrollbar whitespace-nowrap mask-edge-r pr-2">
                     <span className="font-medium text-gray-700 dark:text-gray-300">{transparentOutputText}</span>
@@ -965,13 +966,17 @@ export default function DetailModal() {
                   </div>
                 </div>
               )}
-              <div className="bg-gray-50 dark:bg-white/[0.03] rounded-lg px-3 py-2 min-w-0 overflow-hidden">
+              {task.apiConnectionId === GEMINI_CONNECTION_ID && <div className="bg-gray-50 dark:bg-white/[0.03] rounded-lg px-3 py-2 min-w-0 overflow-hidden">
+                <span className="text-gray-400 dark:text-gray-500">思考强度</span><br />
+                <span className="font-medium text-gray-700 dark:text-gray-300">{task.params.thinking_level === 'high' ? '深入' : task.params.thinking_level === 'medium' ? '适中' : task.params.thinking_level === 'minimal' ? '快速' : '接口默认'}</span>
+              </div>}
+              {task.apiConnectionId !== GEMINI_CONNECTION_ID && <div className="bg-gray-50 dark:bg-white/[0.03] rounded-lg px-3 py-2 min-w-0 overflow-hidden">
                 <span className="text-gray-400 dark:text-gray-500">审核</span>
                 <br />
                 <div className="mt-0.5 overflow-x-auto hide-scrollbar whitespace-nowrap mask-edge-r pr-2">
                   <DetailParamValue task={task} paramKey="moderation" className="font-medium" actualParams={currentActualParams} />
                 </div>
-              </div>
+              </div>}
               <div className="bg-gray-50 dark:bg-white/[0.03] rounded-lg px-3 py-2 min-w-0 overflow-hidden">
                 <span className="text-gray-400 dark:text-gray-500">数量</span>
                 <br />

@@ -2,6 +2,7 @@ import { useState, type ComponentProps, type Ref } from 'react'
 import { DEFAULT_STREAM_PARTIAL_IMAGES, type ApiProfile, type CustomConnectionDefinition } from '../../types'
 import { DEFAULT_IMAGES_MODEL, DEFAULT_API_BASE_URL, isOpenAIConnection, normalizeStreamPartialImages } from '../../lib/apiProfiles'
 import { customConnectionSupportsNativeTransparentBackground } from '../../lib/customConnectionCapabilities'
+import { GEMINI_CONNECTION_ID, DEFAULT_GEMINI_BASE_URL, DEFAULT_GEMINI_MODEL } from '../../lib/gemini'
 import Select from '../Select'
 import { ChevronDownIcon } from '../icons'
 import SettingLabel from './SettingLabel'
@@ -34,7 +35,8 @@ interface ApiProfileEditorProps {
 export default function ApiProfileEditor(props: ApiProfileEditorProps) {
   const [showKey, setShowKey] = useState(false)
   const profile = props.profile
-  const nativeTransparent = !props.customConnection || customConnectionSupportsNativeTransparentBackground(props.customConnection)
+  const gemini = profile.connectionId === GEMINI_CONNECTION_ID
+  const nativeTransparent = !gemini && (!props.customConnection || customConnectionSupportsNativeTransparentBackground(props.customConnection))
   const connectionOptions = props.presetOnly
     ? props.connectionOptions.filter((option) => option.value === profile.connectionId)
     : props.connectionOptions
@@ -47,7 +49,7 @@ export default function ApiProfileEditor(props: ApiProfileEditorProps) {
           <input ref={props.nameInputRef} aria-label="配置名称" value={profile.name} onChange={(e) => props.onChange({ name: e.target.value })} onBlur={(e) => props.onCommit({ name: e.target.value })} disabled={props.locked} className={INPUT_CLASS_NAME} />
         </label>
         <div className="min-w-0">
-          <SettingLabel label="接入方式" help="内置接入按 OpenAI 官方协议发送参数。第三方需兼容相应字段；字段有差异时可使用自定义 HTTP 接口。" />
+          <SettingLabel label="接入方式" help="内置接入按所选官方协议发送参数。第三方需兼容相应路径、认证和字段；字段有差异时可使用自定义 HTTP 接口。" />
           <Select
             value={!props.connectionAvailable ? '接入已失效，请重新选择' : profile.connectionId}
             onChange={props.onConnectionChange}
@@ -59,21 +61,21 @@ export default function ApiProfileEditor(props: ApiProfileEditorProps) {
         </div>
       </div>
       {props.connectionAvailable && <div>
-        <SettingLabel label="API 地址" help={'通常填写服务商提供的基础地址。末尾带 / 时按原地址拼接接口，不自动补 /v1。'} />
-        <input aria-label="API 地址" value={profile.baseUrl} onChange={(e) => props.onChange({ baseUrl: e.target.value })} onBlur={(e) => props.onCommit({ baseUrl: e.target.value })} disabled={props.apiProxyEnabled || props.locked} placeholder={DEFAULT_API_BASE_URL} className={INPUT_CLASS_NAME} />
+        <SettingLabel label="API 地址" help={gemini ? '填写服务商提供的基础地址。只填域名时，请求自动补 /v1beta；末尾带 / 时按原地址拼接接口，不补版本。认证使用 x-goog-api-key。' : '通常填写服务商提供的基础地址。末尾带 / 时按原地址拼接接口，不自动补 /v1。'} />
+        <input aria-label="API 地址" value={profile.baseUrl} onChange={(e) => props.onChange({ baseUrl: e.target.value })} onBlur={(e) => props.onCommit({ baseUrl: e.target.value })} disabled={props.apiProxyEnabled || props.locked} placeholder={gemini ? DEFAULT_GEMINI_BASE_URL : DEFAULT_API_BASE_URL} className={INPUT_CLASS_NAME} />
         {props.apiProxyEnabled && <p className="mt-1.5 text-xs text-amber-600 dark:text-amber-500">已启用部署代理，实际 API 地址由部署端决定。</p>}
       </div>}
       {props.apiProxyAvailable && <SettingSwitch label="使用部署代理" help="请求经部署服务器转发，可绕过浏览器跨域限制。启用后 API 地址由部署端决定。" checked={props.apiProxyChecked} disabled={props.apiProxyLocked || props.locked} onChange={() => props.onChange({ apiProxy: !profile.apiProxy }, true)} />}
       <div>
         <SettingLabel label="API Key" />
         <div className="relative">
-          <input aria-label="API Key" autoComplete="off" value={profile.apiKey} onChange={(e) => props.onChange({ apiKey: e.target.value })} onBlur={(e) => props.onCommit({ apiKey: e.target.value })} type={showKey ? 'text' : 'password'} placeholder={'sk-...'} className={`${INPUT_CLASS_NAME} pr-14`} />
+          <input aria-label="API Key" autoComplete="off" value={profile.apiKey} onChange={(e) => props.onChange({ apiKey: e.target.value })} onBlur={(e) => props.onCommit({ apiKey: e.target.value })} type={showKey ? 'text' : 'password'} placeholder={gemini ? 'API Key' : 'sk-...'} className={`${INPUT_CLASS_NAME} pr-14`} />
           <button type="button" onClick={() => setShowKey(!showKey)} aria-label={showKey ? '隐藏 API Key' : '显示 API Key'} className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 hover:text-blue-500">{showKey ? '隐藏' : '显示'}</button>
         </div>
       </div>
       <div>
         <SettingLabel label="模型 ID" help="填写服务商提供的模型 ID。" />
-        <input aria-label="模型 ID" value={profile.model} onChange={(e) => props.onChange({ model: e.target.value })} onBlur={(e) => props.onCommit({ model: e.target.value })} disabled={props.locked} placeholder={DEFAULT_IMAGES_MODEL} className={INPUT_CLASS_NAME} />
+        <input aria-label="模型 ID" value={profile.model} onChange={(e) => props.onChange({ model: e.target.value })} onBlur={(e) => props.onCommit({ model: e.target.value })} disabled={props.locked} placeholder={gemini ? DEFAULT_GEMINI_MODEL : DEFAULT_IMAGES_MODEL} className={INPUT_CLASS_NAME} />
         <p className="mt-1.5 text-xs text-gray-400">多个模型用逗号分隔，可在首页切换。</p>
       </div>
       <ProfileParamsEditor profile={profile} connection={props.customConnection} locked={props.locked} onChange={props.onChange} />
@@ -87,14 +89,14 @@ export default function ApiProfileEditor(props: ApiProfileEditorProps) {
               <Select value={normalizeStreamPartialImages(profile.streamPartialImages)} onChange={(value) => props.onChange({ streamPartialImages: normalizeStreamPartialImages(value, DEFAULT_STREAM_PARTIAL_IMAGES) }, true)} options={[{ label: '不请求', value: 0 }, { label: '1 张', value: 1 }, { label: '2 张', value: 2 }, { label: '3 张', value: 3 }]} disabled={props.locked} className={INPUT_CLASS_NAME} />
             </div>}
           </>}
-          <div>
+          {!gemini && <div>
             <SettingLabel label="透明背景实现方式" help="首页或默认值开启透明背景后生效。API 原生发送 background: transparent；本地后处理会添加纯色背景提示词，再在浏览器中去除背景。" />
             <Select value={profile.transparentBackgroundMethod} onChange={(value) => props.onChange({ transparentBackgroundMethod: value as ApiProfile['transparentBackgroundMethod'] }, true)} options={[{ label: 'API 原生', value: 'api' }, { label: '本地后处理', value: 'local' }]} disabled={props.locked || !nativeTransparent} className={INPUT_CLASS_NAME} />
             {!nativeTransparent && <p className="mt-1.5 text-xs text-gray-400">此服务商未配置原生透明背景，使用本地后处理。</p>}
-          </div>
+          </div>}
           {props.connectionAvailable && <>
-            <SettingSwitch label="兼容选项：请求 Base64" help="额外添加 response_format: b64_json（自定义接口仅 POST 生效）。官方 GPT Image 无需此字段；只在服务商要求时启用。自定义模板中的同名字段会被覆盖。" checked={!!profile.responseFormatB64Json} disabled={props.locked} onChange={() => props.onChange({ responseFormatB64Json: !profile.responseFormatB64Json }, true)} />
-            <SettingSwitch label="Codex CLI 兼容模式" help="省略 size 和 quality，并将尺寸写入提示词。仅在渠道明确要求时开启；此模式不能保证任意 Codex 转发服务兼容。" checked={profile.codexCli} disabled={props.locked} onChange={() => props.onChange({ codexCli: !profile.codexCli }, true)} />
+            {!gemini && <SettingSwitch label="兼容选项：请求 Base64" help="额外添加 response_format: b64_json（自定义接口仅 POST 生效）。官方 GPT Image 无需此字段；只在服务商要求时启用。自定义模板中的同名字段会被覆盖。" checked={!!profile.responseFormatB64Json} disabled={props.locked} onChange={() => props.onChange({ responseFormatB64Json: !profile.responseFormatB64Json }, true)} />}
+            {!gemini && <SettingSwitch label="Codex CLI 兼容模式" help="省略 size 和 quality，并将尺寸写入提示词。仅在渠道明确要求时开启；此模式不能保证任意 Codex 转发服务兼容。" checked={profile.codexCli} disabled={props.locked} onChange={() => props.onChange({ codexCli: !profile.codexCli }, true)} />}
             <label className="block">
               <SettingLabel label="请求超时（秒）" />
               <input aria-label="请求超时（秒）" value={props.timeoutInput} onChange={(e) => props.onTimeoutChange(e.target.value)} onBlur={props.onTimeoutBlur} type="number" min={10} max={600} disabled={props.locked} className={INPUT_CLASS_NAME} />

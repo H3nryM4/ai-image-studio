@@ -9,8 +9,15 @@ import { createCustomProfileImportUrl } from './profileImportUrl'
 afterEach(() => vi.restoreAllMocks())
 
 describe('home parameters', () => {
+  it('uses a configured hidden count and exposes Gemini thinking only for supported models', () => {
+    const profile = createDefaultOpenAIProfile({ homeParams: [], paramDefaults: { n: 3 } })
+    expect(normalizeHomeParams({ ...DEFAULT_PARAMS, n: 7 }, profile).n).toBe(3)
+    const gemini = createDefaultOpenAIProfile({ connectionId: 'gemini-generate-content', model: 'gemini-3.1-flash-image', homeParams: [], paramDefaults: { thinking_level: 'high' } })
+    expect(normalizeHomeParams(DEFAULT_PARAMS, gemini).thinking_level).toBe('high')
+    expect(getHomeParamState({ ...gemini, model: 'gemini-2.5-flash-image' }).available).not.toContain('thinking_level')
+  })
   it('uses profile defaults for hidden fields and keeps WebP compression with transparency', () => {
-    const profile = createDefaultOpenAIProfile({ homeParams: [], paramDefaults: { output_format: 'webp', output_compression: 75, transparent_output: true, moderation: 'auto', quality: 'high' } })
+    const profile = createDefaultOpenAIProfile({ homeParams: [], paramDefaults: { output_format: 'webp', output_compression: 75, background: 'transparent', transparent_output: true, moderation: 'auto', quality: 'high' } })
     expect(normalizeHomeParams({ ...DEFAULT_PARAMS, moderation: 'low' }, profile)).toMatchObject(profile.paramDefaults!)
     const restored = readProfileImport(createProfileShareJson(profile), normalizeSettings({ profiles: [profile] })).profiles[0]
     expect(restored.paramDefaults).toEqual(profile.paramDefaults)
@@ -18,14 +25,14 @@ describe('home parameters', () => {
 
   it('validates imported defaults without accepting unrelated task fields', () => {
     const profile = normalizeSettings({ profiles: [{ ...createDefaultOpenAIProfile(), paramDefaults: { quality: 'invalid', output_format: 'gif', n: 999, moderation: 'off', output_compression: 200, transparent_output: 'true' } }] }).profiles[0]
-    expect(profile.paramDefaults).toEqual({ output_compression: 100 })
+    expect(profile.paramDefaults).toEqual({ ...DEFAULT_PARAMS, n: 10, output_compression: 100 })
   })
 
   it('restores each profile selection without carrying choices to another channel', () => {
     const first = createDefaultOpenAIProfile({ id: 'first' })
     const second = createDefaultOpenAIProfile({ id: 'second', paramDefaults: { quality: 'low' } })
     const switched = switchHomeParams({ ...DEFAULT_PARAMS, quality: 'high', size: '1536x1024' }, {}, first, second)
-    expect(switched.params).toMatchObject({ quality: 'low', size: 'auto' })
+    expect(switched.params).toMatchObject({ quality: 'low', size: 'default' })
     expect(switchHomeParams({ ...switched.params, n: 2 }, switched.paramsByProfile, second, first).params).toMatchObject({ quality: 'high', size: '1536x1024', n: 1 })
   })
 
@@ -38,7 +45,7 @@ describe('home parameters', () => {
 
   it('defaults old profiles to quality and preserves an explicit empty selection through sharing', () => {
     const settings = normalizeSettings({ profiles: [{ ...createDefaultOpenAIProfile(), homeParams: undefined }] })
-    expect(settings.profiles[0].homeParams).toEqual(['quality'])
+    expect(settings.profiles[0].homeParams).toEqual(['quality', 'n'])
 
     const profile = { ...settings.profiles[0], homeParams: [] }
     const json = createProfileShareJson(profile)
@@ -56,7 +63,7 @@ describe('home parameters', () => {
 
   it('resets hidden advanced values while keeping visible quality and common parameters', () => {
     expect(normalizeHomeParams({ ...DEFAULT_PARAMS, size: '1536x1024', n: 3, quality: 'high', output_format: 'webp', output_compression: 80, moderation: 'low', transparent_output: true }, createDefaultOpenAIProfile())).toEqual({
-      ...DEFAULT_PARAMS, size: '1536x1024', n: 3, quality: 'high',
+      ...DEFAULT_PARAMS, size: '1536x1024', n: 3, quality: 'high', output_format: 'default', moderation: 'default', background: 'default',
     })
   })
 
@@ -96,7 +103,7 @@ describe('home parameters', () => {
   it('retains official request defaults when all advanced home controls are hidden', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ data: [{ b64_json: 'aW1hZ2U=' }] })))
     const settings = normalizeSettings({ profiles: [createDefaultOpenAIProfile({ apiKey: 'test-key', baseUrl: 'https://example.com/v1', streamImages: false, homeParams: [] })] })
-    await callImageApi({ settings, prompt: '画一只猫', inputImageDataUrls: [], params: normalizeHomeParams({ ...DEFAULT_PARAMS, moderation: 'low', output_format: 'webp' }, getActiveApiProfile(settings)) })
-    expect(JSON.parse(fetchMock.mock.calls[0][1]!.body as string)).toMatchObject({ quality: 'auto', moderation: 'auto', output_format: 'png' })
+    await callImageApi({ settings, prompt: '画一只猫', inputImageDataUrls: [], params: normalizeHomeParams({ ...DEFAULT_PARAMS, ...getActiveApiProfile(settings).paramDefaults }, getActiveApiProfile(settings)) })
+    expect(JSON.parse(fetchMock.mock.calls[0][1]!.body as string)).toEqual({ model: getActiveApiProfile(settings).model, prompt: '画一只猫' })
   })
 })

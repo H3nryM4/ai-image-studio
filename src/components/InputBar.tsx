@@ -16,6 +16,8 @@ import { suppressGlobalClicks } from '../lib/clickSuppression'
 import { getContentEditablePlainText, getContentEditableSelection, getCommentTagHtml, setContentEditableCursor, syncCommentTagSelection } from '../lib/contentEditableComments'
 import { useHintTooltip } from '../hooks/useHintTooltip'
 import SizePickerModal from './SizePickerModal'
+import GeminiSizePickerModal from './GeminiSizePickerModal'
+import { GEMINI_CONNECTION_ID, getGeminiImageOptions, normalizeGeminiParams } from '../lib/gemini'
 import { CloseIcon, CollapseIcon, ExpandIcon, LinkIcon, SketchIcon } from './icons'
 import { CommentBadge } from './CommentMarks'
 import AddImageUrlsModal from './input/addImageUrlsModal'
@@ -172,6 +174,9 @@ export default function InputBar() {
       : undefined
     return reusedProfile ? resolveApiProfileModel(reusedProfile, reusedTaskApiModel ?? undefined) : currentActiveProfile
   }, [currentActiveProfile, reusedTaskApiModel, reusedTaskApiProfileId, settings])
+  const gemini = activeProfile.connectionId === GEMINI_CONNECTION_ID
+  const maxInputImages = gemini ? getGeminiImageOptions(activeProfile.model).maxInputImages : MAX_INPUT_IMAGES
+  const geminiParams = normalizeGeminiParams(params, activeProfile.model)
   const isTemporarilyReusedProfile = activeProfile.id !== currentActiveProfile.id
   const modelOptions = useMemo(() => (
     splitModelList(settings.profiles.find((profile) => profile.id === activeProfile.id)?.model ?? activeProfile.model)
@@ -195,7 +200,7 @@ export default function InputBar() {
   const hasSubmitApiConfig = Boolean(activeProfile.apiKey) && isApiConnectionAvailable(effectiveSettings, activeProfile.connectionId)
   // 批量进行中需等待完成或停止后再提交
   const batchRunning = Boolean(batchProgress)
-  const canSubmit = Boolean(prompt.trim() && hasSubmitApiConfig && !batchRunning)
+  const canSubmit = Boolean(prompt.trim() && hasSubmitApiConfig && !batchRunning && !(gemini && maskDraft))
   const batchEnabled = settings.showBatchPrompt && settings.batchPromptEnabled
   // 批量进行中始终在画廊显示入口，以便查看进度和停止
   const showBatch = (settings.showBatchPrompt || batchRunning)
@@ -205,7 +210,7 @@ export default function InputBar() {
     : '请先配置 API'
   const submitTooltipText = !hasSubmitApiConfig
     ? '尚未完成 API 配置，请在右上角设置中进行'
-    : '批量任务进行中，请等待完成或停止后再提交'
+    : gemini && maskDraft ? 'Gemini 暂不支持蒙版，请先移除蒙版' : '批量任务进行中，请等待完成或停止后再提交'
   const promptPlaceholder = batchEnabled
     ? '每条提示词之间空两行分隔...'
     : '描述你想生成的图片...'
@@ -216,17 +221,22 @@ export default function InputBar() {
     syncCommentTagSelection(el)
     setPrompt(getContentEditablePlainText(el))
   }, [setPrompt])
-  const showTransparentOutputControl = (params.output_format === 'png' || params.output_format === 'webp')
+  const showTransparentOutputControl = (params.output_format === 'default' || params.output_format === 'png' || params.output_format === 'webp')
   const transparentOutputEnabled = showTransparentOutputControl && params.transparent_output
-  const compressionDisabled = params.output_format === 'png'
+  const compressionDisabled = params.output_format !== 'jpeg' && params.output_format !== 'webp'
   const outputImageLimit = MAX_OPENAI_OUTPUT_IMAGES
   const nDraftValue = Number(nInput)
   const effectiveNValue = Number.isNaN(nDraftValue) ? params.n : nDraftValue
-  const streamConcurrentByN = activeProfile.connectionId === 'openai-images' && activeProfile.streamImages === true && effectiveNValue > 1
+  const streamConcurrentByN = (gemini || (activeProfile.connectionId === 'openai-images' && activeProfile.streamImages === true)) && effectiveNValue > 1
   const nLimitHintText = `最大请求数量为 ${outputImageLimit}`
-  const displaySize = (activeProfile.codexCli ? normalizeCodexCliImageSize(params.size) : normalizeImageSize(params.size)) || DEFAULT_PARAMS.size
+  const displaySize = gemini
+    ? geminiParams.aspect_ratio === 'auto' && geminiParams.image_size === 'auto'
+      ? '自动'
+      : `${geminiParams.aspect_ratio === 'auto' ? '自动' : geminiParams.aspect_ratio} · ${geminiParams.image_size === 'auto' ? '默认' : geminiParams.image_size === '512' ? '0.5K' : geminiParams.image_size}`
+    : params.size === 'default' ? '接口默认' : (activeProfile.codexCli ? normalizeCodexCliImageSize(params.size) : normalizeImageSize(params.size)) || DEFAULT_PARAMS.size
 
   const qualityOptions = [
+    { label: '接口默认', value: 'default' },
     { label: 'auto', value: 'auto' },
     { label: 'low', value: 'low' },
     { label: 'medium', value: 'medium' },
@@ -238,8 +248,8 @@ export default function InputBar() {
         ]
       : []),
   ]
-  const atImageLimit = inputImages.length >= MAX_INPUT_IMAGES
-  const uploadImageTooltipText = atImageLimit ? `参考图数量已达上限（${MAX_INPUT_IMAGES} 张），无法继续添加` : '添加图片'
+  const atImageLimit = inputImages.length >= maxInputImages
+  const uploadImageTooltipText = atImageLimit ? `参考图数量已达上限（${maxInputImages} 张），无法继续添加` : '添加图片'
   const transparentOutputHint = useHintTooltip()
   const handleTransparentOutputMenuOpenChange = useCallback((open: boolean) => {
     if (open) transparentOutputHint.hide()
@@ -438,15 +448,15 @@ export default function InputBar() {
   const handleFiles = async (files: FileList | File[]) => {
     try {
       const currentCount = useStore.getState().inputImages.length
-      if (currentCount >= MAX_INPUT_IMAGES) {
+      if (currentCount >= maxInputImages) {
         useStore.getState().showToast(
-          `参考图数量已达上限（${MAX_INPUT_IMAGES} 张），无法继续添加`,
+          `参考图数量已达上限（${maxInputImages} 张），无法继续添加`,
           'error',
         )
         return
       }
 
-      const remaining = MAX_INPUT_IMAGES - currentCount
+      const remaining = maxInputImages - currentCount
       const accepted = Array.from(files).filter((f) => f.type.startsWith('image/'))
       const toAdd = accepted.slice(0, remaining)
       const discarded = accepted.length - toAdd.length
@@ -457,7 +467,7 @@ export default function InputBar() {
 
       if (discarded > 0) {
         useStore.getState().showToast(
-          `已达上限 ${MAX_INPUT_IMAGES} 张，${discarded} 张图片被丢弃`,
+          `已达上限 ${maxInputImages} 张，${discarded} 张图片被丢弃`,
           'error',
         )
       }
@@ -1261,11 +1271,12 @@ export default function InputBar() {
 
   return (
     <>
-      <DragUploadOverlay visible={isDragging && !selectionMode} atImageLimit={atImageLimit} maxImages={MAX_INPUT_IMAGES} />
+      <DragUploadOverlay visible={isDragging && !selectionMode} atImageLimit={atImageLimit} maxImages={maxInputImages} />
 
-      {showAddImageUrls && <AddImageUrlsModal onClose={() => setShowAddImageUrls(false)} />}
+      {showAddImageUrls && <AddImageUrlsModal maxImages={maxInputImages} onClose={() => setShowAddImageUrls(false)} />}
 
-      {showSizePicker && (
+      {showSizePicker && gemini && <GeminiSizePickerModal params={params} model={activeProfile.model} onSelect={setParams} onClose={() => setShowSizePicker(false)} />}
+      {showSizePicker && !gemini && (
         <SizePickerModal
           currentSize={params.size}
           onSelect={(size) => setParams({ size })}

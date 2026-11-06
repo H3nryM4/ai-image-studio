@@ -31,6 +31,17 @@ function fallback() {
 }
 
 describe('persisted state codec', () => {
+  it('restores Gemini dimensions and per-profile selections without changing old task defaults', () => {
+    const profile = { ...DEFAULT_SETTINGS.profiles[0], connectionId: 'gemini-generate-content', model: 'gemini-3.1-flash-image' }
+    const settings = normalizeSettings({ profiles: [profile], activeProfileId: profile.id })
+    const params = { ...DEFAULT_PARAMS, aspect_ratio: '16:9', image_size: '2K' }
+    const state = { ...source(settings), params, paramsByProfile: { [`${profile.id}:gemini-generate-content`]: params } }
+    const restored = normalizePersistedState(JSON.parse(JSON.stringify(createPersistedState(state))), fallback())!
+    expect(restored.params).toEqual(params)
+    expect(restored.paramsByProfile[`${profile.id}:gemini-generate-content`]).toEqual(params)
+    expect(normalizePersistedState({ ...createPersistedState(source()), params: DEFAULT_PARAMS }, fallback())!.params).toEqual(DEFAULT_PARAMS)
+  })
+
   it('keeps temporary task reuse from overwriting the active profile parameters on reload', () => {
     const settings = normalizeSettings({ profiles: [{ ...DEFAULT_SETTINGS.profiles[0], id: 'first' }, { ...DEFAULT_SETTINGS.profiles[0], id: 'second' }], activeProfileId: 'first' })
     const state = source(settings)

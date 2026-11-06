@@ -2,6 +2,7 @@ import type { ApiConnectionId, ApiProfile } from '../types'
 import { DEFAULT_STREAM_PARTIAL_IMAGES } from '../types'
 
 import { normalizeBaseUrl } from './devProxy'
+import { GEMINI_CONNECTION_ID, normalizeGeminiBaseUrl } from './gemini'
 
 export function normalizeStreamPartialImages(value: unknown, fallback: number | undefined = DEFAULT_STREAM_PARTIAL_IMAGES): number {
   const fallbackValue = fallback ?? DEFAULT_STREAM_PARTIAL_IMAGES
@@ -46,7 +47,7 @@ export function parseDefaultApiUrl(rawUrl: string): DefaultApiUrlPatch {
 
     if (apiUrlParam !== null) patch.baseUrl = normalizeBaseUrl(apiUrlParam.trim())
     if (apiKeyParam !== null) patch.apiKey = apiKeyParam.trim()
-    if (connectionIdParam === 'openai-images') patch.connectionId = connectionIdParam
+    if (connectionIdParam === 'openai-images' || connectionIdParam === GEMINI_CONNECTION_ID) patch.connectionId = connectionIdParam
     if (modelParam !== null && modelParam.trim()) patch.model = modelParam.trim()
     if (profileNameParam?.trim()) patch.name = profileNameParam.trim()
     if (codexCliParam !== null) patch.codexCli = codexCliParam.trim().toLowerCase() === 'true'
@@ -56,6 +57,7 @@ export function parseDefaultApiUrl(rawUrl: string): DefaultApiUrlPatch {
       patch.transparentBackgroundMethod = transparentBackgroundMethodParam
     }
 
+    if (patch.connectionId === GEMINI_CONNECTION_ID) patch.baseUrl = normalizeGeminiBaseUrl(apiUrlParam ?? baseUrl)
     return patch
   } catch {
     return { baseUrl: normalizeBaseUrl(url) }

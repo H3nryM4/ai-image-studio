@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ApiProfile, AppSettings, BatchProgress, BatchPromptMode, TaskParams } from '../../types'
 import { DEFAULT_BATCH_PROMPT_CONCURRENCY, normalizeBatchPromptConcurrency } from '../../lib/batchPrompts'
+import { getGeminiImageOptions } from '../../lib/gemini'
 import { getHomeParamState } from '../../lib/homeParams'
 import { dismissAllTooltips } from '../../lib/tooltipDismiss'
 import Select from '../Select'
@@ -175,9 +176,10 @@ export default function InputParamsPanel({
   onBatchChange: (patch: BatchSettingsPatch) => void
   onStopBatch: () => void
 }) {
+  const native = activeProfile.transparentBackgroundMethod === 'api'
   const visible = homeParamState.visible.filter((key) =>
     (key !== 'output_compression' || !compressionDisabled) &&
-    (key !== 'transparent_output' || showTransparentOutputControl),
+    (key !== 'transparent_output' || native || showTransparentOutputControl),
   )
   const prefix = (text: string) => <span className="mr-1.5 text-gray-400 dark:text-gray-500">{text}</span>
 
@@ -212,54 +214,59 @@ export default function InputParamsPanel({
           className={`flex w-full items-center ${CHIP_CLASS}`}
         >
           {prefix('尺寸')}
-          <span className="font-mono">{displaySize}</span>
+          {/* 等宽字体缺中文字形会回退到别的字体，中文片段保持与其他参数一致 */}
+          {displaySize.split(' · ').map((part, idx) => (
+            <span key={idx} className={/[一-鿿]/.test(part) ? undefined : 'font-mono'}>
+              {idx > 0 && ' · '}{part}
+            </span>
+          ))}
         </button>
         <ButtonTooltip
           visible={activeProfile.codexCli && sizeHint.visible}
           text="兼容模式不发送 size，尺寸要求会写入提示词，结果由接口决定"
         />
       </div>}
-      {homeParamState.available.includes('n') && <label
-        className={`relative flex items-center max-sm:flex-auto sm:shrink-0 ${CHIP_CLASS} cursor-text`}
-        onMouseEnter={() => { streamConcurrentHint.show() }}
-        onMouseLeave={() => { hideNLimitHint(); streamConcurrentHint.hide() }}
-        onTouchStart={() => { streamConcurrentHint.startTouch() }}
-        onTouchEnd={() => { streamConcurrentHint.clearTimer() }}
-        onTouchCancel={() => {
-          hideNLimitHint()
-          streamConcurrentHint.hide()
-        }}
-        onClick={() => { streamConcurrentHint.show() }}
-      >
-        {prefix('数量')}
-        <input
-          value={nInput}
-          onChange={(e) => handleNInputChange(e.target.value)}
-          onFocus={() => setNInputFocused(true)}
-          onBlur={() => {
-            setNInputFocused(false)
-            commitN()
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'ArrowUp') {
-              handleNLimitIncreaseAttempt(() => e.preventDefault())
-            }
-          }}
-          onWheel={(e) => {
-            if (e.deltaY < 0) {
-              handleNLimitIncreaseAttempt(() => e.preventDefault())
-            }
-          }}
-          type={'number'}
-          min={1}
-          max={outputImageLimit}
-          style={{ width: `${Math.max(1, nInput.length)}ch` }}
-          className="bg-transparent text-xs focus:outline-hidden disabled:cursor-not-allowed [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-        />
-        <ButtonTooltip visible={nLimitHint.visible} text={nLimitHintText} />
-        <ButtonTooltip visible={streamConcurrentByN && streamConcurrentHint.visible && !nLimitHint.visible} text="数量大于 1 时会将多图生成拆分为并发单图" />
-      </label>}
+
       {visible.length > 0 && <ParamPopoverChip label="更多设置" className="sm:shrink-0">
+        {visible.includes('n') && <label
+          className={ROW_CLASS}
+          onMouseEnter={() => { streamConcurrentHint.show() }}
+          onMouseLeave={() => { hideNLimitHint(); streamConcurrentHint.hide() }}
+          onTouchStart={() => { streamConcurrentHint.startTouch() }}
+          onTouchEnd={() => { streamConcurrentHint.clearTimer() }}
+          onTouchCancel={() => {
+            hideNLimitHint()
+            streamConcurrentHint.hide()
+          }}
+          onClick={() => { streamConcurrentHint.show() }}
+        >
+          <span className={ROW_LABEL_CLASS}>数量</span>
+          <input
+            value={nInput}
+            onChange={(e) => handleNInputChange(e.target.value)}
+            onFocus={() => setNInputFocused(true)}
+            onBlur={() => {
+              setNInputFocused(false)
+              commitN()
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'ArrowUp') {
+                handleNLimitIncreaseAttempt(() => e.preventDefault())
+              }
+            }}
+            onWheel={(e) => {
+              if (e.deltaY < 0) {
+                handleNLimitIncreaseAttempt(() => e.preventDefault())
+              }
+            }}
+            type={'number'}
+            min={1}
+            max={outputImageLimit}
+            className="w-28 rounded-xl bg-black/[0.04] px-3 py-1.5 text-xs focus:outline-hidden dark:bg-white/[0.06] disabled:cursor-not-allowed [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+          />
+          <ButtonTooltip visible={nLimitHint.visible} text={nLimitHintText} />
+          <ButtonTooltip visible={streamConcurrentByN && streamConcurrentHint.visible && !nLimitHint.visible} text="数量大于 1 时会将多图生成拆分为并发单图" />
+        </label>}
         {visible.includes('quality') && <div className={ROW_CLASS}>
           <span className={ROW_LABEL_CLASS}>质量</span>
           <div className="w-28"><Select value={params.quality} onChange={(val) => setParams({ quality: val as TaskParams['quality'] })} options={qualityOptions} className={selectClass} /></div>
@@ -273,10 +280,11 @@ export default function InputParamsPanel({
                 setParams({
                   output_format: val as TaskParams['output_format'],
                   ...(val === 'png' ? { output_compression: null } : {}),
-                  ...(val === 'jpeg' ? { transparent_output: false } : {}),
+                  ...(val === 'jpeg' ? { transparent_output: false, ...(params.background === 'transparent' ? { background: 'opaque' as const } : {}) } : {}),
                 })
               }}
               options={[
+                { label: '接口默认', value: 'default' },
                 { label: 'PNG', value: 'png' },
                 { label: 'JPEG', value: 'jpeg' },
                 { label: 'WebP', value: 'webp' },
@@ -295,27 +303,25 @@ export default function InputParamsPanel({
             onTouchCancel={transparentOutputHint.hide}
             onClick={transparentOutputHint.show}
           >
-            <span className={ROW_LABEL_CLASS}>透明背景</span>
+            <span className={ROW_LABEL_CLASS}>{native ? '背景' : '本地去背景'}</span>
             <div className="w-28">
               <Select
-                value={transparentOutputEnabled ? 'on' : 'off'}
+                value={native ? params.background ?? 'default' : transparentOutputEnabled ? 'on' : 'off'}
                 onChange={(val) => {
                   setParams({
-                    transparent_output: val === 'on',
+                    transparent_output: native ? val === 'transparent' : val === 'on',
+                    ...(native ? { background: val as TaskParams['background'], ...(val === 'transparent' && params.output_format === 'jpeg' ? { output_format: 'png' as const } : {}) } : {}),
                     ...(params.output_format === 'png' ? { output_compression: null } : {}),
                   })
                 }}
-                options={[
-                  { label: '关闭', value: 'off' },
-                  { label: '开启', value: 'on' },
-                ]}
+                options={native ? [{ label: '接口默认', value: 'default' }, { label: '不透明', value: 'opaque' }, { label: '透明', value: 'transparent' }] : [{ label: '关闭', value: 'off' }, { label: '开启', value: 'on' }]}
                 className={selectClass}
                 onOpenChange={onTransparentOutputMenuOpenChange}
               />
             </div>
             <ButtonTooltip
               visible={transparentOutputHint.visible}
-              text="实现方式可在设置的 API 配置中选择"
+              text={native ? '接口默认不发送 background；不透明和透明会明确指定背景' : '生成后在浏览器中去除纯色背景'}
             />
           </div>
         )}
@@ -360,12 +366,17 @@ export default function InputParamsPanel({
                 setParams({ moderation: val as TaskParams['moderation'] })
               }}
               options={[
-                { label: '默认', value: 'auto' },
+                { label: '接口默认', value: 'default' },
+                { label: '标准（auto）', value: 'auto' },
                 { label: '较宽松', value: 'low' },
               ]}
               className={selectClass}
             />
           </div>
+        </div>}
+        {visible.includes('thinking_level') && <div className={ROW_CLASS}>
+          <span className={ROW_LABEL_CLASS}>思考强度</span>
+          <div className="w-28"><Select value={params.thinking_level ?? 'default'} onChange={(value) => setParams({ thinking_level: value as TaskParams['thinking_level'] })} options={[{ label: '接口默认', value: 'default' }, ...getGeminiImageOptions(activeProfile.model).thinkingLevels.map((value) => ({ label: value === 'minimal' ? '快速' : value === 'medium' ? '适中' : '深入', value }))]} className={selectClass} /></div>
         </div>}
       </ParamPopoverChip>}
       {showBatch && (

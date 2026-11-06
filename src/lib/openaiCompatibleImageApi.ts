@@ -137,7 +137,7 @@ async function parseImagesApiResponse(payload: ImageApiResponse, mime: string, s
     for (const item of data) {
       const b64 = item.b64_json
       if (b64) {
-        images.push(normalizeBase64Image(b64, mime))
+        images.push(normalizeBase64Image(b64, MIME_MAP[payload.output_format ?? ''] || mime))
         revisedPrompts.push(typeof item.revised_prompt === 'string' ? item.revised_prompt : undefined)
         continue
       }
@@ -160,13 +160,12 @@ async function parseImagesApiResponse(payload: ImageApiResponse, mime: string, s
     throw err
   }
 
-  const actualParams = mergeActualParams(
-    pickActualParams(payload),
-  )
+  const actualParamsList = images.map((image) => mergeActualParams(pickActualParams(payload), { output_format: image.match(/^data:image\/(png|jpeg|webp);/)?.[1] as TaskParams['output_format'] | undefined }))
+  const actualParams = actualParamsList[0]
   return {
     images,
     actualParams,
-    actualParamsList: images.map(() => actualParams),
+    actualParamsList,
     revisedPrompts,
     ...(rawImageUrls.length ? { rawImageUrls } : {}),
   }
@@ -304,6 +303,7 @@ async function callImagesApiSingle(opts: CallApiOptions, profile: ApiProfile): P
     : sizePrompt
   const isEdit = inputImageDataUrls.length > 0
   const mime = MIME_MAP[params.output_format] || 'image/png'
+  const background = profile.transparentBackgroundMethod === 'local' || params.background === 'default' ? undefined : params.background
   const proxyConfig = readClientDevProxyConfig()
   const useApiProxy = shouldUseApiProxy(profile.apiProxy, proxyConfig)
   const requestHeaders = createRequestHeaders(profile)
@@ -319,20 +319,20 @@ async function callImagesApiSingle(opts: CallApiOptions, profile: ApiProfile): P
       const formData = new FormData()
       formData.append('model', profile.model)
       formData.append('prompt', prompt)
-      if (!profile.codexCli) {
+      if (!profile.codexCli && params.size !== 'default') {
         formData.append('size', params.size)
       }
-      formData.append('output_format', params.output_format)
-      formData.append('moderation', params.moderation)
-      if (opts.nativeTransparentBackground) {
-        formData.append('background', 'transparent')
+      if (params.output_format !== 'default') formData.append('output_format', params.output_format)
+      if (params.moderation !== 'default') formData.append('moderation', params.moderation)
+      if (background) {
+        formData.append('background', background)
       }
 
-      if (!profile.codexCli) {
+      if (!profile.codexCli && params.quality !== 'default') {
         formData.append('quality', params.quality)
       }
 
-      if (params.output_format !== 'png' && params.output_compression != null) {
+      if ((params.output_format === 'jpeg' || params.output_format === 'webp') && params.output_compression != null) {
         formData.append('output_compression', String(params.output_compression))
       }
       if (params.n > 1) {
@@ -385,23 +385,23 @@ async function callImagesApiSingle(opts: CallApiOptions, profile: ApiProfile): P
       const body: Record<string, unknown> = {
         model: profile.model,
         prompt,
-        output_format: params.output_format,
-        moderation: params.moderation,
+        ...(params.output_format !== 'default' ? { output_format: params.output_format } : {}),
+        ...(params.moderation !== 'default' ? { moderation: params.moderation } : {}),
       }
 
-      if (opts.nativeTransparentBackground) {
-        body.background = 'transparent'
+      if (background) {
+        body.background = background
       }
 
-      if (!profile.codexCli) {
+      if (!profile.codexCli && params.size !== 'default') {
         body.size = params.size
       }
 
-      if (!profile.codexCli) {
+      if (!profile.codexCli && params.quality !== 'default') {
         body.quality = params.quality
       }
 
-      if (params.output_format !== 'png' && params.output_compression != null) {
+      if ((params.output_format === 'jpeg' || params.output_format === 'webp') && params.output_compression != null) {
         body.output_compression = params.output_compression
       }
       if (params.n > 1) {
@@ -503,12 +503,14 @@ function createCustomConnectionContext(opts: CallApiOptions, profile: ApiProfile
   const prompt = profile.codexCli && !opts.settings.allowPromptRewrite
     ? `${PROMPT_REWRITE_GUARD_PREFIX}\n${sizePrompt}`
     : sizePrompt
-  const params = {
+  const params: Record<string, unknown> = {
     ...opts.params,
     ...(profile.codexCli ? { size: undefined, quality: undefined } : {}),
-    ...(opts.nativeTransparentBackground ? { background: 'transparent' } : {}),
   }
 
+  for (const key of ['size', 'quality', 'output_format', 'moderation', 'background', 'thinking_level']) {
+    if (params[key] === 'default') delete params[key]
+  }
   const inputImageUrls = opts.inputImageUrls?.filter(isHttpUrl) ?? []
 
   return {

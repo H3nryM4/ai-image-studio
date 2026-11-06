@@ -1,4 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
+import { GEMINI_CONNECTION_ID } from '../lib/gemini'
+import { getActiveApiProfile } from '../lib/apiProfiles'
 import type { ImageComment } from '../types'
 import { createInputImageFromFile, deleteImageIfUnreferenced, useStore } from '../store'
 import { useCloseOnEscape } from '../hooks/useCloseOnEscape'
@@ -197,6 +199,13 @@ export default function Lightbox() {
     if (!lightboxImageId || !isInputImage || !src) return
     const imageId = lightboxImageId
     const baseImageSrc = src
+    const state = useStore.getState()
+    const profile = state.settings.profiles.find((item) => item.id === state.reusedTaskApiProfileId) ?? getActiveApiProfile(state.settings)
+    if (profile.connectionId === GEMINI_CONNECTION_ID) {
+      close()
+      setSketchBoard({ baseImageSrc, replaceImageId: imageId })
+      return
+    }
 
     // 已是遮罩主图时继续编辑遮罩
     if (maskDraft?.targetImageId === imageId) {

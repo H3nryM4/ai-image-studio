@@ -15,7 +15,6 @@ export interface CallApiOptions {
   settings: AppSettings
   prompt: string
   params: TaskParams
-  nativeTransparentBackground?: boolean
   /** 输入图片的 data URL 列表 */
   inputImageDataUrls: string[]
   /** 与 inputImageDataUrls 按索引对齐的原链接，不是通过链接添加的为 null */
@@ -49,7 +48,9 @@ export function isDataUrl(value: unknown): value is string {
 }
 
 export function normalizeBase64Image(value: string, fallbackMime: string): string {
-  return value.startsWith('data:') ? value : `data:${fallbackMime};base64,${value}`
+  if (value.startsWith('data:')) return value
+  const mime = value.startsWith('/9j/') ? 'image/jpeg' : value.startsWith('iVBORw0KGgo') ? 'image/png' : value.startsWith('UklGR') ? 'image/webp' : fallbackMime
+  return `data:${mime};base64,${value}`
 }
 
 function formatMiB(bytes: number): string {
@@ -199,6 +200,7 @@ export function pickActualParams(source: unknown): Partial<TaskParams> {
   }
   if (typeof record.output_compression === 'number') actualParams.output_compression = record.output_compression
   if (record.moderation === 'auto' || record.moderation === 'low') actualParams.moderation = record.moderation
+  if (record.background === 'opaque' || record.background === 'transparent') actualParams.background = record.background
   if (typeof record.n === 'number') actualParams.n = record.n
 
   return actualParams

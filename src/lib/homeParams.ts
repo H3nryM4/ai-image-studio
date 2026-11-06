@@ -1,4 +1,5 @@
 import { DEFAULT_HOME_PARAMS, DEFAULT_PARAMS, HOME_PARAM_KEYS, type ApiProfile, type CustomConnectionDefinition, type HomeParam, type TaskParams } from '../types'
+import { GEMINI_CONNECTION_ID, getGeminiImageOptions, normalizeGeminiParams } from './gemini'
 
 export const HOME_PARAM_OPTIONS: Array<{ value: HomeParam; label: string }> = [
   { value: 'quality', label: '质量' },
@@ -6,6 +7,8 @@ export const HOME_PARAM_OPTIONS: Array<{ value: HomeParam; label: string }> = [
   { value: 'transparent_output', label: '透明背景' },
   { value: 'output_compression', label: '压缩参数' },
   { value: 'moderation', label: '内容审核级别' },
+  { value: 'thinking_level', label: '思考强度' },
+  { value: 'n', label: '数量' },
 ]
 
 export function normalizeHomeParamSelection(value: unknown): HomeParam[] {
@@ -16,10 +19,14 @@ export function normalizeParamDefaults(value: unknown): NonNullable<ApiProfile['
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
   const record = value as Record<string, unknown>
   const defaults: NonNullable<ApiProfile['paramDefaults']> = {}
-  if (typeof record.quality === 'string' && ['auto', 'low', 'medium', 'high', 'xhigh', 'max'].includes(record.quality)) defaults.quality = record.quality as TaskParams['quality']
-  if (typeof record.output_format === 'string' && ['png', 'jpeg', 'webp'].includes(record.output_format)) defaults.output_format = record.output_format as TaskParams['output_format']
+  if (typeof record.n === 'number' && Number.isFinite(record.n)) defaults.n = Math.min(10, Math.max(1, Math.trunc(record.n)))
+  if (typeof record.size === 'string' && /^(default|auto|\d+[xX]\d+)$/.test(record.size)) defaults.size = record.size
+  if (typeof record.background === 'string' && ['default', 'auto', 'opaque', 'transparent'].includes(record.background)) defaults.background = record.background as TaskParams['background']
+  if (typeof record.thinking_level === 'string' && ['default', 'minimal', 'medium', 'high'].includes(record.thinking_level)) defaults.thinking_level = record.thinking_level as TaskParams['thinking_level']
+  if (typeof record.quality === 'string' && ['default', 'auto', 'low', 'medium', 'high', 'xhigh', 'max'].includes(record.quality)) defaults.quality = record.quality as TaskParams['quality']
+  if (typeof record.output_format === 'string' && ['default', 'png', 'jpeg', 'webp'].includes(record.output_format)) defaults.output_format = record.output_format as TaskParams['output_format']
   if (typeof record.transparent_output === 'boolean') defaults.transparent_output = record.transparent_output
-  if (record.moderation === 'auto' || record.moderation === 'low') defaults.moderation = record.moderation
+  if (record.moderation === 'default' || record.moderation === 'auto' || record.moderation === 'low') defaults.moderation = record.moderation
   if (record.output_compression === null) defaults.output_compression = null
   if (typeof record.output_compression === 'number' && Number.isFinite(record.output_compression)) {
     defaults.output_compression = Math.max(0, Math.min(100, Math.round(record.output_compression)))
@@ -37,6 +44,12 @@ function collectTemplateVariables(value: unknown, variables: Set<string>) {
 }
 
 export function getHomeParamState(profile: ApiProfile, connection?: CustomConnectionDefinition | null, hasInputImages = false) {
+  if (profile.connectionId === GEMINI_CONNECTION_ID) {
+    return {
+      available: ['size', 'n', 'transparent_output', ...(getGeminiImageOptions(profile.model).thinkingLevels.length ? ['thinking_level'] : [])] as Array<keyof TaskParams>,
+      visible: (profile.homeParams ?? []).filter((key) => key === 'n' || key === 'transparent_output' || (key === 'thinking_level' && getGeminiImageOptions(profile.model).thinkingLevels.length > 0)),
+    }
+  }
   const keys = Object.keys(DEFAULT_PARAMS) as Array<keyof TaskParams>
   const variables = new Set<string>()
   if (connection) {
@@ -45,6 +58,7 @@ export function getHomeParamState(profile: ApiProfile, connection?: CustomConnec
   }
   const openAI = profile.connectionId === 'openai-images'
   const available = keys.filter((key) => {
+    if (key === 'thinking_level') return false
     if (key === 'quality' && profile.codexCli) return false
     if (openAI) return true
     if (!connection) return false
@@ -65,6 +79,14 @@ export function getHomeParamState(profile: ApiProfile, connection?: CustomConnec
 }
 
 export function normalizeHomeParams(params: TaskParams, profile: ApiProfile, connection?: CustomConnectionDefinition | null, hasInputImages = false): TaskParams {
+  if (profile.connectionId === GEMINI_CONNECTION_ID) {
+    return normalizeGeminiParams({
+      ...params,
+      transparent_output: profile.homeParams?.includes('transparent_output') ? params.transparent_output : profile.paramDefaults?.transparent_output ?? false,
+      n: profile.homeParams?.includes('n') ? params.n : profile.paramDefaults?.n ?? 1,
+      thinking_level: profile.homeParams?.includes('thinking_level') ? params.thinking_level : profile.paramDefaults?.thinking_level ?? 'default',
+    }, profile.model)
+  }
   const state = getHomeParamState(profile, connection, hasInputImages)
   const next = { ...params }
   const defaults = { ...DEFAULT_PARAMS, ...profile.paramDefaults }
@@ -74,8 +96,14 @@ export function normalizeHomeParams(params: TaskParams, profile: ApiProfile, con
       Object.assign(next, { [key]: defaults[key] })
     }
   }
+  if (!state.visible.includes('transparent_output')) next.background = profile.paramDefaults?.background
+  if (profile.transparentBackgroundMethod === 'local') next.background = 'default'
+  if (profile.transparentBackgroundMethod === 'api' && next.background) next.transparent_output = next.background === 'transparent'
   if (next.output_format === 'png') next.output_compression = null
-  if (next.output_format === 'jpeg') next.transparent_output = false
+  if (next.output_format === 'jpeg') {
+    next.transparent_output = false
+    if (next.background === 'transparent') next.background = 'opaque'
+  }
   return next
 }
 

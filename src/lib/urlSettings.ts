@@ -1,5 +1,6 @@
 import type { ApiProfile, AppSettings } from '../types'
 import { normalizeBaseUrl } from './devProxy'
+import { GEMINI_CONNECTION_ID, DEFAULT_GEMINI_MODEL, normalizeGeminiBaseUrl } from './gemini'
 import {
   createDefaultOpenAIProfile,
   DEFAULT_IMAGES_MODEL,
@@ -144,7 +145,7 @@ function readUrlProfilePatch(searchParams: URLSearchParams): Partial<ApiProfile>
   const streamPartialImages = searchParams.get('streamPartialImages')
   const transparentBackgroundMethod = searchParams.get('transparentBackgroundMethod')
   if (connectionId) patch.connectionId = connectionId
-  if (baseUrl !== null) patch.baseUrl = normalizeBaseUrl(baseUrl.trim())
+  if (baseUrl !== null) patch.baseUrl = connectionId === GEMINI_CONNECTION_ID ? normalizeGeminiBaseUrl(baseUrl) : normalizeBaseUrl(baseUrl.trim())
   if (apiKey !== null) patch.apiKey = apiKey.trim()
   if (model) patch.model = model
   if (name) patch.name = name
@@ -225,7 +226,7 @@ function buildRegularSettingsFromUrlParams(currentSettings: Partial<AppSettings>
     id: requestedId || createUrlProfileId(new Set(settings.profiles.map((profile) => profile.id))),
     name: 'URL 参数配置',
     connectionId,
-    model: DEFAULT_IMAGES_MODEL,
+    model: connectionId === GEMINI_CONNECTION_ID ? DEFAULT_GEMINI_MODEL : DEFAULT_IMAGES_MODEL,
     ...patch,
   })
   const existing = settings.profiles.find((item) => getProfileDedupKey(item) === getProfileDedupKey(profile) && (!patch.name || item.name.trim() === patch.name))

@@ -2,6 +2,7 @@ import { DEFAULT_PARAMS, type AppSettings, type TaskParams } from '../types'
 import { getActiveApiProfile, isApiConnectionAvailable } from './apiProfiles'
 import { isGptImage25Model } from './imageModels'
 import { normalizeCodexCliImageSize, normalizeImageSize } from './size'
+import { GEMINI_CONNECTION_ID, normalizeGeminiParams } from './gemini'
 
 export const MAX_OPENAI_OUTPUT_IMAGES = 10
 
@@ -10,6 +11,7 @@ export function normalizeParamsForSettings(
   settings: AppSettings,
 ): TaskParams {
   const activeProfile = getActiveApiProfile(settings)
+  if (activeProfile.connectionId === GEMINI_CONNECTION_ID) return normalizeGeminiParams({ ...params, n: Math.min(MAX_OPENAI_OUTPUT_IMAGES, Math.max(1, Math.trunc(params.n) || 1)) }, activeProfile.model)
   const nextParams: TaskParams = {
     ...params,
     size: normalizeImageSize(params.size) || DEFAULT_PARAMS.size,

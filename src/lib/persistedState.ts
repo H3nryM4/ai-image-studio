@@ -46,14 +46,18 @@ function normalizeParams(value: unknown, fallback: TaskParams): TaskParams {
   if (!isRecord(value)) return fallback
   return {
     size: typeof value.size === 'string' ? value.size : fallback.size,
-    quality: value.quality === 'auto' || value.quality === 'low' || value.quality === 'medium' || value.quality === 'high' || value.quality === 'xhigh' || value.quality === 'max'
+    ...(typeof value.aspect_ratio === 'string' ? { aspect_ratio: value.aspect_ratio } : {}),
+    ...(typeof value.image_size === 'string' ? { image_size: value.image_size } : {}),
+    thinking_level: typeof value.thinking_level === 'string' && ['default', 'minimal', 'medium', 'high'].includes(value.thinking_level) ? value.thinking_level as TaskParams['thinking_level'] : fallback.thinking_level,
+    background: typeof value.background === 'string' && ['default', 'auto', 'opaque', 'transparent'].includes(value.background) ? value.background as TaskParams['background'] : fallback.background,
+    quality: value.quality === 'default' || value.quality === 'auto' || value.quality === 'low' || value.quality === 'medium' || value.quality === 'high' || value.quality === 'xhigh' || value.quality === 'max'
       ? value.quality
       : fallback.quality,
-    output_format: value.output_format === 'png' || value.output_format === 'jpeg' || value.output_format === 'webp' ? value.output_format : fallback.output_format,
+    output_format: value.output_format === 'default' || value.output_format === 'png' || value.output_format === 'jpeg' || value.output_format === 'webp' ? value.output_format : fallback.output_format,
     output_compression: value.output_compression === null || (typeof value.output_compression === 'number' && Number.isFinite(value.output_compression))
       ? value.output_compression
       : fallback.output_compression,
-    moderation: value.moderation === 'auto' || value.moderation === 'low' ? value.moderation : fallback.moderation,
+    moderation: value.moderation === 'default' || value.moderation === 'auto' || value.moderation === 'low' ? value.moderation : fallback.moderation,
     n: typeof value.n === 'number' && Number.isFinite(value.n) ? value.n : fallback.n,
     transparent_output: typeof value.transparent_output === 'boolean' ? value.transparent_output : fallback.transparent_output,
   }

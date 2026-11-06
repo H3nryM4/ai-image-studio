@@ -1,5 +1,5 @@
 import type { ApiProfile, ApiConnectionId, AppSettings, PresetConfig, CustomConnectionContentType, CustomConnectionDefinition, CustomConnectionFileMapping, CustomConnectionPollMapping, CustomConnectionRequestMethod, CustomConnectionResultMapping, CustomConnectionSubmitMapping, CustomConnectionTemplate, ReferenceImageEditAction, RetryMode } from '../types'
-import { DEFAULT_STREAM_PARTIAL_IMAGES, DEFAULT_ZIP_DOWNLOAD_ROUTES, ZIP_DOWNLOAD_ROUTE_VALUES } from '../types'
+import { DEFAULT_PARAMS, DEFAULT_STREAM_PARTIAL_IMAGES, DEFAULT_ZIP_DOWNLOAD_ROUTES, ZIP_DOWNLOAD_ROUTE_VALUES } from '../types'
 import { customConnectionSupportsNativeTransparentBackground } from './customConnectionCapabilities'
 import { shouldUseApiProxy } from './devProxy'
 import { normalizeStreamPartialImages, parseDefaultApiUrl } from './defaultApiUrl'
@@ -8,6 +8,7 @@ import { isImportableConfigUrl } from './importableConfigUrl'
 import { DEFAULT_IMAGES_MODEL } from './imageModels'
 import { normalizeBatchPromptConcurrency } from './batchPrompts'
 import { normalizeHomeParamSelection, normalizeParamDefaults } from './homeParams'
+import { GEMINI_CONNECTION_ID, DEFAULT_GEMINI_BASE_URL, DEFAULT_GEMINI_MODEL } from './gemini'
 
 const OPENAI_DEFAULT_API_BASE_URL = 'https://api.openai.com/v1'
 const RAW_DEFAULT_API_URL = readRuntimeEnv(import.meta.env.VITE_DEFAULT_API_URL)
@@ -21,7 +22,7 @@ export { DEFAULT_IMAGES_MODEL } from './imageModels'
 export const DEFAULT_OPENAI_PROFILE_ID = 'default-openai'
 export const DEFAULT_API_TIMEOUT = 600
 
-const BUILT_IN_CONNECTION_IDS = new Set<ApiConnectionId>(['openai-images'])
+const BUILT_IN_CONNECTION_IDS = new Set<ApiConnectionId>(['openai-images', GEMINI_CONNECTION_ID])
 const DEFAULT_CUSTOM_CONNECTION_PATHS = {
   generationPath: 'images/generations',
   editPath: 'images/edits',
@@ -86,7 +87,7 @@ function normalizeZipDownloadRoutes(value: unknown) {
 function normalizeConnectionOrder(value: unknown, customConnections: CustomConnectionDefinition[]): string[] | undefined {
   if (!Array.isArray(value)) return undefined
 
-  const connectionIds = ['openai-images', ...customConnections.map((connection) => connection.id)]
+  const connectionIds = ['openai-images', GEMINI_CONNECTION_ID, ...customConnections.map((connection) => connection.id)]
   const knownIds = new Set(connectionIds)
   const ordered = value
     .map(String)
@@ -257,13 +258,17 @@ export function normalizeCustomConnectionDefinitions(input: unknown): CustomConn
 
 export function createDefaultOpenAIProfile(overrides: Partial<ApiProfile> = {}): ApiProfile {
   const connectionId = overrides.connectionId ?? DEFAULT_API_URL_PATCH?.connectionId ?? 'openai-images'
+  const gemini = connectionId === GEMINI_CONNECTION_ID
+  const defaultBaseUrl = gemini ? DEFAULT_GEMINI_BASE_URL : DEFAULT_API_BASE_URL
+  const defaultModel = gemini ? DEFAULT_GEMINI_MODEL : DEFAULT_IMAGES_MODEL
+  const useDeploymentDefaults = !gemini || DEFAULT_API_URL_PATCH?.connectionId === GEMINI_CONNECTION_ID
 
   return {
     id: DEFAULT_OPENAI_PROFILE_ID,
     name: DEFAULT_API_URL_PATCH?.name ?? '默认',
-    baseUrl: DEFAULT_API_BASE_URL,
+    baseUrl: useDeploymentDefaults ? DEFAULT_API_BASE_URL : defaultBaseUrl,
     apiKey: DEFAULT_API_URL_PATCH?.apiKey ?? '',
-    model: DEFAULT_API_URL_PATCH?.model ?? DEFAULT_IMAGES_MODEL,
+    model: (useDeploymentDefaults ? DEFAULT_API_URL_PATCH?.model : undefined) ?? defaultModel,
     timeout: DEFAULT_API_TIMEOUT,
     codexCli: DEFAULT_API_URL_PATCH?.codexCli ?? false,
     apiProxy: DEFAULT_OPENAI_API_PROXY,
@@ -271,9 +276,10 @@ export function createDefaultOpenAIProfile(overrides: Partial<ApiProfile> = {}):
     transparentBackgroundMethod: DEFAULT_API_URL_PATCH?.transparentBackgroundMethod ?? 'api',
     ...overrides,
     connectionId,
-    homeParams: normalizeHomeParamSelection(overrides.homeParams),
-    paramDefaults: normalizeParamDefaults(overrides.paramDefaults),
-    streamImages: overrides.streamImages ?? DEFAULT_API_URL_PATCH?.streamImages ?? false,
+    ...(connectionId === GEMINI_CONNECTION_ID ? { codexCli: false, responseFormatB64Json: undefined, transparentBackgroundMethod: 'local' as const } : {}),
+    homeParams: normalizeHomeParamSelection(overrides.homeParams ?? (connectionId === GEMINI_CONNECTION_ID ? ['n'] : undefined)),
+    paramDefaults: { ...normalizeParamDefaults(DEFAULT_PARAMS), ...normalizeParamDefaults(overrides.paramDefaults) },
+    streamImages: connectionId === GEMINI_CONNECTION_ID ? false : overrides.streamImages ?? DEFAULT_API_URL_PATCH?.streamImages ?? false,
   }
 }
 
@@ -301,18 +307,18 @@ export function switchApiProfileConnection(profile: ApiProfile, connectionId: Ap
   return {
     ...profile,
     connectionId,
-    baseUrl: savedDraft?.baseUrl ?? profile.baseUrl,
-    model: savedDraft?.model ?? (profile.model || DEFAULT_IMAGES_MODEL),
+    baseUrl: savedDraft?.baseUrl ?? (connectionId === GEMINI_CONNECTION_ID ? DEFAULT_GEMINI_BASE_URL : profile.connectionId === GEMINI_CONNECTION_ID && openAI ? DEFAULT_API_BASE_URL : profile.baseUrl),
+    model: savedDraft?.model ?? (connectionId === GEMINI_CONNECTION_ID ? DEFAULT_GEMINI_MODEL : profile.connectionId === GEMINI_CONNECTION_ID && openAI ? DEFAULT_IMAGES_MODEL : profile.model || DEFAULT_IMAGES_MODEL),
     codexCli: savedDraft?.codexCli ?? (openAI && fromOpenAI ? profile.codexCli : false),
     apiProxy: savedDraft?.apiProxy ?? (openAI && (fromOpenAI ? profile.apiProxy : DEFAULT_OPENAI_API_PROXY)),
     responseFormatB64Json: savedDraft?.responseFormatB64Json,
     streamImages: openAI ? savedDraft?.streamImages ?? false : false,
     streamPartialImages: savedDraft?.streamPartialImages ?? (openAI && fromOpenAI ? profile.streamPartialImages : DEFAULT_STREAM_PARTIAL_IMAGES),
-    transparentBackgroundMethod: customConnection && !customConnectionSupportsNativeTransparentBackground(customConnection)
+    transparentBackgroundMethod: connectionId === GEMINI_CONNECTION_ID || (customConnection && !customConnectionSupportsNativeTransparentBackground(customConnection))
       ? 'local'
       : savedDraft?.transparentBackgroundMethod ?? 'api',
-    homeParams: normalizeHomeParamSelection(savedDraft?.homeParams),
-    paramDefaults: normalizeParamDefaults(savedDraft?.paramDefaults),
+    homeParams: normalizeHomeParamSelection(savedDraft?.homeParams ?? (connectionId === GEMINI_CONNECTION_ID ? ['n'] : undefined)),
+    paramDefaults: { ...normalizeParamDefaults(DEFAULT_PARAMS), ...normalizeParamDefaults(savedDraft?.paramDefaults) },
     connectionDrafts,
   }
 }
@@ -324,7 +330,7 @@ function normalizeConnectionDraft(
   nativeTransparentConnectionIds: Set<string>,
 ): ApiProfileConnectionDraft {
   if (!isRecord(input)) return undefined
-  const nativeTransparentBackgroundUnavailable = customConnectionIds.has(connectionId) && !nativeTransparentConnectionIds.has(connectionId)
+  const nativeTransparentBackgroundUnavailable = connectionId === GEMINI_CONNECTION_ID || (customConnectionIds.has(connectionId) && !nativeTransparentConnectionIds.has(connectionId))
   const transparentBackgroundMethod = nativeTransparentBackgroundUnavailable ? 'local' : 'api'
   const fallback = createDefaultOpenAIProfile({ connectionId, transparentBackgroundMethod })
   const baseUrl = typeof input.baseUrl === 'string' ? input.baseUrl : undefined
@@ -336,7 +342,7 @@ function normalizeConnectionDraft(
     baseUrl,
     model,
     homeParams: normalizeHomeParamSelection(input.homeParams),
-    paramDefaults: normalizeParamDefaults(input.paramDefaults),
+    paramDefaults: { ...normalizeParamDefaults(DEFAULT_PARAMS), ...normalizeParamDefaults(input.paramDefaults) },
     codexCli: typeof input.codexCli === 'boolean' ? input.codexCli : fallback.codexCli,
     apiProxy: typeof input.apiProxy === 'boolean' ? input.apiProxy : fallback.apiProxy,
     responseFormatB64Json: input.responseFormatB64Json === true ? true : undefined,
@@ -379,7 +385,7 @@ export function normalizeApiProfile(
   const streamImages = isOpenAIConnection(connectionId)
     ? typeof record.streamImages === 'boolean' ? record.streamImages : defaults.streamImages
     : false
-  const nativeTransparentBackgroundUnavailable = customConnectionIds.has(connectionId) && !nativeTransparentConnectionIds.has(connectionId)
+  const nativeTransparentBackgroundUnavailable = connectionId === GEMINI_CONNECTION_ID || (customConnectionIds.has(connectionId) && !nativeTransparentConnectionIds.has(connectionId))
 
   return {
     ...defaults,
@@ -393,16 +399,16 @@ export function normalizeApiProfile(
     model: (typeof record.model === 'string' && normalizeModelList(record.model)) || defaults.model,
     selectedModel: typeof record.selectedModel === 'string' && record.selectedModel.trim() ? record.selectedModel.trim() : undefined,
     timeout: typeof record.timeout === 'number' && Number.isFinite(record.timeout) ? record.timeout : defaults.timeout,
-    codexCli: Boolean(record.codexCli),
+    codexCli: connectionId !== GEMINI_CONNECTION_ID && Boolean(record.codexCli),
     apiProxy: typeof record.apiProxy === 'boolean' ? record.apiProxy : defaults.apiProxy,
-    responseFormatB64Json: record.responseFormatB64Json === true ? true : undefined,
+    responseFormatB64Json: connectionId !== GEMINI_CONNECTION_ID && record.responseFormatB64Json === true ? true : undefined,
     streamImages,
     streamPartialImages: normalizeStreamPartialImages(record.streamPartialImages, defaults.streamPartialImages),
     transparentBackgroundMethod: !nativeTransparentBackgroundUnavailable && (record.transparentBackgroundMethod === 'api' || record.transparentBackgroundMethod === 'local')
       ? record.transparentBackgroundMethod
       : defaults.transparentBackgroundMethod,
-    homeParams: normalizeHomeParamSelection(record.homeParams),
-    paramDefaults: normalizeParamDefaults(record.paramDefaults),
+    homeParams: normalizeHomeParamSelection(record.homeParams ?? (connectionId === GEMINI_CONNECTION_ID ? ['n'] : undefined)),
+    paramDefaults: { ...normalizeParamDefaults(DEFAULT_PARAMS), ...normalizeParamDefaults(record.paramDefaults) },
     connectionDrafts: normalizeConnectionDrafts(record.connectionDrafts, customConnectionIds, nativeTransparentConnectionIds),
   }
 }
@@ -540,6 +546,7 @@ export function getCustomConnectionDefinition(settings: Partial<AppSettings> | u
 
 export function getApiConnectionLabel(settings: Partial<AppSettings> | unknown, connectionId: ApiConnectionId): string {
   if (connectionId === 'openai-images') return 'OpenAI Images API'
+  if (connectionId === GEMINI_CONNECTION_ID) return 'Gemini generateContent'
   return getCustomConnectionDefinition(settings, connectionId)?.name ?? '接入已失效'
 }
 
@@ -653,6 +660,9 @@ export function validateApiProfile(profile: ApiProfile, settings?: Partial<AppSe
 }
 
 function isDefaultOpenAIProfile(profile: ApiProfile): boolean {
+  const entries = Object.entries(profile.paramDefaults ?? {})
+  const defaults = normalizeParamDefaults(DEFAULT_PARAMS)
+  const untouchedDefaults = entries.length === Object.keys(defaults).length && entries.every(([key, value]) => defaults[key as keyof typeof defaults] === value)
   return profile.id === DEFAULT_OPENAI_PROFILE_ID &&
     profile.name === '默认' &&
     profile.baseUrl === DEFAULT_API_BASE_URL &&
@@ -666,7 +676,7 @@ function isDefaultOpenAIProfile(profile: ApiProfile): boolean {
     profile.streamPartialImages === DEFAULT_STREAM_PARTIAL_IMAGES &&
     profile.transparentBackgroundMethod === 'api' &&
     JSON.stringify(profile.homeParams) === JSON.stringify(normalizeHomeParamSelection(undefined)) &&
-    Object.keys(profile.paramDefaults ?? {}).length === 0
+    untouchedDefaults
 }
 
 function hasOnlyDefaultProfiles(settings: AppSettings): boolean {

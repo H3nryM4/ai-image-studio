@@ -7,11 +7,11 @@ import { usePreventBackgroundScroll } from '../../hooks/usePreventBackgroundScro
 import { LinkIcon } from '../icons'
 
 /** 以图片链接添加参考图：每行一个链接，按顺序下载入库，并记录原链接 */
-export default function AddImageUrlsModal({ onClose }: { onClose: () => void }) {
+export default function AddImageUrlsModal({ onClose, maxImages = MAX_INPUT_IMAGES }: { onClose: () => void; maxImages?: number }) {
   const [text, setText] = useState('')
   const [errorLines, setErrorLines] = useState<Set<number>>(() => new Set())
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
-  const remaining = useStore((s) => MAX_INPUT_IMAGES - s.inputImages.length)
+  const remaining = useStore((s) => maxImages - s.inputImages.length)
   const panelRef = useRef<HTMLDivElement>(null)
   const highlightRef = useRef<HTMLDivElement>(null)
 
@@ -48,7 +48,7 @@ export default function AddImageUrlsModal({ onClose }: { onClose: () => void }) 
 
     const urls = [...new Set(lines.filter(Boolean))]
     if (urls.length > remaining) {
-      showToast(`参考图最多 ${MAX_INPUT_IMAGES} 张，当前还能添加 ${remaining} 张`, 'error')
+      showToast(`参考图最多 ${maxImages} 张，当前还能添加 ${remaining} 张`, 'error')
       return
     }
 

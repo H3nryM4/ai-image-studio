@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { TaskParams, TaskRecord } from '../types'
+import { GEMINI_CONNECTION_ID } from './gemini'
 import ViewportTooltip from '../components/ViewportTooltip'
 
 type ParamKey = keyof TaskParams
@@ -64,20 +65,24 @@ export function ActualValueBadge({ value, className = '', variant = 'highlight' 
 }
 
 export function getParamDisplay(task: TaskRecord, paramKey: ParamKey, actualParams = task.actualParams) {
+  if (task.apiConnectionId === GEMINI_CONNECTION_ID && paramKey === 'output_format') {
+    const format = actualParams?.output_format
+    return { displayValue: format ?? '接口默认', isMismatch: false, requestedValue: '接口默认', isAutoResolved: false }
+  }
   const requestedValue = task.params[paramKey]
   const actualValue = actualParams?.[paramKey]
   const hasActualValue = actualValue !== undefined && actualValue !== null
   const displayValue = hasActualValue ? actualValue : requestedValue
   const isMismatch =
     hasActualValue &&
-    requestedValue !== 'auto' &&
+    requestedValue !== 'auto' && requestedValue !== 'default' &&
     String(actualValue) !== String(requestedValue)
 
   return {
-    displayValue: String(displayValue),
+    displayValue: displayValue === 'default' ? '接口默认' : String(displayValue),
     isMismatch,
-    requestedValue: String(requestedValue),
-    isAutoResolved: hasActualValue && requestedValue === 'auto' && String(actualValue) !== String(requestedValue),
+    requestedValue: requestedValue === 'default' ? '接口默认' : String(requestedValue),
+    isAutoResolved: hasActualValue && (requestedValue === 'auto' || requestedValue === 'default') && String(actualValue) !== String(requestedValue),
   }
 }
 

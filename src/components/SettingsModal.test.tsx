@@ -70,6 +70,20 @@ async function selectConnection(value: string) {
 }
 
 describe('settings modal', () => {
+  it('switches to Gemini with a valid versioned address and hides Images-only controls', async () => {
+    await openSettings()
+    await selectConnection('gemini-generate-content')
+    expect(useStore.getState().settings.profiles[0]).toMatchObject({ connectionId: 'gemini-generate-content', baseUrl: 'https://generativelanguage.googleapis.com/v1beta', model: 'gemini-3.1-flash-image', homeParams: ['n'], transparentBackgroundMethod: 'local' })
+    expect(el.querySelector('button[aria-label="首页显示质量"]')).toBeNull()
+    expect(el.querySelector('button[aria-label="首页显示内容审核级别"]')).toBeNull()
+    expect(el.textContent).not.toContain('Codex CLI 兼容模式')
+    expect(el.textContent).not.toContain('兼容选项：请求 Base64')
+    expect(el.textContent).not.toContain('流式传输')
+    expect(el.querySelector('button[aria-label="首页显示本地去背景"]')).not.toBeNull()
+    await selectConnection('openai-images')
+    expect(el.querySelector('button[aria-label="首页显示质量"]')).not.toBeNull()
+  })
+
   it('saves home visibility separately from the profile default value', async () => {
     await openSettings()
     const toggle = el.querySelector<HTMLButtonElement>('button[aria-label="首页显示图片格式"]')!
@@ -156,7 +170,7 @@ describe('settings modal', () => {
     const settings = normalizeSettings({ ...DEFAULT_SETTINGS, customConnections: [connection], profiles: [profile], activeProfileId: profile.id })
     await openSettings(settings)
     expect(Array.from(el.querySelector('select')!.options).map((option) => option.value)).toEqual([
-      '__add_custom_connection__', 'openai-images', 'vendor:images',
+      '__add_custom_connection__', 'openai-images', 'gemini-generate-content', 'vendor:images',
     ])
     expect(el.querySelector('input[aria-label="模型 ID"]')).not.toBeNull()
 

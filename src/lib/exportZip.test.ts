@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { strToU8, zipSync } from 'fflate'
 
 import type { AppSettings, StoredImage, StoredImageThumbnail, TaskParams, TaskRecord } from '../types'
+import { DEFAULT_PARAMS } from '../types'
 import { DEFAULT_SETTINGS } from './apiProfiles'
 import { buildExportZip, getExportImageEstimatedBytes, getExportZipPlan, readExportZip, readExportZipFileAsDataUrl, readExportZipManifest } from './exportZip'
 
@@ -34,7 +35,8 @@ describe('exportZip', () => {
     const task: TaskRecord = {
       id: 'task-1',
       prompt: '提示词',
-      params: {} as TaskParams,
+      params: { ...DEFAULT_PARAMS, aspect_ratio: '16:9', image_size: '2K' } as TaskParams,
+      apiConnectionId: 'gemini-generate-content',
       inputImageIds: ['img-1'],
       outputImages: ['img-2'],
       streamPartialImageIds: ['img-3'],

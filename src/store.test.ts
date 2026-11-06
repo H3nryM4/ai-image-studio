@@ -762,6 +762,7 @@ describe('mask draft lifecycle in store actions', () => {
         ...DEFAULT_PARAMS,
         output_format: 'png',
         transparent_output: true,
+        background: 'transparent',
       },
     })
 
@@ -771,7 +772,7 @@ describe('mask draft lifecycle in store actions', () => {
 
     expect(callImageApi).toHaveBeenCalledWith(expect.objectContaining({
       prompt: '透明玻璃瓶',
-      nativeTransparentBackground: true,
+      params: expect.objectContaining({ background: 'transparent' }),
     }))
     expect(removeKeyedBackgroundFromDataUrl).not.toHaveBeenCalled()
     const [task] = useStore.getState().tasks

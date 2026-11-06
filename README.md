@@ -12,7 +12,7 @@
 
 **基于 OpenAI gpt-image-2.5 API 的图片生成与编辑工具**
 
-提供简洁精美的 Web UI，支持 OpenAI Images API 与自定义 HTTP 接口。<br>
+提供简洁精美的 Web UI，支持 OpenAI Images API、Gemini generateContent 与自定义 HTTP 接口。<br>
 支持文本生图、参考图、画板标注与遮罩编辑，数据纯本地化存储，带来流畅的历史记录与参数管理体验。
 
 <br>
@@ -104,6 +104,7 @@
 - **多模型切换**：配置的模型 ID 可用逗号分隔填写多个模型（如 `gpt-image-2.5-sunburst, gpt-image-2`），在首页参数栏的“模型”中切换，选择按配置分别记住；预置配置、URL 传参与导入导出均支持这种写法。
 - **多种 API 接入**：在 API 配置的「接入方式」中统一选择以下接口。
   - **OpenAI Images API**：通过图片接口生成图片，支持官方及兼容接口。
+  - **Gemini generateContent**：支持文生图、参考图编辑、宽高比、分辨率与按模型支持的思考强度选择。多图按次数请求，每个任务最多两个请求并发；透明背景使用本地去背景。暂不支持蒙版编辑。
   - **自定义 HTTP 接口**：通过 JSON 定义请求和结果映射，支持 JSON 或 multipart 请求、同步返回或异步轮询，以及图片 URL 或 Base64 结果。
 - **API 代理**：OpenAI 兼容接口可开启同源 `/api-proxy/` 代理，交由 Docker 或本地开发环境转发至真实 API，绕开浏览器 CORS 限制。
 - **Codex CLI 兼容模式**：对上游为 Codex CLI 的 API，开启后应用 Codex CLI 实际支持的参数，并将多图生成拆分为并发单图。

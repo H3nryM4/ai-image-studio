@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { DEFAULT_PARAMS } from '../types'
-import { createDefaultOpenAIProfile, DEFAULT_SETTINGS } from './apiProfiles'
+import { createDefaultOpenAIProfile, DEFAULT_SETTINGS, normalizeSettings } from './apiProfiles'
 import { callImageApi } from './api'
 import { maybeAppendStreamingHint } from './imageApiShared'
 
@@ -16,6 +16,19 @@ describe('API error hints', () => {
 })
 
 describe('callImageApi', () => {
+  it('omits optional interface defaults for generation and edits while preserving explicit values', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => new Response(JSON.stringify({ data: [{ b64_json: '/9j/AAAA' }] })))
+    const settings = normalizeSettings({ profiles: [createDefaultOpenAIProfile({ apiKey: 'test-key' })] })
+    const result = await callImageApi({ settings, params: DEFAULT_PARAMS, prompt: '猫', inputImageDataUrls: [] })
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual({ model: settings.profiles[0].model, prompt: '猫' })
+    expect(result.images[0]).toMatch(/^data:image\/jpeg;/)
+    expect(result.actualParams?.output_format).toBe('jpeg')
+    await callImageApi({ settings, params: DEFAULT_PARAMS, prompt: '修改', inputImageDataUrls: ['data:image/png;base64,aW1n'] })
+    const form = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/images/edits'))?.[1]?.body as FormData
+    for (const key of ['quality', 'size', 'output_format', 'moderation', 'background']) expect(form.has(key)).toBe(false)
+    await callImageApi({ settings, params: { ...DEFAULT_PARAMS, quality: 'auto', output_format: 'png', background: 'opaque' }, prompt: '猫', inputImageDataUrls: [] })
+    expect(JSON.parse(String(fetchMock.mock.calls[fetchMock.mock.calls.length - 1][1]?.body))).toMatchObject({ quality: 'auto', output_format: 'png', background: 'opaque' })
+  })
   afterEach(() => {
     vi.restoreAllMocks()
     vi.unstubAllEnvs()
@@ -104,8 +117,7 @@ describe('callImageApi', () => {
         profiles: [createDefaultOpenAIProfile({ apiKey: 'test-key' })],
       },
       prompt: 'prompt',
-      params: { ...DEFAULT_PARAMS, output_format: 'webp', transparent_output: true },
-      nativeTransparentBackground: true,
+      params: { ...DEFAULT_PARAMS, output_format: 'webp', transparent_output: true, background: 'transparent' },
       inputImageDataUrls: [],
     })
 
@@ -129,8 +141,7 @@ describe('callImageApi', () => {
         profiles: [createDefaultOpenAIProfile({ apiKey: 'test-key' })],
       },
       prompt: 'prompt',
-      params: { ...DEFAULT_PARAMS, transparent_output: true },
-      nativeTransparentBackground: true,
+      params: { ...DEFAULT_PARAMS, transparent_output: true, background: 'transparent' },
       inputImageDataUrls: ['data:image/png;base64,aW1hZ2U='],
     })
 
@@ -665,8 +676,7 @@ describe('callImageApi', () => {
         }]).map((profile) => ({ ...profile, baseUrl: '', apiKey: 'test-key', apiProxy: true })),
       },
       prompt: 'prompt',
-      params: { ...DEFAULT_PARAMS },
-      nativeTransparentBackground: true,
+      params: { ...DEFAULT_PARAMS, background: 'transparent' },
       inputImageDataUrls: [],
     })
 
@@ -812,8 +822,7 @@ describe('callImageApi', () => {
         }]).map((profile) => ({ ...profile, baseUrl: 'https://api.example.com/v1', codexCli: true })),
       },
       prompt: 'prompt',
-      params: { ...DEFAULT_PARAMS, size: '1024x768', quality: 'high', n: 3 },
-      nativeTransparentBackground: true,
+      params: { ...DEFAULT_PARAMS, size: '1024x768', quality: 'high', n: 3, background: 'transparent' },
       inputImageDataUrls: ['data:image/png;base64,aW1hZ2U='],
     })
 
@@ -932,8 +941,7 @@ describe('callImageApi', () => {
         activeProfileId: 'profile-custom-async-background',
       },
       prompt: 'prompt',
-      params: { ...DEFAULT_PARAMS },
-      nativeTransparentBackground: true,
+      params: { ...DEFAULT_PARAMS, background: 'transparent' },
       inputImageDataUrls: [],
     })).rejects.toThrow('请将「透明背景实现方式」切换为「本地后处理」')
   })

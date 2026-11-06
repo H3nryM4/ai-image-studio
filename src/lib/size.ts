@@ -85,7 +85,7 @@ export function normalizeCodexCliImageSize(size: string) {
 }
 
 export function prependCodexCliSizePrompt(prompt: string, size: string) {
-  if (size === 'auto') return prompt
+  if (size === 'auto' || size === 'default') return prompt
   const trimmed = prompt.trimStart()
   const hint = `Generate at ${size} resolution.`
   if (trimmed.startsWith(hint)) return trimmed
@@ -93,7 +93,7 @@ export function prependCodexCliSizePrompt(prompt: string, size: string) {
 }
 
 export function stripInjectedCodexCliSizePrompt(prompt: string, originalPrompt: string, size: string) {
-  if (size === 'auto') return prompt
+  if (size === 'auto' || size === 'default') return prompt
   const prefix = `Generate at ${size} resolution.`
   if (originalPrompt.trimStart().startsWith(prefix)) return prompt
   const trimmed = prompt.trimStart()
