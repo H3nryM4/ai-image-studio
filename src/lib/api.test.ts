@@ -3,6 +3,7 @@ import { DEFAULT_PARAMS } from '../types'
 import { createDefaultOpenAIProfile, DEFAULT_SETTINGS, normalizeSettings } from './apiProfiles'
 import { callImageApi } from './api'
 import { maybeAppendStreamingHint } from './imageApiShared'
+import * as canvasImage from './canvasImage'
 
 describe('API error hints', () => {
   it.each([false, true])('uses the transparent background hint when streaming is %s', (streamImages) => {
@@ -1222,6 +1223,8 @@ describe('callImageApi', () => {
 })
 
 describe('custom connection reference image templates', () => {
+  afterEach(() => vi.restoreAllMocks())
+
   function settingsWith(body: Record<string, unknown>) {
     return {
       ...DEFAULT_SETTINGS,
@@ -1260,6 +1263,29 @@ describe('custom connection reference image templates', () => {
 
     const body = JSON.parse(String((fetchMock.mock.calls[0][1] as RequestInit).body))
     expect(body.image).toEqual(['aW1hZ2Ux', 'aW1hZ2Uy'])
+  })
+
+  it('does not add GIF frame fields to an existing whole-params template', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => new Response(JSON.stringify({ data: [{ b64_json: 'aW1hZ2U=' }] })))
+    const settings = settingsWith({ prompt: '$prompt', params: '$params' })
+    await callImageApi({ settings, prompt: '猫', params: DEFAULT_PARAMS, inputImageDataUrls: [] })
+    const body = JSON.parse(String(fetchMock.mock.calls[0][1]?.body))
+    expect(body.params).not.toHaveProperty('frame_count')
+    expect(body.params).not.toHaveProperty('frame_duration_ms')
+    await callImageApi({ settings, prompt: '动图', params: { ...DEFAULT_PARAMS, output_format: 'gif', frame_count: 8, frame_duration_ms: 100 }, inputImageDataUrls: [] })
+    expect(JSON.parse(String(fetchMock.mock.calls[1][1]?.body)).params).toMatchObject({ frame_count: 8, frame_duration_ms: 100 })
+  })
+
+  it('does not reuse an old SVG link after converting the reference to PNG', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+    vi.spyOn(canvasImage, 'toApiInputImageDataUrl').mockResolvedValue('data:image/png;base64,aW1hZ2U=')
+    await expect(callImageApi({
+      settings: settingsWith({ prompt: '$prompt', image: '$inputImages.urls' }),
+      prompt: '修改', params: DEFAULT_PARAMS,
+      inputImageDataUrls: ['data:image/svg+xml;base64,c3Zn'],
+      inputImageUrls: ['https://example.com/original.svg'],
+    })).rejects.toThrow('只接受链接参考图')
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 
   it('sends original links via $inputImages.urls', async () => {

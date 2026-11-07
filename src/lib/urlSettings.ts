@@ -1,6 +1,7 @@
 import type { ApiProfile, AppSettings } from '../types'
 import { normalizeBaseUrl } from './devProxy'
 import { GEMINI_CONNECTION_ID, DEFAULT_GEMINI_MODEL, normalizeGeminiBaseUrl } from './gemini'
+import { GROK_CONNECTION_ID, DEFAULT_GROK_MODEL } from './grok'
 import {
   createDefaultOpenAIProfile,
   DEFAULT_IMAGES_MODEL,
@@ -226,7 +227,7 @@ function buildRegularSettingsFromUrlParams(currentSettings: Partial<AppSettings>
     id: requestedId || createUrlProfileId(new Set(settings.profiles.map((profile) => profile.id))),
     name: 'URL 参数配置',
     connectionId,
-    model: connectionId === GEMINI_CONNECTION_ID ? DEFAULT_GEMINI_MODEL : DEFAULT_IMAGES_MODEL,
+    model: connectionId === GEMINI_CONNECTION_ID ? DEFAULT_GEMINI_MODEL : connectionId === GROK_CONNECTION_ID ? DEFAULT_GROK_MODEL : DEFAULT_IMAGES_MODEL,
     ...patch,
   })
   const existing = settings.profiles.find((item) => getProfileDedupKey(item) === getProfileDedupKey(profile) && (!patch.name || item.name.trim() === patch.name))

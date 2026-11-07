@@ -1,3 +1,6 @@
+import { imageDataUrlToPngBlob } from './canvasImage'
+import { blobToDataUrl } from './dataUrl'
+
 export async function copyTextToClipboard(text: string) {
   let asyncClipboardError: unknown = null
 
@@ -83,6 +86,8 @@ function isClipboardTypeSupported(type: string) {
 }
 
 async function imageBlobToPngBlob(blob: Blob): Promise<Blob> {
+  // SVG 可能只有 viewBox，复用图片加载流程补尺寸后再绘制。
+  if (blob.type.split(';')[0] === 'image/svg+xml') return imageDataUrlToPngBlob(await blobToDataUrl(blob))
   const image = await createImageBitmap(blob)
   try {
     const canvas = document.createElement('canvas')

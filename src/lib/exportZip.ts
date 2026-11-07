@@ -276,6 +276,7 @@ function getImageCreatedAtFallback(tasks: TaskRecord[]) {
     for (const id of [
       ...(task.inputImageIds || []),
       ...(task.maskImageId ? [task.maskImageId] : []),
+      ...(task.markupImageId ? [task.markupImageId] : []),
       ...(task.outputImages || []),
       ...(task.transparentOriginalImages || []),
       ...(task.streamPartialImageIds || []),
@@ -298,6 +299,7 @@ function getImageFileNameBases(tasks: TaskRecord[]) {
   for (const task of tasks) addImageFileNameBases(bases, task.inputImageIds || [], `task-${task.id}-input`)
   for (const task of tasks) {
     if (task.maskImageId && !bases.has(task.maskImageId)) bases.set(task.maskImageId, `task-${task.id}-mask`)
+    if (task.markupImageId && !bases.has(task.markupImageId)) bases.set(task.markupImageId, `task-${task.id}-markup`)
   }
 
   return bases

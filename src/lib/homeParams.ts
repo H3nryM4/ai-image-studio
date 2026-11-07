@@ -1,9 +1,15 @@
-import { DEFAULT_HOME_PARAMS, DEFAULT_PARAMS, HOME_PARAM_KEYS, type ApiProfile, type CustomConnectionDefinition, type HomeParam, type TaskParams } from '../types'
+import { DEFAULT_HOME_PARAMS, DEFAULT_PARAMS, HOME_PARAM_KEYS, OUTPUT_FORMATS, type ApiProfile, type CustomConnectionDefinition, type HomeParam, type TaskParams } from '../types'
 import { GEMINI_CONNECTION_ID, getGeminiImageOptions, normalizeGeminiParams } from './gemini'
+import { GROK_CONNECTION_ID, getGrokImageOptions, normalizeGrokParams } from './grok'
+import { isVectorOrAnimatedFormat, supportsGptImage26Params } from './imageModels'
+import { normalizeGifParams } from './gptImageParams'
 
 export const HOME_PARAM_OPTIONS: Array<{ value: HomeParam; label: string }> = [
   { value: 'quality', label: '质量' },
+  { value: 'complexity', label: '复杂度' },
   { value: 'output_format', label: '图片格式' },
+  { value: 'frame_count', label: 'GIF 帧数' },
+  { value: 'frame_duration_ms', label: '每帧时长' },
   { value: 'transparent_output', label: '透明背景' },
   { value: 'output_compression', label: '压缩参数' },
   { value: 'moderation', label: '内容审核级别' },
@@ -24,7 +30,11 @@ export function normalizeParamDefaults(value: unknown): NonNullable<ApiProfile['
   if (typeof record.background === 'string' && ['default', 'auto', 'opaque', 'transparent'].includes(record.background)) defaults.background = record.background as TaskParams['background']
   if (typeof record.thinking_level === 'string' && ['default', 'minimal', 'medium', 'high'].includes(record.thinking_level)) defaults.thinking_level = record.thinking_level as TaskParams['thinking_level']
   if (typeof record.quality === 'string' && ['default', 'auto', 'low', 'medium', 'high', 'xhigh', 'max'].includes(record.quality)) defaults.quality = record.quality as TaskParams['quality']
-  if (typeof record.output_format === 'string' && ['default', 'png', 'jpeg', 'webp'].includes(record.output_format)) defaults.output_format = record.output_format as TaskParams['output_format']
+  if (record.output_format === 'default' || OUTPUT_FORMATS.includes(record.output_format as typeof OUTPUT_FORMATS[number])) defaults.output_format = record.output_format as TaskParams['output_format']
+  if (typeof record.complexity === 'string' && ['default', 'low', 'medium', 'high'].includes(record.complexity)) defaults.complexity = record.complexity as TaskParams['complexity']
+  const gif = normalizeGifParams({ frame_count: typeof record.frame_count === 'number' ? record.frame_count : undefined, frame_duration_ms: typeof record.frame_duration_ms === 'number' ? record.frame_duration_ms : undefined })
+  if (typeof record.frame_count === 'number' && Number.isFinite(record.frame_count)) defaults.frame_count = gif.frame_count
+  if (typeof record.frame_duration_ms === 'number' && Number.isFinite(record.frame_duration_ms)) defaults.frame_duration_ms = gif.frame_duration_ms
   if (typeof record.transparent_output === 'boolean') defaults.transparent_output = record.transparent_output
   if (record.moderation === 'default' || record.moderation === 'auto' || record.moderation === 'low') defaults.moderation = record.moderation
   if (record.output_compression === null) defaults.output_compression = null
@@ -44,6 +54,10 @@ function collectTemplateVariables(value: unknown, variables: Set<string>) {
 }
 
 export function getHomeParamState(profile: ApiProfile, connection?: CustomConnectionDefinition | null, hasInputImages = false) {
+  if (profile.connectionId === GROK_CONNECTION_ID) {
+    const available: Array<keyof TaskParams> = ['size', 'n', 'transparent_output', ...(getGrokImageOptions(profile.model).supportsQuality ? ['quality' as const] : [])]
+    return { available, visible: (profile.homeParams ?? []).filter((key) => available.includes(key)) }
+  }
   if (profile.connectionId === GEMINI_CONNECTION_ID) {
     return {
       available: ['size', 'n', 'transparent_output', ...(getGeminiImageOptions(profile.model).thinkingLevels.length ? ['thinking_level'] : [])] as Array<keyof TaskParams>,
@@ -60,7 +74,7 @@ export function getHomeParamState(profile: ApiProfile, connection?: CustomConnec
   const available = keys.filter((key) => {
     if (key === 'thinking_level') return false
     if (key === 'quality' && profile.codexCli) return false
-    if (openAI) return true
+    if (openAI) return !['complexity', 'frame_count', 'frame_duration_ms'].includes(key) || supportsGptImage26Params(profile.model)
     if (!connection) return false
     if (key === 'n' && profile.codexCli && !(hasInputImages && connection.editSubmit ? connection.editSubmit : connection.submit).taskIdPath) return true
     if (key === 'size' && profile.codexCli) return variables.has('$prompt')
@@ -79,6 +93,14 @@ export function getHomeParamState(profile: ApiProfile, connection?: CustomConnec
 }
 
 export function normalizeHomeParams(params: TaskParams, profile: ApiProfile, connection?: CustomConnectionDefinition | null, hasInputImages = false): TaskParams {
+  if (profile.connectionId === GROK_CONNECTION_ID) {
+    return normalizeGrokParams({
+      ...params,
+      quality: profile.homeParams?.includes('quality') ? params.quality : profile.paramDefaults?.quality ?? 'default',
+      transparent_output: profile.homeParams?.includes('transparent_output') ? params.transparent_output : profile.paramDefaults?.transparent_output ?? false,
+      n: profile.homeParams?.includes('n') ? params.n : profile.paramDefaults?.n ?? 1,
+    }, profile.model)
+  }
   if (profile.connectionId === GEMINI_CONNECTION_ID) {
     return normalizeGeminiParams({
       ...params,
@@ -103,6 +125,11 @@ export function normalizeHomeParams(params: TaskParams, profile: ApiProfile, con
   if (next.output_format === 'jpeg') {
     next.transparent_output = false
     if (next.background === 'transparent') next.background = 'opaque'
+  }
+  if (isVectorOrAnimatedFormat(next.output_format)) {
+    next.output_compression = null
+    if (next.output_format === 'svg') next.n = 1
+    if (profile.transparentBackgroundMethod === 'local') next.transparent_output = false
   }
   return next
 }

@@ -5,10 +5,11 @@ import { usePreventBackgroundScroll } from '../hooks/usePreventBackgroundScroll'
 import { useTooltip } from '../hooks/useTooltip'
 import { ensureImageCached, getCachedImage } from '../lib/imageCache'
 import { formatImageRatio } from '../lib/size'
-import { GEMINI_CONNECTION_ID } from '../lib/gemini'
-import { ActualValueBadge, DetailParamValue } from '../lib/paramDisplay'
+import { ActualValueBadge } from '../lib/paramDisplay'
 import { copyImageSourceToClipboard, copyTextToClipboard, getClipboardFailureMessage } from '../lib/clipboard'
 import { createMaskPreviewDataUrl } from '../lib/canvasImage'
+import MarkupOverlay from './input/markupOverlay'
+import TaskParamsDetails from './TaskParamsDetails'
 import { dismissAllTooltips } from '../lib/tooltipDismiss'
 import { downloadImageEntriesAsZip, downloadImageIds, getImageZipEntries } from '../lib/downloadImages'
 import { getImageComments, getTaskPromptText } from '../lib/promptImageComments'
@@ -151,6 +152,7 @@ export default function DetailModal() {
   const maskTargetSrc = maskTargetId ? imageSrcs[maskTargetId] || '' : ''
   const maskSrc = task?.maskImageId ? imageSrcs[task.maskImageId] || '' : ''
   const allInputImageIds = task?.inputImageIds ?? []
+  const inputMarkupIds = task?.markupImageId && allInputImageIds.length ? { [allInputImageIds[0]]: task.markupImageId } : {}
   const outputSlots = useMemo(() => {
     if (!task) return []
     const outputErrors = task.outputErrors ?? []
@@ -179,6 +181,9 @@ export default function DetailModal() {
   const currentOutputImageId = currentOutputSlot?.imageId || ''
   const currentOutputImageIndex = currentOutputSlot?.outputImageIndex ?? -1
   const currentOutputError = currentOutputSlot?.error || ''
+  const rawResponsePayload = currentOutputError
+    ? task?.outputErrors?.find((item) => item.requestIndex === currentOutputSlot.requestIndex)?.rawResponsePayload
+    : task?.rawResponsePayload
   const currentOriginalOutputImageId = currentOutputImageIndex >= 0 ? task?.transparentOriginalImages?.[currentOutputImageIndex] || '' : ''
   const currentOutputPreviewSrc = currentOutputImageId ? outputPreviewSrcs[currentOutputImageId] || '' : ''
 
@@ -260,10 +265,7 @@ export default function DetailModal() {
   const streamPreviewLen = streamPreviewItems.length
   const currentStreamPreviewSrc = activeStreamPreviewSrc
   const streamPartialImageIds = task.streamPartialImageIds ?? []
-  const supportsTransparentOutput = task.params.output_format === 'default' || task.params.output_format === 'png' || task.params.output_format === 'webp'
-  const transparentOutputText = task.transparentOutput ? '本地去背景' : currentActualParams?.background === 'opaque' ? '不透明' : currentActualParams?.background === 'transparent' ? '透明' : task.params.background === 'opaque' ? '不透明' : task.params.background === 'transparent' ? '透明' : '接口默认'
   const currentTransparentOutputFailed = Boolean(currentOutputImageId && task.transparentOutput && task.transparentOriginalImages?.[currentOutputImageIndex] === '')
-  const outputCompressionText = task.params.output_compression == null ? '未设置' : String(task.params.output_compression)
 
   const formatTime = (ts: number | null) => {
     if (!ts) return ''
@@ -601,6 +603,7 @@ export default function DetailModal() {
               >
                 {currentOutputError}
               </p>
+              {rawResponsePayload && <button type="button" aria-label="查看原始响应" onClick={() => setShowRawResponseModal(true)} className="mt-3 rounded-full border border-purple-200/80 bg-purple-50 px-3 py-1.5 text-sm text-purple-600 transition hover:bg-purple-100 dark:border-purple-500/20 dark:bg-purple-500/10 dark:text-purple-400">查看原始响应</button>}
               {outputLen > 1 && (
                 <>
                   <button
@@ -722,7 +725,7 @@ export default function DetailModal() {
                     复制完整报错
                   </ViewportTooltip>
                 </div>
-                {task.rawResponsePayload && (
+                {rawResponsePayload && (
                   <div className="relative group">
                     <button
                       type="button"
@@ -879,9 +882,9 @@ export default function DetailModal() {
                         <div key={imgId} className="relative group inline-block">
                           <div
                             className={`relative w-16 h-16 rounded-lg overflow-hidden border cursor-pointer hover:opacity-80 transition ${
-                              isMaskTarget || commentCount > 0 ? 'border-blue-500 border-2 shadow-xs' : 'border-gray-200 dark:border-white/[0.08]'
+                              isMaskTarget || commentCount > 0 || inputMarkupIds[imgId] ? 'border-blue-500 border-2 shadow-xs' : 'border-gray-200 dark:border-white/[0.08]'
                             }`}
-                            onClick={() => setLightboxImageId(imgId, allInputImageIds, task.prompt)}
+                            onClick={() => setLightboxImageId(imgId, allInputImageIds, task.prompt, inputMarkupIds)}
                           >
                             {displaySrc && (
                               <img
@@ -891,6 +894,7 @@ export default function DetailModal() {
                                 alt=""
                               />
                             )}
+                            {inputMarkupIds[imgId] && <MarkupOverlay key={inputMarkupIds[imgId]} imageId={inputMarkupIds[imgId]} />}
                             {isMaskTarget && (
                               <span className="absolute left-1 top-1 rounded bg-blue-500/90 px-1.5 py-0.5 text-[8px] leading-none text-white font-bold tracking-wider backdrop-blur-xs z-10 pointer-events-none">
                                 MASK
@@ -921,70 +925,7 @@ export default function DetailModal() {
                 </div>
               </div>
             )}
-            <div className="grid grid-cols-2 gap-2 text-xs mb-4 min-w-0">
-              <div className="bg-gray-50 dark:bg-white/[0.03] rounded-lg px-3 py-2 min-w-0 overflow-hidden">
-                <span className="text-gray-400 dark:text-gray-500">尺寸</span>
-                <br />
-                <div className="mt-0.5 overflow-x-auto hide-scrollbar whitespace-nowrap mask-edge-r pr-2">
-                  <DetailParamValue task={task} paramKey="size" className="font-medium" actualParams={currentActualParams} />
-                </div>
-              </div>
-              <div className="bg-gray-50 dark:bg-white/[0.03] rounded-lg px-3 py-2 min-w-0 overflow-hidden">
-                <span className="text-gray-400 dark:text-gray-500">{task.apiConnectionId === GEMINI_CONNECTION_ID ? '比例与分辨率' : '质量'}</span>
-                <br />
-                <div className="mt-0.5 overflow-x-auto hide-scrollbar whitespace-nowrap mask-edge-r pr-2">
-                  {task.apiConnectionId === GEMINI_CONNECTION_ID ? <span className="font-medium text-gray-700 dark:text-gray-300">{task.params.aspect_ratio === 'auto' || !task.params.aspect_ratio ? '自动' : task.params.aspect_ratio} · {task.params.image_size === 'auto' || !task.params.image_size ? '默认' : task.params.image_size}</span> : <DetailParamValue task={task} paramKey="quality" className="font-medium" actualParams={currentActualParams} />}
-                </div>
-              </div>
-              <div className="bg-gray-50 dark:bg-white/[0.03] rounded-lg px-3 py-2 min-w-0 overflow-hidden">
-                <span className="text-gray-400 dark:text-gray-500">格式</span>
-                <br />
-                <div className="mt-0.5 overflow-x-auto hide-scrollbar whitespace-nowrap mask-edge-r pr-2">
-                  <DetailParamValue task={task} paramKey="output_format" className="font-medium" actualParams={currentActualParams} />
-                </div>
-              </div>
-              {supportsTransparentOutput && (
-                <div className="bg-gray-50 dark:bg-white/[0.03] rounded-lg px-3 py-2 min-w-0 overflow-hidden">
-                  <span className="text-gray-400 dark:text-gray-500">背景</span>
-                  <br />
-                  <div className="mt-0.5 overflow-x-auto hide-scrollbar whitespace-nowrap mask-edge-r pr-2">
-                    <span className="font-medium text-gray-700 dark:text-gray-300">{transparentOutputText}</span>
-                    {currentTransparentOutputFailed && (
-                      <span className="ml-1.5 rounded bg-red-50 px-1 py-0.5 text-[10px] font-medium uppercase leading-none text-red-600 dark:bg-red-500/10 dark:text-red-400">
-                        failed
-                      </span>
-                    )}
-                  </div>
-                </div>
-              )}
-              {task.params.output_format !== 'png' && (
-                <div className="bg-gray-50 dark:bg-white/[0.03] rounded-lg px-3 py-2 min-w-0 overflow-hidden">
-                  <span className="text-gray-400 dark:text-gray-500">压缩率</span>
-                  <br />
-                  <div className="mt-0.5 overflow-x-auto hide-scrollbar whitespace-nowrap mask-edge-r pr-2">
-                    <span className="font-medium text-gray-700 dark:text-gray-300">{outputCompressionText}</span>
-                  </div>
-                </div>
-              )}
-              {task.apiConnectionId === GEMINI_CONNECTION_ID && <div className="bg-gray-50 dark:bg-white/[0.03] rounded-lg px-3 py-2 min-w-0 overflow-hidden">
-                <span className="text-gray-400 dark:text-gray-500">思考强度</span><br />
-                <span className="font-medium text-gray-700 dark:text-gray-300">{task.params.thinking_level === 'high' ? '深入' : task.params.thinking_level === 'medium' ? '适中' : task.params.thinking_level === 'minimal' ? '快速' : '接口默认'}</span>
-              </div>}
-              {task.apiConnectionId !== GEMINI_CONNECTION_ID && <div className="bg-gray-50 dark:bg-white/[0.03] rounded-lg px-3 py-2 min-w-0 overflow-hidden">
-                <span className="text-gray-400 dark:text-gray-500">审核</span>
-                <br />
-                <div className="mt-0.5 overflow-x-auto hide-scrollbar whitespace-nowrap mask-edge-r pr-2">
-                  <DetailParamValue task={task} paramKey="moderation" className="font-medium" actualParams={currentActualParams} />
-                </div>
-              </div>}
-              <div className="bg-gray-50 dark:bg-white/[0.03] rounded-lg px-3 py-2 min-w-0 overflow-hidden">
-                <span className="text-gray-400 dark:text-gray-500">数量</span>
-                <br />
-                <div className="mt-0.5 overflow-x-auto hide-scrollbar whitespace-nowrap mask-edge-r pr-2">
-                  <DetailParamValue task={task} paramKey="n" className="font-medium" />
-                </div>
-              </div>
-            </div>
+            <TaskParamsDetails task={task} actualParams={currentActualParams} transparentOutputFailed={currentTransparentOutputFailed} />
 
             {/* 时间 */}
             <div className="text-xs text-gray-400 dark:text-gray-500 mb-4">
@@ -1129,7 +1070,7 @@ export default function DetailModal() {
         </div>
       )}
 
-      {showRawResponseModal && task?.rawResponsePayload && (
+      {showRawResponseModal && rawResponsePayload && (
         <div
           className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4 backdrop-blur-xs sm:p-6"
           onPointerDown={(e) => {
@@ -1156,7 +1097,7 @@ export default function DetailModal() {
                   type="button"
                   onClick={async () => {
                     try {
-                      await copyTextToClipboard(task.rawResponsePayload!)
+                      await copyTextToClipboard(rawResponsePayload)
                       showToast('复制成功', 'success')
                     } catch (err) {
                       showToast(getClipboardFailureMessage('复制失败', err), 'error')
@@ -1178,7 +1119,7 @@ export default function DetailModal() {
             </div>
             <div className="flex-1 min-h-0 overflow-y-auto p-5 bg-gray-50/50 dark:bg-black/20 overscroll-contain">
               <pre data-selectable-text className="text-[11px] sm:text-xs text-gray-600 dark:text-gray-300 font-mono whitespace-pre-wrap break-all select-text">
-                {task.rawResponsePayload.replace(/"(b64_json|base64|data)":\s*"[^"]+"/g, '"$1": "<base64_data>"')}
+                {rawResponsePayload.replace(/"(b64_json|base64|data)":\s*"[^"]+"/g, '"$1": "<base64_data>"')}
               </pre>
             </div>
           </div>

@@ -4,7 +4,7 @@ import { useStore, submitTask, stopBatchPrompts, addImageFromFile } from '../sto
 import { DEFAULT_PARAMS, MAX_INPUT_IMAGES } from '../types'
 import { getActiveApiProfile, getCustomConnectionDefinition, isApiConnectionAvailable, normalizeSettings, resolveApiProfileModel, splitModelList } from '../lib/apiProfiles'
 import { getHomeParamState, normalizeHomeParams } from '../lib/homeParams'
-import { isGptImage25Model } from '../lib/imageModels'
+import { isGptImage25Model, isVectorOrAnimatedFormat } from '../lib/imageModels'
 import { ensureImageCached } from '../lib/imageCache'
 import { splitBatchPrompts } from '../lib/batchPrompts'
 import { getChangedParams, MAX_OPENAI_OUTPUT_IMAGES, normalizeParamsForSettings } from '../lib/paramCompatibility'
@@ -16,11 +16,13 @@ import { suppressGlobalClicks } from '../lib/clickSuppression'
 import { getContentEditablePlainText, getContentEditableSelection, getCommentTagHtml, setContentEditableCursor, syncCommentTagSelection } from '../lib/contentEditableComments'
 import { useHintTooltip } from '../hooks/useHintTooltip'
 import SizePickerModal from './SizePickerModal'
-import GeminiSizePickerModal from './GeminiSizePickerModal'
+import ModelSizePickerModal from './ModelSizePickerModal'
 import { GEMINI_CONNECTION_ID, getGeminiImageOptions, normalizeGeminiParams } from '../lib/gemini'
+import { GROK_CONNECTION_ID, getGrokImageOptions, normalizeGrokParams } from '../lib/grok'
 import { CloseIcon, CollapseIcon, ExpandIcon, LinkIcon, SketchIcon } from './icons'
 import { CommentBadge } from './CommentMarks'
 import AddImageUrlsModal from './input/addImageUrlsModal'
+import MarkupOverlay from './input/markupOverlay'
 import ButtonTooltip from './input/buttonTooltip'
 import DragUploadOverlay from './input/dragUploadOverlay'
 import InputBatchBars from './input/inputBatchBars'
@@ -175,8 +177,10 @@ export default function InputBar() {
     return reusedProfile ? resolveApiProfileModel(reusedProfile, reusedTaskApiModel ?? undefined) : currentActiveProfile
   }, [currentActiveProfile, reusedTaskApiModel, reusedTaskApiProfileId, settings])
   const gemini = activeProfile.connectionId === GEMINI_CONNECTION_ID
-  const maxInputImages = gemini ? getGeminiImageOptions(activeProfile.model).maxInputImages : MAX_INPUT_IMAGES
-  const geminiParams = normalizeGeminiParams(params, activeProfile.model)
+  const grok = activeProfile.connectionId === GROK_CONNECTION_ID
+  const modelDimensions = gemini || grok
+  const maxInputImages = gemini ? getGeminiImageOptions(activeProfile.model).maxInputImages : grok ? getGrokImageOptions(activeProfile.model).maxInputImages : MAX_INPUT_IMAGES
+  const modelParams = grok ? normalizeGrokParams(params, activeProfile.model) : normalizeGeminiParams(params, activeProfile.model)
   const isTemporarilyReusedProfile = activeProfile.id !== currentActiveProfile.id
   const modelOptions = useMemo(() => (
     splitModelList(settings.profiles.find((profile) => profile.id === activeProfile.id)?.model ?? activeProfile.model)
@@ -200,7 +204,8 @@ export default function InputBar() {
   const hasSubmitApiConfig = Boolean(activeProfile.apiKey) && isApiConnectionAvailable(effectiveSettings, activeProfile.connectionId)
   // 批量进行中需等待完成或停止后再提交
   const batchRunning = Boolean(batchProgress)
-  const canSubmit = Boolean(prompt.trim() && hasSubmitApiConfig && !batchRunning && !(gemini && maskDraft))
+  const unsupportedInput = Boolean(maskDraft && (modelDimensions || params.output_format === 'gif')) || (params.output_format === 'svg' && inputImages.length > 0)
+  const canSubmit = Boolean(prompt.trim() && hasSubmitApiConfig && !batchRunning && !unsupportedInput)
   const batchEnabled = settings.showBatchPrompt && settings.batchPromptEnabled
   // 批量进行中始终在画廊显示入口，以便查看进度和停止
   const showBatch = (settings.showBatchPrompt || batchRunning)
@@ -210,7 +215,9 @@ export default function InputBar() {
     : '请先配置 API'
   const submitTooltipText = !hasSubmitApiConfig
     ? '尚未完成 API 配置，请在右上角设置中进行'
-    : gemini && maskDraft ? 'Gemini 暂不支持蒙版，请先移除蒙版' : '批量任务进行中，请等待完成或停止后再提交'
+    : maskDraft && (modelDimensions || params.output_format === 'gif') ? '当前接入或格式不支持蒙版，请先移除蒙版'
+    : params.output_format === 'svg' && inputImages.length > 0 ? 'SVG 仅支持文生图，请先移除参考图'
+    : '批量任务进行中，请等待完成或停止后再提交'
   const promptPlaceholder = batchEnabled
     ? '每条提示词之间空两行分隔...'
     : '描述你想生成的图片...'
@@ -224,15 +231,15 @@ export default function InputBar() {
   const showTransparentOutputControl = (params.output_format === 'default' || params.output_format === 'png' || params.output_format === 'webp')
   const transparentOutputEnabled = showTransparentOutputControl && params.transparent_output
   const compressionDisabled = params.output_format !== 'jpeg' && params.output_format !== 'webp'
-  const outputImageLimit = MAX_OPENAI_OUTPUT_IMAGES
+  const outputImageLimit = params.output_format === 'svg' ? 1 : MAX_OPENAI_OUTPUT_IMAGES
   const nDraftValue = Number(nInput)
   const effectiveNValue = Number.isNaN(nDraftValue) ? params.n : nDraftValue
-  const streamConcurrentByN = (gemini || (activeProfile.connectionId === 'openai-images' && activeProfile.streamImages === true)) && effectiveNValue > 1
+  const streamConcurrentByN = (gemini || (activeProfile.connectionId === 'openai-images' && activeProfile.streamImages === true && !isVectorOrAnimatedFormat(params.output_format))) && effectiveNValue > 1
   const nLimitHintText = `最大请求数量为 ${outputImageLimit}`
-  const displaySize = gemini
-    ? geminiParams.aspect_ratio === 'auto' && geminiParams.image_size === 'auto'
+  const displaySize = modelDimensions
+    ? modelParams.aspect_ratio === 'auto' && modelParams.image_size === 'auto'
       ? '自动'
-      : `${geminiParams.aspect_ratio === 'auto' ? '自动' : geminiParams.aspect_ratio} · ${geminiParams.image_size === 'auto' ? '默认' : geminiParams.image_size === '512' ? '0.5K' : geminiParams.image_size}`
+      : `${modelParams.aspect_ratio === 'auto' ? '自动' : modelParams.aspect_ratio} · ${modelParams.image_size === 'auto' ? '默认' : modelParams.image_size === '512' ? '0.5K' : modelParams.image_size}`
     : params.size === 'default' ? '接口默认' : (activeProfile.codexCli ? normalizeCodexCliImageSize(params.size) : normalizeImageSize(params.size)) || DEFAULT_PARAMS.size
 
   const qualityOptions = [
@@ -240,7 +247,7 @@ export default function InputBar() {
     { label: 'auto', value: 'auto' },
     { label: 'low', value: 'low' },
     { label: 'medium', value: 'medium' },
-    { label: 'high', value: 'high' },
+    ...(!grok ? [{ label: 'high', value: 'high' }] : []),
     ...(isGptImage25Model(activeProfile.model)
       ? [
           { label: 'xhigh', value: 'xhigh' },
@@ -1037,13 +1044,13 @@ export default function InputBar() {
         )}
         <div
           className={`relative w-[52px] h-[52px] rounded-xl overflow-hidden shadow-xs cursor-grab active:cursor-grabbing select-none ${
-            isMaskTarget || commentCount > 0
+            isMaskTarget || commentCount > 0 || img.markupImageId
               ? 'border-2 border-blue-500'
               : 'border border-gray-200 dark:border-white/[0.08]'
           }`}
           onClick={() => {
             if (suppressImageClickRef.current) return
-            setLightboxImageId(img.id, inputImages.map((i) => i.id), prompt)
+            setLightboxImageId(img.id, inputImages.map((i) => i.id), prompt, Object.fromEntries(inputImages.map((i) => [i.id, i.markupImageId])))
           }}
         >
           {displaySrc && (
@@ -1055,6 +1062,7 @@ export default function InputBar() {
               />
             </div>
           )}
+          {img.markupImageId && <MarkupOverlay key={img.markupImageId} imageId={img.markupImageId} />}
           {isMaskTarget && (
             <span className="absolute left-1 top-1 rounded bg-blue-500/90 px-1.5 py-0.5 text-[8px] leading-none text-white font-bold tracking-wider backdrop-blur-xs z-10 pointer-events-none">
               MASK
@@ -1068,7 +1076,7 @@ export default function InputBar() {
             className="absolute inset-0 w-full h-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer z-20 focus:outline-hidden border-none"
             onClick={(e) => {
               e.stopPropagation()
-              setLightboxImageId(img.id, inputImages.map((i) => i.id), prompt)
+              setLightboxImageId(img.id, inputImages.map((i) => i.id), prompt, Object.fromEntries(inputImages.map((i) => [i.id, i.markupImageId])))
             }}
             title="查看"
             aria-label="查看参考图"
@@ -1256,6 +1264,7 @@ export default function InputBar() {
       streamConcurrentHint={streamConcurrentHint}
       sizeHint={sizeHint}
       homeParamState={getHomeParamState(activeProfile, getCustomConnectionDefinition(effectiveSettings, activeProfile.connectionId), inputImages.length > 0)}
+      hasInputImages={inputImages.length > 0}
       onOpenSizePicker={() => setShowSizePicker(true)}
       showBatch={showBatch}
       batchEnabled={batchEnabled}
@@ -1275,8 +1284,8 @@ export default function InputBar() {
 
       {showAddImageUrls && <AddImageUrlsModal maxImages={maxInputImages} onClose={() => setShowAddImageUrls(false)} />}
 
-      {showSizePicker && gemini && <GeminiSizePickerModal params={params} model={activeProfile.model} onSelect={setParams} onClose={() => setShowSizePicker(false)} />}
-      {showSizePicker && !gemini && (
+      {showSizePicker && modelDimensions && <ModelSizePickerModal params={params} model={activeProfile.model} connectionId={activeProfile.connectionId} onSelect={setParams} onClose={() => setShowSizePicker(false)} />}
+      {showSizePicker && !modelDimensions && (
         <SizePickerModal
           currentSize={params.size}
           onSelect={(size) => setParams({ size })}

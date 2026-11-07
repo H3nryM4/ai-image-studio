@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { TaskParams, TaskRecord } from '../types'
 import { GEMINI_CONNECTION_ID } from './gemini'
+import { GROK_CONNECTION_ID } from './grok'
 import ViewportTooltip from '../components/ViewportTooltip'
 
 type ParamKey = keyof TaskParams
@@ -65,11 +66,11 @@ export function ActualValueBadge({ value, className = '', variant = 'highlight' 
 }
 
 export function getParamDisplay(task: TaskRecord, paramKey: ParamKey, actualParams = task.actualParams) {
-  if (task.apiConnectionId === GEMINI_CONNECTION_ID && paramKey === 'output_format') {
+  if ((task.apiConnectionId === GEMINI_CONNECTION_ID || task.apiConnectionId === GROK_CONNECTION_ID) && paramKey === 'output_format') {
     const format = actualParams?.output_format
     return { displayValue: format ?? '接口默认', isMismatch: false, requestedValue: '接口默认', isAutoResolved: false }
   }
-  const requestedValue = task.params[paramKey]
+  const requestedValue = task.params[paramKey] ?? (paramKey === 'complexity' ? 'default' : undefined)
   const actualValue = actualParams?.[paramKey]
   const hasActualValue = actualValue !== undefined && actualValue !== null
   const displayValue = hasActualValue ? actualValue : requestedValue

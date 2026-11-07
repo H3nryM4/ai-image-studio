@@ -2,12 +2,25 @@
   "profiles": [
     {
       "id": "example-openai",
-      "name": "示例配置",
-      "provider": "openai",
+      "name": "OpenAI 示例配置",
+      "connectionId": "openai-images",
       "baseUrl": "https://api.example.com/v1",
       "model": "gpt-image-2.5-sunburst",
-      "apiMode": "images",
       "isDefault": true
+    },
+    {
+      "id": "example-gemini",
+      "name": "Gemini 示例配置",
+      "connectionId": "gemini-generate-content",
+      "baseUrl": "https://generativelanguage.googleapis.com/v1beta",
+      "model": "gemini-3.1-flash-image"
+    },
+    {
+      "id": "example-grok",
+      "name": "Grok 示例配置",
+      "connectionId": "xai-images",
+      "baseUrl": "https://api.x.ai/v1",
+      "model": "grok-imagine-image-2.0"
     }
   ]
 }

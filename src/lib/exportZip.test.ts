@@ -38,6 +38,7 @@ describe('exportZip', () => {
       params: { ...DEFAULT_PARAMS, aspect_ratio: '16:9', image_size: '2K' } as TaskParams,
       apiConnectionId: 'gemini-generate-content',
       inputImageIds: ['img-1'],
+      markupImageId: 'img-markup',
       outputImages: ['img-2'],
       streamPartialImageIds: ['img-3'],
       status: 'done',
@@ -58,6 +59,10 @@ describe('exportZip', () => {
       id: 'img-3',
       dataUrl: 'data:image/png;base64,CAkKCw==',
       source: 'generated',
+    }, {
+      id: 'img-markup',
+      dataUrl: 'data:image/png;base64,DA0ODw==',
+      source: 'mask',
     }]
     const thumbnail: StoredImageThumbnail = {
       id: 'img-1',
@@ -91,6 +96,9 @@ describe('exportZip', () => {
     })
     expect(parsed.manifest.imageFiles?.['img-2']?.path).toBe('images/task-task-1.png')
     expect(parsed.manifest.imageFiles?.['img-3']?.path).toBe('images/task-task-1-partial.png')
+    expect(parsed.manifest.tasks?.[0].markupImageId).toBe('img-markup')
+    expect(parsed.manifest.imageFiles?.['img-markup']?.path).toBe('images/task-task-1-markup.png')
+    expect(readExportZipFileAsDataUrl(parsed.files, 'images/task-task-1-markup.png')).toBe(images[3].dataUrl)
     expect(parsed.manifest.thumbnailFiles?.['img-1']).toEqual({
       path: 'thumbnails/task-task-1-input.jpeg',
       width: 32,

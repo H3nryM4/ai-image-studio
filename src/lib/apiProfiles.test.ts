@@ -1470,7 +1470,7 @@ describe('custom connections', () => {
       ],
     })
 
-    expect(settings.connectionOrder).toEqual(['custom-beta', 'openai-images', 'gemini-generate-content', 'custom-alpha'])
+    expect(settings.connectionOrder).toEqual(['custom-beta', 'openai-images', 'gemini-generate-content', 'xai-images', 'custom-alpha'])
   })
 
   it('reads the active connection from its profile', () => {

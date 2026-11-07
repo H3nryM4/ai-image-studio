@@ -74,6 +74,8 @@ export interface ApiProfile {
   apiKey: string
   /** 模型 ID 列表，多个模型以 `, ` 分隔 */
   model: string
+  /** SVG 编写模型，留空时使用接口默认值。 */
+  svgModel?: string
   /** 首页选中的模型；不在列表中时回退到第一个 */
   selectedModel?: string
   timeout: number
@@ -87,7 +89,7 @@ export interface ApiProfile {
   homeParams?: HomeParam[]
   /** 首页隐藏的参数使用此配置的默认值。 */
   paramDefaults?: Partial<Pick<TaskParams, HomeParam | 'size' | 'background'>>
-  connectionDrafts?: Partial<Record<ApiConnectionId, Partial<Pick<ApiProfile, 'baseUrl' | 'model' | 'codexCli' | 'apiProxy' | 'responseFormatB64Json' | 'streamImages' | 'streamPartialImages' | 'transparentBackgroundMethod' | 'homeParams' | 'paramDefaults'>>>>
+  connectionDrafts?: Partial<Record<ApiConnectionId, Partial<Pick<ApiProfile, 'baseUrl' | 'model' | 'svgModel' | 'codexCli' | 'apiProxy' | 'responseFormatB64Json' | 'streamImages' | 'streamPartialImages' | 'transparentBackgroundMethod' | 'homeParams' | 'paramDefaults'>>>>
 }
 
 export interface PresetConfig {
@@ -150,18 +152,23 @@ export interface AppSettings {
 
 export interface TaskParams {
   size: string
-  /** Gemini 的比例和分辨率独立于 Images API 的像素尺寸。 */
+  /** Gemini / Grok 的比例和分辨率独立于 GPT Image 的像素尺寸。 */
   aspect_ratio?: string
   image_size?: string
   thinking_level?: 'default' | 'minimal' | 'medium' | 'high'
   background?: 'default' | 'auto' | 'opaque' | 'transparent'
   quality: 'default' | 'auto' | 'low' | 'medium' | 'high' | 'xhigh' | 'max'
-  output_format: 'default' | 'png' | 'jpeg' | 'webp'
+  output_format: 'default' | 'png' | 'jpeg' | 'webp' | 'svg' | 'gif'
   output_compression: number | null
   moderation: 'default' | 'auto' | 'low'
   n: number
   transparent_output: boolean
+  complexity?: 'default' | 'low' | 'medium' | 'high'
+  frame_count?: number
+  frame_duration_ms?: number
 }
+
+export const OUTPUT_FORMATS = ['png', 'jpeg', 'webp', 'svg', 'gif'] as const
 
 export const DEFAULT_PARAMS: TaskParams = {
   size: 'default',
@@ -173,9 +180,12 @@ export const DEFAULT_PARAMS: TaskParams = {
   thinking_level: 'default',
   n: 1,
   transparent_output: false,
+  complexity: 'default',
+  frame_count: 9,
+  frame_duration_ms: 200,
 }
 
-export const HOME_PARAM_KEYS = ['quality', 'output_format', 'transparent_output', 'output_compression', 'moderation', 'thinking_level', 'n'] as const
+export const HOME_PARAM_KEYS = ['quality', 'complexity', 'output_format', 'frame_count', 'frame_duration_ms', 'transparent_output', 'output_compression', 'moderation', 'thinking_level', 'n'] as const
 export type HomeParam = typeof HOME_PARAM_KEYS[number]
 export const DEFAULT_HOME_PARAMS: HomeParam[] = ['quality', 'n']
 
@@ -186,6 +196,8 @@ export interface InputImage {
   id: string
   /** data URL，用于预览 */
   dataUrl: string
+  /** 与原图分开保存的透明标注层。 */
+  markupImageId?: string
 }
 
 /** 参考图上的评论标注，x / y 为相对原图宽高的比例（0~1） */
@@ -237,10 +249,12 @@ export interface TaskRecord {
   inputImageIds: string[]
   maskTargetImageId?: string | null
   maskImageId?: string | null
+  /** 第一张参考图的独立标注层。 */
+  markupImageId?: string | null
   /** 输出图片的 image store id 列表 */
   outputImages: string[]
   /** 并发多图中失败的输出槽位，requestIndex 为从 0 开始的请求序号 */
-  outputErrors?: Array<{ requestIndex: number; error: string }>
+  outputErrors?: Array<{ requestIndex: number; error: string; rawResponsePayload?: string }>
   /** 流式生成的中间步骤图片 id 列表，仅失败时保留供排查/下载 */
   streamPartialImageIds?: string[]
   /** API 返回的原始图片 HTTP URL（非 base64 时记录） */

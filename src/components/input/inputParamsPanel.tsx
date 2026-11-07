@@ -2,10 +2,12 @@ import { useEffect, useRef, useState } from 'react'
 import type { ApiProfile, AppSettings, BatchProgress, BatchPromptMode, TaskParams } from '../../types'
 import { DEFAULT_BATCH_PROMPT_CONCURRENCY, normalizeBatchPromptConcurrency } from '../../lib/batchPrompts'
 import { getGeminiImageOptions } from '../../lib/gemini'
+import { getImageOutputFormats } from '../../lib/imageModels'
 import { getHomeParamState } from '../../lib/homeParams'
 import { dismissAllTooltips } from '../../lib/tooltipDismiss'
 import Select from '../Select'
 import ButtonTooltip from './buttonTooltip'
+import GifFrameInput from './gifFrameInput'
 import ParamPopoverChip, { CHIP_BASE_CLASS, CHIP_IDLE_CLASS } from './paramPopoverChip'
 
 const CHIP_CLASS = `${CHIP_BASE_CLASS} ${CHIP_IDLE_CLASS}`
@@ -124,6 +126,7 @@ export default function InputParamsPanel({
   streamConcurrentHint,
   sizeHint,
   homeParamState,
+  hasInputImages = false,
   onOpenSizePicker,
   showBatch,
   batchEnabled,
@@ -165,6 +168,7 @@ export default function InputParamsPanel({
   streamConcurrentHint: HintTooltipState
   sizeHint: HintTooltipState
   homeParamState: ReturnType<typeof getHomeParamState>
+  hasInputImages?: boolean
   onOpenSizePicker: () => void
   showBatch: boolean
   batchEnabled: boolean
@@ -179,6 +183,7 @@ export default function InputParamsPanel({
   const native = activeProfile.transparentBackgroundMethod === 'api'
   const visible = homeParamState.visible.filter((key) =>
     (key !== 'output_compression' || !compressionDisabled) &&
+    ((key !== 'frame_count' && key !== 'frame_duration_ms') || params.output_format === 'gif') &&
     (key !== 'transparent_output' || native || showTransparentOutputControl),
   )
   const prefix = (text: string) => <span className="mr-1.5 text-gray-400 dark:text-gray-500">{text}</span>
@@ -271,6 +276,10 @@ export default function InputParamsPanel({
           <span className={ROW_LABEL_CLASS}>质量</span>
           <div className="w-28"><Select value={params.quality} onChange={(val) => setParams({ quality: val as TaskParams['quality'] })} options={qualityOptions} className={selectClass} /></div>
         </div>}
+        {visible.includes('complexity') && <div className={ROW_CLASS}>
+          <span className={ROW_LABEL_CLASS}>复杂度</span>
+          <div className="w-28"><Select value={params.complexity ?? 'default'} onChange={(value) => setParams({ complexity: value as TaskParams['complexity'] })} options={['default', 'low', 'medium', 'high'].map((value) => ({ label: value === 'default' ? '接口默认' : value, value }))} className={selectClass} /></div>
+        </div>}
         {visible.includes('output_format') && <div className={ROW_CLASS}>
           <span className={ROW_LABEL_CLASS}>格式</span>
           <div className="w-28">
@@ -281,18 +290,22 @@ export default function InputParamsPanel({
                   output_format: val as TaskParams['output_format'],
                   ...(val === 'png' ? { output_compression: null } : {}),
                   ...(val === 'jpeg' ? { transparent_output: false, ...(params.background === 'transparent' ? { background: 'opaque' as const } : {}) } : {}),
+                  ...(val === 'svg' || val === 'gif' ? { output_compression: null, ...(!native ? { transparent_output: false } : {}) } : {}),
+                  ...(val === 'svg' ? { n: 1 } : {}),
                 })
               }}
               options={[
                 { label: '接口默认', value: 'default' },
-                { label: 'PNG', value: 'png' },
-                { label: 'JPEG', value: 'jpeg' },
-                { label: 'WebP', value: 'webp' },
+                ...getImageOutputFormats(activeProfile.model, hasInputImages).map((value) => ({ label: value === 'webp' ? 'WebP' : value.toUpperCase(), value })),
               ]}
               className={selectClass}
             />
           </div>
         </div>}
+        {(['frame_count', 'frame_duration_ms'] as const).filter((key) => visible.includes(key)).map((key) => <label key={key} className={ROW_CLASS}>
+          <span className={ROW_LABEL_CLASS}>{key === 'frame_count' ? 'GIF 帧数' : '每帧时长（毫秒）'}</span>
+          <GifFrameInput param={key} value={params[key] ?? (key === 'frame_count' ? 9 : 200)} onChange={setParams} />
+        </label>)}
         {visible.includes('transparent_output') && (
           <div
             className={ROW_CLASS}

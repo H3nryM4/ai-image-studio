@@ -9,6 +9,7 @@ import { DEFAULT_IMAGES_MODEL } from './imageModels'
 import { normalizeBatchPromptConcurrency } from './batchPrompts'
 import { normalizeHomeParamSelection, normalizeParamDefaults } from './homeParams'
 import { GEMINI_CONNECTION_ID, DEFAULT_GEMINI_BASE_URL, DEFAULT_GEMINI_MODEL } from './gemini'
+import { GROK_CONNECTION_ID, DEFAULT_GROK_BASE_URL, DEFAULT_GROK_MODEL } from './grok'
 
 const OPENAI_DEFAULT_API_BASE_URL = 'https://api.openai.com/v1'
 const RAW_DEFAULT_API_URL = readRuntimeEnv(import.meta.env.VITE_DEFAULT_API_URL)
@@ -22,7 +23,7 @@ export { DEFAULT_IMAGES_MODEL } from './imageModels'
 export const DEFAULT_OPENAI_PROFILE_ID = 'default-openai'
 export const DEFAULT_API_TIMEOUT = 600
 
-const BUILT_IN_CONNECTION_IDS = new Set<ApiConnectionId>(['openai-images', GEMINI_CONNECTION_ID])
+const BUILT_IN_CONNECTION_IDS = new Set<ApiConnectionId>(['openai-images', GEMINI_CONNECTION_ID, GROK_CONNECTION_ID])
 const DEFAULT_CUSTOM_CONNECTION_PATHS = {
   generationPath: 'images/generations',
   editPath: 'images/edits',
@@ -87,7 +88,7 @@ function normalizeZipDownloadRoutes(value: unknown) {
 function normalizeConnectionOrder(value: unknown, customConnections: CustomConnectionDefinition[]): string[] | undefined {
   if (!Array.isArray(value)) return undefined
 
-  const connectionIds = ['openai-images', GEMINI_CONNECTION_ID, ...customConnections.map((connection) => connection.id)]
+  const connectionIds = ['openai-images', GEMINI_CONNECTION_ID, GROK_CONNECTION_ID, ...customConnections.map((connection) => connection.id)]
   const knownIds = new Set(connectionIds)
   const ordered = value
     .map(String)
@@ -259,9 +260,10 @@ export function normalizeCustomConnectionDefinitions(input: unknown): CustomConn
 export function createDefaultOpenAIProfile(overrides: Partial<ApiProfile> = {}): ApiProfile {
   const connectionId = overrides.connectionId ?? DEFAULT_API_URL_PATCH?.connectionId ?? 'openai-images'
   const gemini = connectionId === GEMINI_CONNECTION_ID
-  const defaultBaseUrl = gemini ? DEFAULT_GEMINI_BASE_URL : DEFAULT_API_BASE_URL
-  const defaultModel = gemini ? DEFAULT_GEMINI_MODEL : DEFAULT_IMAGES_MODEL
-  const useDeploymentDefaults = !gemini || DEFAULT_API_URL_PATCH?.connectionId === GEMINI_CONNECTION_ID
+  const grok = connectionId === GROK_CONNECTION_ID
+  const defaultBaseUrl = gemini ? DEFAULT_GEMINI_BASE_URL : grok ? DEFAULT_GROK_BASE_URL : DEFAULT_API_BASE_URL
+  const defaultModel = gemini ? DEFAULT_GEMINI_MODEL : grok ? DEFAULT_GROK_MODEL : DEFAULT_IMAGES_MODEL
+  const useDeploymentDefaults = (!gemini && !grok) || DEFAULT_API_URL_PATCH?.connectionId === connectionId
 
   return {
     id: DEFAULT_OPENAI_PROFILE_ID,
@@ -276,10 +278,12 @@ export function createDefaultOpenAIProfile(overrides: Partial<ApiProfile> = {}):
     transparentBackgroundMethod: DEFAULT_API_URL_PATCH?.transparentBackgroundMethod ?? 'api',
     ...overrides,
     connectionId,
-    ...(connectionId === GEMINI_CONNECTION_ID ? { codexCli: false, responseFormatB64Json: undefined, transparentBackgroundMethod: 'local' as const } : {}),
+    ...(gemini || grok ? { codexCli: false, transparentBackgroundMethod: 'local' as const } : {}),
+    ...(gemini ? { responseFormatB64Json: undefined } : {}),
     homeParams: normalizeHomeParamSelection(overrides.homeParams ?? (connectionId === GEMINI_CONNECTION_ID ? ['n'] : undefined)),
     paramDefaults: { ...normalizeParamDefaults(DEFAULT_PARAMS), ...normalizeParamDefaults(overrides.paramDefaults) },
-    streamImages: connectionId === GEMINI_CONNECTION_ID ? false : overrides.streamImages ?? DEFAULT_API_URL_PATCH?.streamImages ?? false,
+    svgModel: typeof overrides.svgModel === 'string' && overrides.svgModel.trim() ? overrides.svgModel.trim() : undefined,
+    streamImages: gemini || grok ? false : overrides.streamImages ?? DEFAULT_API_URL_PATCH?.streamImages ?? false,
   }
 }
 
@@ -290,6 +294,7 @@ export function switchApiProfileConnection(profile: ApiProfile, connectionId: Ap
     [profile.connectionId]: {
       baseUrl: profile.baseUrl,
       model: profile.model,
+      svgModel: profile.svgModel,
       codexCli: profile.codexCli,
       apiProxy: profile.apiProxy,
       responseFormatB64Json: profile.responseFormatB64Json,
@@ -303,18 +308,21 @@ export function switchApiProfileConnection(profile: ApiProfile, connectionId: Ap
   const savedDraft = connectionDrafts[connectionId]
   const openAI = isOpenAIConnection(connectionId)
   const fromOpenAI = isOpenAIConnection(profile.connectionId)
+  const nativeImage = connectionId === GEMINI_CONNECTION_ID || connectionId === GROK_CONNECTION_ID
+  const fromNativeImage = profile.connectionId === GEMINI_CONNECTION_ID || profile.connectionId === GROK_CONNECTION_ID
 
   return {
     ...profile,
     connectionId,
-    baseUrl: savedDraft?.baseUrl ?? (connectionId === GEMINI_CONNECTION_ID ? DEFAULT_GEMINI_BASE_URL : profile.connectionId === GEMINI_CONNECTION_ID && openAI ? DEFAULT_API_BASE_URL : profile.baseUrl),
-    model: savedDraft?.model ?? (connectionId === GEMINI_CONNECTION_ID ? DEFAULT_GEMINI_MODEL : profile.connectionId === GEMINI_CONNECTION_ID && openAI ? DEFAULT_IMAGES_MODEL : profile.model || DEFAULT_IMAGES_MODEL),
+    baseUrl: savedDraft?.baseUrl ?? (connectionId === GEMINI_CONNECTION_ID ? DEFAULT_GEMINI_BASE_URL : connectionId === GROK_CONNECTION_ID ? DEFAULT_GROK_BASE_URL : fromNativeImage && openAI ? DEFAULT_API_BASE_URL : profile.baseUrl),
+    model: savedDraft?.model ?? (connectionId === GEMINI_CONNECTION_ID ? DEFAULT_GEMINI_MODEL : connectionId === GROK_CONNECTION_ID ? DEFAULT_GROK_MODEL : fromNativeImage && openAI ? DEFAULT_IMAGES_MODEL : profile.model || DEFAULT_IMAGES_MODEL),
+    svgModel: openAI ? savedDraft?.svgModel : undefined,
     codexCli: savedDraft?.codexCli ?? (openAI && fromOpenAI ? profile.codexCli : false),
     apiProxy: savedDraft?.apiProxy ?? (openAI && (fromOpenAI ? profile.apiProxy : DEFAULT_OPENAI_API_PROXY)),
     responseFormatB64Json: savedDraft?.responseFormatB64Json,
     streamImages: openAI ? savedDraft?.streamImages ?? false : false,
     streamPartialImages: savedDraft?.streamPartialImages ?? (openAI && fromOpenAI ? profile.streamPartialImages : DEFAULT_STREAM_PARTIAL_IMAGES),
-    transparentBackgroundMethod: connectionId === GEMINI_CONNECTION_ID || (customConnection && !customConnectionSupportsNativeTransparentBackground(customConnection))
+    transparentBackgroundMethod: nativeImage || (customConnection && !customConnectionSupportsNativeTransparentBackground(customConnection))
       ? 'local'
       : savedDraft?.transparentBackgroundMethod ?? 'api',
     homeParams: normalizeHomeParamSelection(savedDraft?.homeParams ?? (connectionId === GEMINI_CONNECTION_ID ? ['n'] : undefined)),
@@ -330,7 +338,7 @@ function normalizeConnectionDraft(
   nativeTransparentConnectionIds: Set<string>,
 ): ApiProfileConnectionDraft {
   if (!isRecord(input)) return undefined
-  const nativeTransparentBackgroundUnavailable = connectionId === GEMINI_CONNECTION_ID || (customConnectionIds.has(connectionId) && !nativeTransparentConnectionIds.has(connectionId))
+  const nativeTransparentBackgroundUnavailable = connectionId === GEMINI_CONNECTION_ID || connectionId === GROK_CONNECTION_ID || (customConnectionIds.has(connectionId) && !nativeTransparentConnectionIds.has(connectionId))
   const transparentBackgroundMethod = nativeTransparentBackgroundUnavailable ? 'local' : 'api'
   const fallback = createDefaultOpenAIProfile({ connectionId, transparentBackgroundMethod })
   const baseUrl = typeof input.baseUrl === 'string' ? input.baseUrl : undefined
@@ -341,12 +349,13 @@ function normalizeConnectionDraft(
   return {
     baseUrl,
     model,
+    svgModel: typeof input.svgModel === 'string' && input.svgModel.trim() ? input.svgModel.trim() : undefined,
     homeParams: normalizeHomeParamSelection(input.homeParams),
     paramDefaults: { ...normalizeParamDefaults(DEFAULT_PARAMS), ...normalizeParamDefaults(input.paramDefaults) },
-    codexCli: typeof input.codexCli === 'boolean' ? input.codexCli : fallback.codexCli,
+    codexCli: connectionId !== GEMINI_CONNECTION_ID && connectionId !== GROK_CONNECTION_ID && (typeof input.codexCli === 'boolean' ? input.codexCli : fallback.codexCli),
     apiProxy: typeof input.apiProxy === 'boolean' ? input.apiProxy : fallback.apiProxy,
     responseFormatB64Json: input.responseFormatB64Json === true ? true : undefined,
-    streamImages: typeof input.streamImages === 'boolean' ? input.streamImages : fallback.streamImages,
+    streamImages: isOpenAIConnection(connectionId) && (typeof input.streamImages === 'boolean' ? input.streamImages : fallback.streamImages),
     streamPartialImages: normalizeStreamPartialImages(input.streamPartialImages, fallback.streamPartialImages),
     transparentBackgroundMethod: !nativeTransparentBackgroundUnavailable && (input.transparentBackgroundMethod === 'api' || input.transparentBackgroundMethod === 'local')
       ? input.transparentBackgroundMethod
@@ -385,7 +394,7 @@ export function normalizeApiProfile(
   const streamImages = isOpenAIConnection(connectionId)
     ? typeof record.streamImages === 'boolean' ? record.streamImages : defaults.streamImages
     : false
-  const nativeTransparentBackgroundUnavailable = connectionId === GEMINI_CONNECTION_ID || (customConnectionIds.has(connectionId) && !nativeTransparentConnectionIds.has(connectionId))
+  const nativeTransparentBackgroundUnavailable = connectionId === GEMINI_CONNECTION_ID || connectionId === GROK_CONNECTION_ID || (customConnectionIds.has(connectionId) && !nativeTransparentConnectionIds.has(connectionId))
 
   return {
     ...defaults,
@@ -398,8 +407,9 @@ export function normalizeApiProfile(
     apiKey: typeof record.apiKey === 'string' ? record.apiKey : defaults.apiKey,
     model: (typeof record.model === 'string' && normalizeModelList(record.model)) || defaults.model,
     selectedModel: typeof record.selectedModel === 'string' && record.selectedModel.trim() ? record.selectedModel.trim() : undefined,
+    svgModel: typeof record.svgModel === 'string' && record.svgModel.trim() ? record.svgModel.trim() : undefined,
     timeout: typeof record.timeout === 'number' && Number.isFinite(record.timeout) ? record.timeout : defaults.timeout,
-    codexCli: connectionId !== GEMINI_CONNECTION_ID && Boolean(record.codexCli),
+    codexCli: connectionId !== GEMINI_CONNECTION_ID && connectionId !== GROK_CONNECTION_ID && Boolean(record.codexCli),
     apiProxy: typeof record.apiProxy === 'boolean' ? record.apiProxy : defaults.apiProxy,
     responseFormatB64Json: connectionId !== GEMINI_CONNECTION_ID && record.responseFormatB64Json === true ? true : undefined,
     streamImages,
@@ -547,6 +557,7 @@ export function getCustomConnectionDefinition(settings: Partial<AppSettings> | u
 export function getApiConnectionLabel(settings: Partial<AppSettings> | unknown, connectionId: ApiConnectionId): string {
   if (connectionId === 'openai-images') return 'OpenAI Images API'
   if (connectionId === GEMINI_CONNECTION_ID) return 'Gemini generateContent'
+  if (connectionId === GROK_CONNECTION_ID) return 'Grok Images API'
   return getCustomConnectionDefinition(settings, connectionId)?.name ?? '接入已失效'
 }
 
@@ -668,6 +679,7 @@ function isDefaultOpenAIProfile(profile: ApiProfile): boolean {
     profile.baseUrl === DEFAULT_API_BASE_URL &&
     profile.apiKey === '' &&
     profile.model === DEFAULT_IMAGES_MODEL &&
+    !profile.svgModel &&
     profile.timeout === DEFAULT_API_TIMEOUT &&
     profile.connectionId === 'openai-images' &&
     profile.codexCli === false &&
@@ -851,6 +863,7 @@ const PRESET_PROFILE_DEPLOYMENT_KEYS = [
   'connectionId',
   'baseUrl',
   'model',
+  'svgModel',
   'timeout',
   'codexCli',
   'apiProxy',

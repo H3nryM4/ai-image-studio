@@ -8,6 +8,7 @@ const MIME_EXTENSIONS: Record<string, string> = {
   'image/jpeg': 'jpg',
   'image/webp': 'webp',
   'image/gif': 'gif',
+  'image/svg+xml': 'svg',
 }
 
 export interface DownloadImagesResult {
@@ -125,7 +126,8 @@ function triggerDownload(blob: Blob, fileName: string) {
 }
 
 function getBlobExtension(blob: Blob): string {
-  return MIME_EXTENSIONS[blob.type.toLowerCase()] ?? blob.type.split('/')[1] ?? 'png'
+  const mime = blob.type.toLowerCase().split(';')[0].trim()
+  return MIME_EXTENSIONS[mime] ?? mime.split('/')[1] ?? 'png'
 }
 
 function delay(ms: number) {

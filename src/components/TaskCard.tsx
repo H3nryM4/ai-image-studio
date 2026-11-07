@@ -318,7 +318,7 @@ export default function TaskCard({
 
   const formatDisplay = getParamDisplay(task, 'output_format')
   const showFormat = task.params.output_format !== 'png' || formatDisplay.isMismatch
-  const showTransparentOutput = task.transparentOutput || task.params.transparent_output
+  const showTransparentOutput = task.transparentOutput || task.params.transparent_output || task.params.background === 'transparent' || task.actualParams?.background === 'transparent'
 
   const nDisplay = getParamDisplay(task, 'n')
   const showN = (task.params.n > 1 || nDisplay.isMismatch)

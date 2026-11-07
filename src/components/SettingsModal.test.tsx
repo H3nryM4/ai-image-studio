@@ -70,6 +70,45 @@ async function selectConnection(value: string) {
 }
 
 describe('settings modal', () => {
+  it('configures 2.6 features when an older model appears first in the same profile', async () => {
+    const profile = createDefaultOpenAIProfile({ model: 'gpt-image-2.5-sunburst, gpt-image-2.6-sunburst' })
+    await openSettings(normalizeSettings({ profiles: [profile], activeProfileId: profile.id }))
+    expect(el.querySelector('button[aria-label="首页显示复杂度"]')).not.toBeNull()
+    expect(el.querySelector('input[aria-label="默认GIF 帧数"]')).not.toBeNull()
+    const toggle = el.querySelector<HTMLButtonElement>('button[aria-label="首页显示图片格式"]')!
+    const select = toggle.parentElement!.querySelector('select')!
+    expect([...select.options].map((option) => option.value)).toEqual(expect.arrayContaining(['svg', 'gif']))
+    await act(async () => toggle.click())
+    await act(async () => {
+      select.value = 'gif'
+      select.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+    expect(useStore.getState().settings.profiles[0]).toMatchObject({ paramDefaults: { output_format: 'gif' }, homeParams: expect.arrayContaining(['output_format']) })
+  })
+
+  it.each([
+    ['xai-images', 'grok-imagine-image, grok-imagine-image-2.0', '质量', ['default', 'auto', 'low', 'medium']],
+    ['gemini-generate-content', 'gemini-2.5-flash-image, nano-banana-2-1', '思考强度', ['default', 'minimal', 'medium', 'high']],
+  ] as const)('offers supported parameters across all %s models', async (connectionId, model, label, values) => {
+    const profile = createDefaultOpenAIProfile({ connectionId, model })
+    await openSettings(normalizeSettings({ profiles: [profile], activeProfileId: profile.id }))
+    const toggle = el.querySelector<HTMLButtonElement>(`button[aria-label="首页显示${label}"]`)!
+    const select = toggle.parentElement!.querySelector('select')!
+    expect([...select.options].map((option) => option.value)).toEqual(values)
+  })
+
+  it('switches to Grok with native defaults and hides unsupported compatibility controls', async () => {
+    await openSettings()
+    await selectConnection('xai-images')
+    expect(useStore.getState().settings.profiles[0]).toMatchObject({ connectionId: 'xai-images', baseUrl: 'https://api.x.ai/v1', model: 'grok-imagine-image-2.0', codexCli: false, streamImages: false, transparentBackgroundMethod: 'local' })
+    expect(el.textContent).not.toContain('Codex CLI 兼容模式')
+    expect(el.textContent).not.toContain('流式传输')
+    expect(el.querySelector('input[aria-label="SVG 编写模型 ID"]')).toBeNull()
+    expect(el.textContent).toContain('兼容选项：请求 Base64')
+    await selectConnection('openai-images')
+    expect(el.querySelector('input[aria-label="SVG 编写模型 ID"]')).not.toBeNull()
+  })
+
   it('switches to Gemini with a valid versioned address and hides Images-only controls', async () => {
     await openSettings()
     await selectConnection('gemini-generate-content')
@@ -170,7 +209,7 @@ describe('settings modal', () => {
     const settings = normalizeSettings({ ...DEFAULT_SETTINGS, customConnections: [connection], profiles: [profile], activeProfileId: profile.id })
     await openSettings(settings)
     expect(Array.from(el.querySelector('select')!.options).map((option) => option.value)).toEqual([
-      '__add_custom_connection__', 'openai-images', 'gemini-generate-content', 'vendor:images',
+      '__add_custom_connection__', 'openai-images', 'gemini-generate-content', 'xai-images', 'vendor:images',
     ])
     expect(el.querySelector('input[aria-label="模型 ID"]')).not.toBeNull()
 

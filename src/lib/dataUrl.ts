@@ -4,6 +4,7 @@ const IMAGE_MIME_BY_EXTENSION: Record<string, string> = {
   jpeg: 'image/jpeg',
   webp: 'image/webp',
   gif: 'image/gif',
+  svg: 'image/svg+xml',
 }
 
 function bytesToBase64(bytes: Uint8Array): string {
@@ -15,9 +16,12 @@ function bytesToBase64(bytes: Uint8Array): string {
 }
 
 export function dataUrlToBytes(dataUrl: string): { ext: string; bytes: Uint8Array } {
-  const match = dataUrl.match(/^data:image\/(\w+);base64,/)
-  const ext = match?.[1] ?? 'png'
-  const binary = atob(dataUrl.replace(/^data:[^;]+;base64,/, ''))
+  const match = dataUrl.match(/^data:image\/([\w.+-]+)((?:;[^,]*)?),([\s\S]*)$/i)
+  if (!match) throw new Error('图片 data URL 格式无效')
+  const mime = match[1].toLowerCase()
+  const ext = mime === 'svg+xml' ? 'svg' : mime
+  if (!/;base64(?:;|$)/i.test(match[2])) return { ext, bytes: new TextEncoder().encode(decodeURIComponent(match[3])) }
+  const binary = atob(match[3])
   const bytes = new Uint8Array(binary.length)
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
   return { ext, bytes }

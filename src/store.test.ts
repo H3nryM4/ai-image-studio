@@ -150,6 +150,63 @@ function importFile(data: ExportData, files: Record<string, Uint8Array> = {}): F
   return { name: 'backup.zip', size: zipped.byteLength, arrayBuffer: async () => buffer.slice(0) } as File
 }
 
+describe('independent reference annotations', () => {
+  const original = { id: 'markup-original', dataUrl: 'data:image/png;base64,original' }
+  const layer = { id: 'markup-layer', dataUrl: 'data:image/png;base64,layer' }
+
+  beforeEach(async () => {
+    await clearTasks()
+    await clearImages()
+    await putImage(original)
+    await putImage(layer)
+    const profile = createDefaultOpenAIProfile({ apiKey: 'test-key' })
+    useStore.setState({
+      settings: normalizeSettings({ profiles: [profile], activeProfileId: profile.id }),
+      tasks: [],
+      inputImages: [],
+      prompt: '',
+      params: DEFAULT_PARAMS,
+      maskDraft: null,
+      maskEditorImageId: null,
+      reusedTaskApiProfileId: null,
+      reusedTaskApiProfileMissing: false,
+      batchProgress: null,
+      showToast: vi.fn(),
+    })
+  })
+
+  it('keeps draft and historical layers during startup cleanup and restores the draft link', async () => {
+    const savedTask = task({ id: 'markup-history', inputImageIds: [original.id], markupImageId: layer.id })
+    await putDbTask(savedTask)
+    useStore.setState({ inputImages: [{ id: original.id, dataUrl: '', markupImageId: layer.id }] })
+    await initStore()
+    expect(useStore.getState().inputImages).toEqual([{ ...original, markupImageId: layer.id }])
+    expect(await getImage(layer.id)).toEqual(layer)
+  })
+
+  it('reuses the original image and its layer, and preserves a layer while the draft still uses it', async () => {
+    const savedTask = task({ id: 'markup-reuse', inputImageIds: [original.id], markupImageId: layer.id })
+    await putDbTask(savedTask)
+    useStore.setState({ tasks: [savedTask] })
+    await reuseConfig(savedTask)
+    expect(useStore.getState().inputImages).toEqual([{ ...original, markupImageId: layer.id }])
+    await removeTask(savedTask)
+    expect(await getImage(layer.id)).toEqual(layer)
+    useStore.getState().setInputImageMarkup(original.id)
+    await vi.waitFor(async () => expect(await getImage(layer.id)).toBeUndefined())
+    expect(useStore.getState().inputImages[0].id).toBe(original.id)
+    expect(await getImage(original.id)).toEqual(original)
+  })
+
+  it('deletes an annotation together with the last task that references it', async () => {
+    const savedTask = task({ id: 'markup-delete', inputImageIds: [original.id], markupImageId: layer.id })
+    await putDbTask(savedTask)
+    useStore.setState({ tasks: [savedTask] })
+    await removeTask(savedTask)
+    expect(await getImage(layer.id)).toBeUndefined()
+  })
+})
+
 describe('data operation locking', () => {
   it('detects running and recoverable image tasks', () => {
     expect(hasActiveDataOperations([task()])).toBe(false)

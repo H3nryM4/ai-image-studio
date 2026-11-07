@@ -1,6 +1,6 @@
 # 自定义服务商 LLM 提示词
 
-设置页“复制给 LLM”按钮使用以下提示词，用于让 LLM 根据第三方图像生成 API 文档生成可导入的自定义服务商配置。
+设置页“复制给 LLM”按钮使用以下提示词，用于让 LLM 根据第三方图像生成 API 文档生成可导入的自定义服务商配置。兼容内置协议的接口可直接选择 OpenAI Images API、Gemini generateContent 或 Grok Images API，无需另建自定义接口。
 
 ````text
 # 角色
@@ -21,7 +21,7 @@
 
 ## customConnections 元素（Manifest）
 每个元素的顶层字段：id、name、submit、editSubmit、poll。
-id 是服务商的唯一标识，用于 profiles 中的 connectionId 字段引用，建议使用 custom-{英文短名} 格式。
+id 是服务商的唯一标识，用于 profiles 中的 connectionId 字段引用，建议使用 custom-{英文短名} 格式；不能使用内置标识 openai-images、gemini-generate-content 或 xai-images。
 submit 是文生图提交配置，必填。
 editSubmit 是图生图或局部重绘提交配置，可选。如果文生图和图生图使用同一个 JSON 接口，可以省略 editSubmit，并在 submit.body 中加入 image_urls。
 poll 是异步任务查询配置，可选；同步接口不要写 poll。
@@ -55,6 +55,7 @@ body 模板变量：
 - $profile.model：用户在设置里填写的模型 ID。
 - $prompt：当前提示词。
 - $params.size、$params.quality、$params.output_format、$params.output_compression、$params.moderation、$params.n：应用内参数。
+- $params.complexity、$params.frame_count、$params.frame_duration_ms：支持模型的复杂度、GIF 帧数与每帧时长（毫秒）。只映射文档明确支持的字段，固定值也可直接写在模板中。
 - $params.background：API 原生透明背景参数；启用时为 `"transparent"`，未启用时自动省略。
 - $inputImages.dataUrls：参考图 data URL 数组；没有参考图时会自动省略该字段。
 - $inputImages.base64：参考图的裸 base64 数组，不带 data URL 前缀；没有参考图时会自动省略该字段。

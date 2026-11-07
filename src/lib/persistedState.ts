@@ -53,7 +53,10 @@ function normalizeParams(value: unknown, fallback: TaskParams): TaskParams {
     quality: value.quality === 'default' || value.quality === 'auto' || value.quality === 'low' || value.quality === 'medium' || value.quality === 'high' || value.quality === 'xhigh' || value.quality === 'max'
       ? value.quality
       : fallback.quality,
-    output_format: value.output_format === 'default' || value.output_format === 'png' || value.output_format === 'jpeg' || value.output_format === 'webp' ? value.output_format : fallback.output_format,
+    output_format: value.output_format === 'default' || value.output_format === 'png' || value.output_format === 'jpeg' || value.output_format === 'webp' || value.output_format === 'svg' || value.output_format === 'gif' ? value.output_format : fallback.output_format,
+    complexity: value.complexity === 'default' || value.complexity === 'low' || value.complexity === 'medium' || value.complexity === 'high' ? value.complexity : fallback.complexity,
+    frame_count: typeof value.frame_count === 'number' && Number.isFinite(value.frame_count) ? Math.min(16, Math.max(2, Math.round(value.frame_count))) : fallback.frame_count,
+    frame_duration_ms: typeof value.frame_duration_ms === 'number' && Number.isFinite(value.frame_duration_ms) ? Math.min(2000, Math.max(20, Math.round(value.frame_duration_ms / 10) * 10)) : fallback.frame_duration_ms,
     output_compression: value.output_compression === null || (typeof value.output_compression === 'number' && Number.isFinite(value.output_compression))
       ? value.output_compression
       : fallback.output_compression,
@@ -79,7 +82,7 @@ export function createPersistedState(state: PersistedStateSource): Partial<Persi
     },
     ...(settings.persistInputOnRestart ? {
       prompt: state.prompt,
-      inputImages: state.inputImages.map((img) => ({ id: img.id, dataUrl: '' })),
+      inputImages: state.inputImages.map((img) => ({ id: img.id, dataUrl: '', ...(img.markupImageId ? { markupImageId: img.markupImageId } : {}) })),
       maskDraft: state.maskDraft,
       maskEditorImageId: state.maskEditorImageId,
     } : {}),
@@ -102,7 +105,7 @@ export function normalizePersistedState(persistedState: unknown, fallback: Persi
       })()
     : null
   const inputImages = settings.persistInputOnRestart && Array.isArray(persistedState.inputImages)
-    ? persistedState.inputImages.flatMap((img): InputImage[] => isRecord(img) && typeof img.id === 'string' ? [{ id: img.id, dataUrl: '' }] : [])
+    ? persistedState.inputImages.flatMap((img): InputImage[] => isRecord(img) && typeof img.id === 'string' ? [{ id: img.id, dataUrl: '', ...(typeof img.markupImageId === 'string' && img.markupImageId ? { markupImageId: img.markupImageId } : {}) }] : [])
     : []
   const mask = persistedState.maskDraft
   const maskDraft = settings.persistInputOnRestart && isRecord(mask) && typeof mask.targetImageId === 'string'

@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { copyImageSourceToClipboard } from './clipboard'
+import * as canvasImage from './canvasImage'
 
 const mocks = vi.hoisted(() => ({
   fetch: vi.fn(),
@@ -26,6 +27,7 @@ describe('copyImageSourceToClipboard', () => {
   })
 
   afterEach(() => {
+    vi.restoreAllMocks()
     vi.unstubAllGlobals()
   })
 
@@ -58,5 +60,15 @@ describe('copyImageSourceToClipboard', () => {
   it('图片源为空时报错', async () => {
     await expect(copyImageSourceToClipboard(Promise.resolve(undefined))).rejects.toThrow('Image source is not available')
     expect(mocks.fetch).not.toHaveBeenCalled()
+  })
+
+  it('SVG 通过支持 viewBox 的加载流程转为剪贴板 PNG', async () => {
+    const png = new Blob(['png'], { type: 'image/png' })
+    const convert = vi.spyOn(canvasImage, 'imageDataUrlToPngBlob').mockResolvedValue(png)
+    mocks.fetch.mockResolvedValue({ blob: async () => new Blob(['<svg viewBox="0 0 400 200"/>'], { type: 'image/svg+xml' }) })
+    await copyImageSourceToClipboard('data:image/svg+xml;base64,c3Zn')
+    expect(convert).toHaveBeenCalledWith(expect.stringMatching(/^data:image\/svg\+xml;base64,/))
+    const item = mocks.write.mock.calls[0][0][0] as FakeClipboardItem
+    await expect(item.items['image/png']).resolves.toBe(png)
   })
 })

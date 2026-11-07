@@ -11,8 +11,11 @@ import { callImageApi } from './lib/api'
 import { showBrowserNotification } from './lib/browserNotification'
 import { IMAGE_FETCH_CORS_HINT, isHttpUrl } from './lib/imageApiShared'
 import { getCustomQueuedImageResult } from './lib/openaiCompatibleImageApi'
-import { validateMaskMatchesImage } from './lib/canvasImage'
+import { toApiInputImageDataUrl, validateMaskMatchesImage } from './lib/canvasImage'
+import { persistTaskInputImages, toReferenceImage } from './lib/inputImages'
 import { GEMINI_CONNECTION_ID } from './lib/gemini'
+import { GROK_CONNECTION_ID } from './lib/grok'
+import { isVectorOrAnimatedFormat } from './lib/imageModels'
 import { orderInputImagesForMask } from './lib/mask'
 import { normalizeHomeParams, switchHomeParams } from './lib/homeParams'
 import { getChangedParams, normalizeParamsForSettings } from './lib/paramCompatibility'
@@ -145,6 +148,7 @@ interface AppState {
   /** 通过链接添加的参考图 id 到原链接，供只接受链接参考图的自定义服务商使用 */
   imageSourceUrls: Record<string, string>
   addInputImage: (img: InputImage) => void
+  setInputImageMarkup: (id: string, markupImageId?: string) => void
   replaceInputImage: (idx: number, img: InputImage) => void
   removeInputImage: (idx: number) => void
   clearInputImages: () => void
@@ -217,7 +221,8 @@ interface AppState {
   lightboxImageList: string[]
   /** 预览参考图时对应的提示词，按图片在列表中的位置取其评论；为空时不显示评论 */
   lightboxCommentPrompt: string | null
-  setLightboxImageId: (id: string | null, list?: string[], commentPrompt?: string | null) => void
+  lightboxMarkupIds: Record<string, string | undefined>
+  setLightboxImageId: (id: string | null, list?: string[], commentPrompt?: string | null, markupIds?: Record<string, string | undefined>) => void
   /** 画板；baseImageSrc 为画布底图，replaceImageId 为完成后要替换的参考图 */
   sketchBoard: SketchBoardRequest | null
   setSketchBoard: (board: SketchBoardRequest | null) => void
@@ -259,13 +264,13 @@ interface AppState {
 }
 
 function isImageReferencedByState(state: AppState, imageId: string) {
-  return state.inputImages.some((img) => img.id === imageId) || state.tasks.some((task) =>
+  return state.inputImages.some((img) => img.id === imageId || img.markupImageId === imageId) || state.tasks.some((task) =>
     task.inputImageIds.includes(imageId) ||
     task.outputImages.includes(imageId) ||
     task.transparentOriginalImages?.includes(imageId) ||
     task.streamPartialImageIds?.includes(imageId) ||
     task.maskTargetImageId === imageId ||
-    task.maskImageId === imageId,
+    task.maskImageId === imageId || task.markupImageId === imageId,
   )
 }
 
@@ -407,14 +412,21 @@ export const useStore = create<AppState>()(
           if (s.inputImages.find((i) => i.id === img.id)) return s
           return { inputImages: [...s.inputImages, img] }
         }),
+      setInputImageMarkup: (id, markupImageId) => {
+        const previous = useStore.getState().inputImages.find((img) => img.id === id)?.markupImageId
+        set((s) => ({ inputImages: s.inputImages.map((img) => img.id === id ? { ...img, markupImageId } : img) }))
+        if (previous && previous !== markupImageId) void deleteImageIfUnreferenced(previous)
+      },
       replaceInputImage: (idx, img) => {
         let removedImageId: string | null = null
+        let removedMarkupId: string | undefined
         set((s) => {
           if (idx < 0 || idx >= s.inputImages.length) return s
           const previous = s.inputImages[idx]
           if (!previous || previous.id === img.id) return s
           if (s.inputImages.some((item, itemIdx) => itemIdx !== idx && item.id === img.id)) return s
           removedImageId = previous.id
+          removedMarkupId = previous.markupImageId
           const inputImages = s.inputImages.map((item, itemIdx) => itemIdx === idx ? img : item)
           return updateInputDraftImages(s, inputImages, {
             equivalentImageIds: { [previous.id]: img.id },
@@ -422,6 +434,7 @@ export const useStore = create<AppState>()(
           })
         })
         if (removedImageId) void deleteImageIfUnreferenced(removedImageId)
+        if (removedMarkupId) void deleteImageIfUnreferenced(removedMarkupId)
       },
       removeInputImage: (idx) =>
         set((s) => {
@@ -476,8 +489,8 @@ export const useStore = create<AppState>()(
       setMaskEditorImageId: (maskEditorImageId) => {
         const state = useStore.getState()
         const profile = state.settings.profiles.find((item) => item.id === state.reusedTaskApiProfileId) ?? getActiveApiProfile(state.settings)
-        if (maskEditorImageId && profile.connectionId === GEMINI_CONNECTION_ID) {
-          state.showToast('Gemini 暂不支持蒙版编辑，请使用画板或文字描述修改区域', 'info')
+        if (maskEditorImageId && (profile.connectionId === GEMINI_CONNECTION_ID || profile.connectionId === GROK_CONNECTION_ID || state.params.output_format === 'gif')) {
+          state.showToast('当前接入或格式不支持蒙版编辑，请使用画板或文字描述修改区域', 'info')
           return
         }
         if (maskEditorImageId) dismissAllTooltips()
@@ -617,12 +630,14 @@ export const useStore = create<AppState>()(
       lightboxImageId: null,
       lightboxImageList: [],
       lightboxCommentPrompt: null,
-      setLightboxImageId: (lightboxImageId, list, commentPrompt = null) => {
+      lightboxMarkupIds: {},
+      setLightboxImageId: (lightboxImageId, list, commentPrompt = null, markupIds = {}) => {
         if (lightboxImageId) dismissAllTooltips()
         set({
           lightboxImageId,
           lightboxImageList: list ?? (lightboxImageId ? [lightboxImageId] : []),
           lightboxCommentPrompt: lightboxImageId ? commentPrompt : null,
+          lightboxMarkupIds: lightboxImageId ? markupIds : {},
         })
       },
       sketchBoard: null,
@@ -722,7 +737,7 @@ function usesConcurrentImageRequests(settings: AppSettings, profile: ApiProfile,
   if (n <= 1) return false
   if (profile.connectionId === GEMINI_CONNECTION_ID) return true
   if (isOpenAIConnection(profile.connectionId)) {
-    return profile.codexCli || profile.streamImages
+    return profile.codexCli || (profile.streamImages && !isVectorOrAnimatedFormat(params.output_format))
   }
   return profile.codexCli && !isAsyncCustomConnectionTask(settings, profile.connectionId, hasInputImages)
 }
@@ -930,7 +945,7 @@ export async function initStore() {
   }
 
   const state = useStore.getState()
-  const referencedIds = new Set(state.inputImages.map((img) => img.id))
+  const referencedIds = new Set(state.inputImages.flatMap((img) => [img.id, ...(img.markupImageId ? [img.markupImageId] : [])]))
   for (const task of tasks) addTaskReferencedImageIds(referencedIds, task)
   const imageIds = await getAllImageIds()
   const referencedImageIds: string[] = []
@@ -948,7 +963,8 @@ export async function initStore() {
   for (const img of state.inputImages) {
     const dataUrl = img.dataUrl || (await getImage(img.id))?.dataUrl
     if (!dataUrl) continue
-    images.push({ id: img.id, dataUrl })
+    const markupImageId = img.markupImageId && await ensureImageCached(img.markupImageId) ? img.markupImageId : undefined
+    images.push({ id: img.id, dataUrl, ...(markupImageId ? { markupImageId } : {}) })
     cacheImage(img.id, dataUrl)
   }
   useStore.setState(updateInputDraftImages(state, images))
@@ -995,6 +1011,11 @@ export async function submitTask(options: { allowFullMask?: boolean; useCurrentA
     return
   }
 
+  if ((maskDraft && (activeProfile.connectionId === GEMINI_CONNECTION_ID || activeProfile.connectionId === GROK_CONNECTION_ID || params.output_format === 'gif')) || (params.output_format === 'svg' && inputImages.length > 0)) {
+    showToast(params.output_format === 'svg' ? 'SVG 仅支持文生图，请移除参考图' : '当前接入或格式不支持蒙版，请先移除蒙版', 'error')
+    return
+  }
+
   const batchPrompts = normalizedSettings.showBatchPrompt && normalizedSettings.batchPromptEnabled ? splitBatchPrompts(prompt) : []
   if (useStore.getState().batchProgress) {
     showToast('批量任务进行中，请等待完成或停止后再提交', 'error')
@@ -1038,10 +1059,9 @@ export async function submitTask(options: { allowFullMask?: boolean; useCurrentA
   }
 
   // 持久化输入图片到 IndexedDB（此前只在内存缓存中）
+  let taskInputImages = orderedInputImages
   try {
-    for (const img of orderedInputImages) {
-      await storeImage(img.dataUrl)
-    }
+    taskInputImages = await persistTaskInputImages(orderedInputImages, true)
   } catch (err) {
     console.error('保存参考图失败', err)
     endBatch(batchId)
@@ -1080,9 +1100,10 @@ export async function submitTask(options: { allowFullMask?: boolean; useCurrentA
       apiProfileId: activeProfile.id,
       apiProfileName: activeProfile.name,
       apiModel: activeProfile.model,
-      inputImageIds: orderedInputImages.map((i) => i.id),
+      inputImageIds: taskInputImages.map((i) => i.id),
       maskTargetImageId,
       maskImageId,
+      markupImageId: taskInputImages[0]?.markupImageId,
       transparentOutput: transparentMeta?.transparentOutput,
       transparentPrompt: transparentMeta?.effectivePrompt,
       outputImages: [],
@@ -1196,6 +1217,7 @@ export function stopBatchPrompts() {
 function addTaskReferencedImageIds(target: Set<string>, task: TaskRecord) {
   for (const id of task.inputImageIds || []) target.add(id)
   if (task.maskImageId) target.add(task.maskImageId)
+  if (task.markupImageId) target.add(task.markupImageId)
   for (const id of task.outputImages || []) target.add(id)
   for (const id of task.transparentOriginalImages || []) {
     if (id) target.add(id)
@@ -1260,7 +1282,10 @@ async function deleteUnreferencedImageIds(imageIds: Iterable<string>) {
   const { tasks, inputImages } = useStore.getState()
   const stillUsed = new Set<string>()
   for (const task of tasks) addTaskReferencedImageIds(stillUsed, task)
-  for (const img of inputImages) stillUsed.add(img.id)
+  for (const img of inputImages) {
+    stillUsed.add(img.id)
+    if (img.markupImageId) stillUsed.add(img.markupImageId)
+  }
 
   for (const imgId of candidates) {
     if (stillUsed.has(imgId)) continue
@@ -1330,6 +1355,8 @@ async function executeTask(taskId: string) {
       maskDataUrl = await ensureImageCached(task.maskImageId)
       if (!maskDataUrl) throw new Error('遮罩图片已不存在')
     }
+    const markupDataUrl = task.markupImageId ? await ensureImageCached(task.markupImageId) : undefined
+    if (task.markupImageId && !markupDataUrl) throw new Error('标注图片已不存在')
 
     const requestPrompt = task.transparentOutput && task.transparentPrompt
       ? task.transparentPrompt
@@ -1342,6 +1369,7 @@ async function executeTask(taskId: string) {
       inputImageDataUrls: inputDataUrls,
       inputImageUrls: task.inputImageIds.map((id) => useStore.getState().imageSourceUrls[id] ?? null),
       maskDataUrl,
+      markupDataUrl,
       onCustomTaskEnqueued: (request) => {
         if (taskExecutions.get(taskId) !== execution) return
         customTaskInfo = request
@@ -1576,6 +1604,10 @@ export async function retryTask(task: TaskRecord) {
   if (!source || source.status === 'running' || source.customRecoverable) return
   const activeProfile = getActiveApiProfile(settings)
   const normalizedParams = normalizeParamsForSettings(source.params, settings)
+  if ((normalizedParams.output_format === 'svg' && source.inputImageIds.length > 0) || (source.maskImageId && (activeProfile.connectionId === GEMINI_CONNECTION_ID || activeProfile.connectionId === GROK_CONNECTION_ID || normalizedParams.output_format === 'gif'))) {
+    state.showToast(normalizedParams.output_format === 'svg' ? 'SVG 仅支持文生图，请先复用任务并移除参考图' : '当前接入或格式不支持蒙版，请先复用任务并移除蒙版', 'error')
+    return
+  }
   const shouldUseTransparentOutput = (normalizedParams.output_format === 'default' || normalizedParams.output_format === 'png' || normalizedParams.output_format === 'webp') && normalizedParams.transparent_output
   const taskParams = shouldUseTransparentOutput
     ? getTransparentRequestParams(normalizedParams)
@@ -1604,6 +1636,7 @@ export async function retryTask(task: TaskRecord) {
     inputImageIds: [...source.inputImageIds],
     maskTargetImageId: source.maskTargetImageId ?? null,
     maskImageId: source.maskImageId ?? null,
+    markupImageId: source.markupImageId,
     transparentOutput: transparentMeta?.transparentOutput,
     transparentPrompt: transparentMeta?.effectivePrompt,
     outputImages: [],
@@ -1679,10 +1712,11 @@ export async function reuseConfig(task: TaskRecord) {
 
   // 恢复输入图片
   const imgs: InputImage[] = []
-  for (const imgId of task.inputImageIds) {
+  for (const [idx, imgId] of task.inputImageIds.entries()) {
     const dataUrl = await ensureImageCached(imgId)
     if (dataUrl) {
-      imgs.push({ id: imgId, dataUrl })
+      const markupImageId = idx === 0 && task.markupImageId && await ensureImageCached(task.markupImageId) ? task.markupImageId : undefined
+      imgs.push({ id: imgId, dataUrl, ...(markupImageId ? { markupImageId } : {}) })
     }
   }
   setInputImages(imgs)
@@ -1731,10 +1765,11 @@ export async function editOutputs(task: TaskRecord) {
 
   let added = 0
   for (const imgId of task.outputImages) {
-    if (inputImages.find((i) => i.id === imgId)) continue
     const dataUrl = await ensureImageCached(imgId)
     if (dataUrl) {
-      addInputImage({ id: imgId, dataUrl })
+      const image = await toReferenceImage(imgId, dataUrl)
+      if (inputImages.some((img) => img.id === image.id)) continue
+      addInputImage(image)
       added++
     }
   }
@@ -2227,7 +2262,7 @@ export async function addImageFromFile(file: File): Promise<void> {
 
 export async function createInputImageFromFile(file: File): Promise<InputImage | null> {
   if (!file.type.startsWith('image/')) return null
-  const dataUrl = await fileToDataUrl(file)
+  const dataUrl = await toApiInputImageDataUrl(await fileToDataUrl(file))
   const id = await storeImage(dataUrl, 'upload')
   cacheImage(id, dataUrl)
   // 本地添加的图片即使与链接添加的内容相同，也不再沿用当时的链接，以免提交已过期的链接
@@ -2241,10 +2276,12 @@ export async function addImageFromUrl(src: string): Promise<void> {
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   const blob = await res.blob()
   if (!blob.type.startsWith('image/')) throw new Error('不是有效的图片')
-  const dataUrl = await blobToDataUrl(blob)
+  const original = await blobToDataUrl(blob)
+  const dataUrl = await toApiInputImageDataUrl(original)
   const id = await storeImage(dataUrl, 'upload')
   cacheImage(id, dataUrl)
   // 内容相同的图片共用一个 id，记录最近一次添加的链接
-  if (isHttpUrl(src)) useStore.setState((s) => ({ imageSourceUrls: { ...s.imageSourceUrls, [id]: src } }))
+  if (isHttpUrl(src) && dataUrl === original) useStore.setState((s) => ({ imageSourceUrls: { ...s.imageSourceUrls, [id]: src } }))
+  else if (dataUrl !== original) forgetImageSourceUrl(id)
   useStore.getState().addInputImage({ id, dataUrl })
 }

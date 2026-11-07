@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import type { TaskParams } from '../types'
-import { getGeminiImageOptions, normalizeGeminiParams } from '../lib/gemini'
+import { GEMINI_CONNECTION_ID, getGeminiImageOptions, normalizeGeminiParams } from '../lib/gemini'
+import { GROK_CONNECTION_ID, getGrokImageOptions, normalizeGrokParams } from '../lib/grok'
 import { useCloseOnEscape } from '../hooks/useCloseOnEscape'
 import { usePreventBackgroundScroll } from '../hooks/usePreventBackgroundScroll'
 
@@ -9,16 +10,18 @@ const buttonClass = (active: boolean) => `rounded-xl border px-3 py-2 text-sm tr
   : 'border-transparent bg-black/[0.04] text-gray-600 hover:bg-black/[0.07] dark:bg-white/[0.06] dark:text-gray-300 dark:hover:bg-white/[0.1]'
 }`
 
-export default function GeminiSizePickerModal({ params, model, onSelect, onClose }: {
+export default function ModelSizePickerModal({ params, model, connectionId = GEMINI_CONNECTION_ID, onSelect, onClose }: {
   params: TaskParams
   model: string
+  connectionId?: string
   onSelect: (params: Partial<TaskParams>) => void
   onClose: () => void
 }) {
-  const normalized = normalizeGeminiParams(params, model)
+  const grok = connectionId === GROK_CONNECTION_ID
+  const normalized = grok ? normalizeGrokParams(params, model) : normalizeGeminiParams(params, model)
   const [ratio, setRatio] = useState(normalized.aspect_ratio ?? 'auto')
   const [resolution, setResolution] = useState(normalized.image_size ?? 'auto')
-  const options = getGeminiImageOptions(model)
+  const options = grok ? getGrokImageOptions(model) : getGeminiImageOptions(model)
   const modalRef = useRef<HTMLDivElement>(null)
   const mouseDownTargetRef = useRef<EventTarget | null>(null)
   usePreventBackgroundScroll(true)
@@ -46,13 +49,13 @@ export default function GeminiSizePickerModal({ params, model, onSelect, onClose
         ref={modalRef}
         role="dialog"
         aria-modal="true"
-        aria-label="设置 Gemini 图像尺寸"
+        aria-label={`设置 ${grok ? 'Grok' : 'Gemini'} 图像尺寸`}
         className="relative z-10 w-full max-w-md rounded-3xl border border-white/50 bg-white/95 p-5 shadow-2xl ring-1 ring-black/5 animate-modal-in dark:border-white/[0.08] dark:bg-gray-900/95 dark:ring-white/10"
       >
         <div className="mb-5 flex items-start justify-between gap-4">
           <div>
             <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100">设置图像尺寸</h3>
-            <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">实际像素由模型决定，兼容渠道以服务商支持为准</p>
+            <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">{grok ? 'Grok 支持 1K 和 2K 分辨率，实际像素由模型决定' : 'Gemini 的实际像素由模型决定，兼容渠道以服务商支持为准'}</p>
           </div>
           <button
             type="button"
@@ -67,7 +70,7 @@ export default function GeminiSizePickerModal({ params, model, onSelect, onClose
         </div>
 
         <div className="space-y-5">
-          <section>
+          {options.resolutions.length > 0 && <section>
             <div className="mb-2 text-xs font-medium text-gray-400 dark:text-gray-500">分辨率</div>
             <div className="flex gap-2">
               {['auto', ...options.resolutions].map((value) => (
@@ -82,7 +85,7 @@ export default function GeminiSizePickerModal({ params, model, onSelect, onClose
                 </button>
               ))}
             </div>
-          </section>
+          </section>}
 
           <section>
             <div className="mb-2 text-xs font-medium text-gray-400 dark:text-gray-500">宽高比</div>

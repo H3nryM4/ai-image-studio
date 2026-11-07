@@ -31,6 +31,25 @@ function fallback() {
 }
 
 describe('persisted state codec', () => {
+  it('restores independent input annotations and new output parameters without storing payloads', () => {
+    const state = {
+      ...source(),
+      inputImages: [{ ...imageA, markupImageId: 'markup-a' }],
+      params: { ...DEFAULT_PARAMS, output_format: 'gif' as const, complexity: 'high' as const, frame_count: 12, frame_duration_ms: 300 },
+    }
+    const persisted = createPersistedState(state)
+    expect(persisted.inputImages).toEqual([{ id: imageA.id, dataUrl: '', markupImageId: 'markup-a' }])
+    const restored = normalizePersistedState(JSON.parse(JSON.stringify(persisted)), fallback())!
+    expect(restored.inputImages).toEqual(persisted.inputImages)
+    expect(restored.params).toEqual(state.params)
+    const invalid = normalizePersistedState({
+      ...persisted,
+      inputImages: [{ id: imageA.id, markupImageId: { id: 'invalid' } }],
+      params: { ...state.params, frame_count: 99, frame_duration_ms: 3 },
+    }, fallback())!
+    expect(invalid.inputImages).toEqual([{ id: imageA.id, dataUrl: '' }])
+    expect(invalid.params).toMatchObject({ frame_count: 16, frame_duration_ms: 20 })
+  })
   it('restores Gemini dimensions and per-profile selections without changing old task defaults', () => {
     const profile = { ...DEFAULT_SETTINGS.profiles[0], connectionId: 'gemini-generate-content', model: 'gemini-3.1-flash-image' }
     const settings = normalizeSettings({ profiles: [profile], activeProfileId: profile.id })

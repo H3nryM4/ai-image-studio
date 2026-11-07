@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { DEFAULT_PARAMS } from '../types'
 import { callImageApi } from './api'
 import { createDefaultOpenAIProfile, getActiveApiProfile, normalizeSettings, switchApiProfileConnection } from './apiProfiles'
-import { buildGeminiApiUrl, DEFAULT_GEMINI_MODEL, GEMINI_CONNECTION_ID, normalizeGeminiBaseUrl, normalizeGeminiParams } from './gemini'
+import { buildGeminiApiUrl, DEFAULT_GEMINI_MODEL, GEMINI_CONNECTION_ID, getGeminiImageOptions, normalizeGeminiBaseUrl, normalizeGeminiParams } from './gemini'
 import { getHomeParamState, normalizeHomeParams, switchHomeParams } from './homeParams'
 import { createProfileShareJson, readProfileImport } from './profileSharing'
 import { normalizeParamsForSettings } from './paramCompatibility'
@@ -47,6 +47,14 @@ describe('Gemini generateContent', () => {
     expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body)).generationConfig).toEqual({ responseModalities: ['TEXT', 'IMAGE'] })
   })
 
+  it.each(['gemini-2.5-flash-image', 'gemini-2.5-flash-image-preview', 'nano-banana', 'google/nano-banana-preview', 'gemini-nano-banana-image'])('omits unsupported imageSize for first-generation model %s', async (model) => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(response())
+    const firstGeneration = normalizeSettings({ profiles: [{ ...profile, model }], activeProfileId: profile.id })
+    await callImageApi({ ...opts, settings: firstGeneration, params: { ...DEFAULT_PARAMS, aspect_ratio: '16:9', image_size: '1K' } })
+    expect(getGeminiImageOptions(model)).toMatchObject({ resolutions: [], maxInputImages: 3, thinkingLevels: [] })
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body)).generationConfig).toEqual({ responseModalities: ['TEXT', 'IMAGE'], imageConfig: { aspectRatio: '16:9' } })
+  })
+
   it.each([
     [{ promptFeedback: { blockReason: 'SAFETY' } }, 'SAFETY'],
     [{ candidates: [{ finishReason: 'IMAGE_SAFETY', content: { parts: [image] } }] }, 'IMAGE_SAFETY'],
@@ -55,7 +63,25 @@ describe('Gemini generateContent', () => {
   ])('rejects successful HTTP responses that do not contain a usable final image', async (payload, message) => {
     vi.spyOn(console, 'warn').mockImplementation(() => {})
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify(payload)))
-    await expect(callImageApi(opts)).rejects.toThrow(message)
+    await expect(callImageApi(opts)).rejects.toMatchObject({ message: expect.stringContaining(message), rawResponsePayload: JSON.stringify(payload) })
+  })
+
+  it.each([200, 502])('retains unparseable response bodies for HTTP %s', async (status) => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('<html>upstream error</html>', { status }))
+    await expect(callImageApi(opts)).rejects.toMatchObject({ rawResponsePayload: '<html>upstream error</html>' })
+  })
+
+  it('retains each original response when every request fails', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const payload = JSON.stringify({ error: { message: 'quota exceeded' } })
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async () => new Response(payload, { status: 429 }))
+    const err = await callImageApi({ ...opts, params: { ...DEFAULT_PARAMS, n: 2 } }).catch((err: unknown) => err) as Error & { rawResponsePayload: string }
+    expect(err.message).toContain('quota exceeded')
+    expect(JSON.parse(err.rawResponsePayload)).toEqual([
+      { requestIndex: 0, error: 'quota exceeded', rawResponsePayload: payload },
+      { requestIndex: 1, error: 'quota exceeded', rawResponsePayload: payload },
+    ])
   })
 
   it('keeps successes after a failed request and limits concurrency to two', async () => {
@@ -75,14 +101,14 @@ describe('Gemini generateContent', () => {
     expect(calls).toBe(4)
     expect(maximum).toBe(2)
     expect(result.images).toHaveLength(3)
-    expect(result.failedRequests).toEqual([{ requestIndex: 1, error: 'quota exceeded' }])
+    expect(result.failedRequests).toEqual([{ requestIndex: 1, error: 'quota exceeded', rawResponsePayload: JSON.stringify({ error: { message: 'quota exceeded' } }) }])
   })
 
   it('keeps the timeout active while reading the response body', async () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {})
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (_, init) => ({
       ok: true,
-      json: () => new Promise((_, reject) => init?.signal?.addEventListener('abort', () => reject(new Error('aborted')))),
+      text: () => new Promise((_, reject) => init?.signal?.addEventListener('abort', () => reject(new Error('aborted')))),
     } as Response))
     const shortSettings = normalizeSettings({ profiles: [{ ...profile, timeout: 0.02 }], activeProfileId: profile.id })
     await expect(callImageApi({ ...opts, settings: shortSettings })).rejects.toThrow('请求超时')
@@ -104,6 +130,19 @@ describe('Gemini generateContent', () => {
 })
 
 describe('Gemini configuration', () => {
+  it.each([
+    ['google/nano-banana-2', ['512', '1K', '2K', '4K'], ['minimal', 'high'], true],
+    ['nano_banana-2.1', ['1K', '2K', '4K'], ['minimal', 'medium', 'high'], true],
+    ['nano-banana-2-1', ['1K', '2K', '4K'], ['minimal', 'medium', 'high'], true],
+    ['nano-banana-pro', ['1K', '2K', '4K'], [], false],
+    ['nano-banana-2-lite', ['1K'], ['minimal', 'high'], false],
+    ['gemini-3.1-flash-lite-image', ['1K'], ['minimal', 'high'], false],
+  ])('recognizes image options for model alias %s', (model, resolutions, thinkingLevels, extended) => {
+    const options = getGeminiImageOptions(model)
+    expect(options).toMatchObject({ resolutions, thinkingLevels })
+    expect(options.ratios.includes('1:8')).toBe(extended)
+  })
+
   it('preserves explicit versions and path prefixes without adding OpenAI v1', () => {
     expect(buildGeminiApiUrl('https://example.com', 'models/custom-model')).toBe('https://example.com/v1beta/models/custom-model:generateContent')
     expect(normalizeGeminiBaseUrl('https://example.com')).toBe('https://example.com')

@@ -1,10 +1,12 @@
-import type { AppSettings, TaskParams } from '../types'
+import { OUTPUT_FORMATS, type AppSettings, type TaskParams } from '../types'
 import { blobToDataUrl } from './dataUrl'
 
 export const MIME_MAP: Record<string, string> = {
   png: 'image/png',
   jpeg: 'image/jpeg',
   webp: 'image/webp',
+  svg: 'image/svg+xml',
+  gif: 'image/gif',
 }
 
 export const MAX_MASK_EDIT_FILE_BYTES = 50 * 1024 * 1024
@@ -20,6 +22,7 @@ export interface CallApiOptions {
   /** 与 inputImageDataUrls 按索引对齐的原链接，不是通过链接添加的为 null */
   inputImageUrls?: (string | null)[]
   maskDataUrl?: string
+  markupDataUrl?: string
   onCustomTaskEnqueued?: (task: { taskId: string }) => void
   onPartialImage?: (partial: { image: string; partialImageIndex?: number; requestIndex?: number }) => void
 }
@@ -36,7 +39,7 @@ export interface CallApiResult {
   /** API 返回的原始图片 HTTP URL（非 base64 时记录） */
   rawImageUrls?: string[]
   /** 并发多图请求中失败的单张请求 */
-  failedRequests?: Array<{ requestIndex: number; error: string }>
+  failedRequests?: Array<{ requestIndex: number; error: string; rawResponsePayload?: string }>
 }
 
 export function isHttpUrl(value: unknown): value is string {
@@ -166,12 +169,21 @@ export async function fetchImageUrlAsDataUrl(url: string, fallbackMime: string, 
   return blobToDataUrl(blob, fallbackMime)
 }
 
+export function appendModerationDetails(message: string, details: unknown): string {
+  if (!details || typeof details !== 'object') return message
+  const record = details as Record<string, unknown>
+  const stage = record.moderation_stage === 'input' ? '提示词或参考图' : record.moderation_stage === 'output' ? '生成结果' : ''
+  const categories = Array.isArray(record.categories) ? record.categories.filter((item): item is string => typeof item === 'string' && Boolean(item)) : []
+  const parts = [stage ? `拦截来源：${stage}` : '', categories.length ? `类别：${categories.join('、')}` : ''].filter(Boolean)
+  return parts.length ? `${message}\n${parts.join('；')}` : message
+}
+
 export async function getApiErrorMessage(response: Response): Promise<string> {
   let errorMsg = `HTTP ${response.status}`
   const textResponse = response.clone()
   try {
     const errJson = await response.json()
-    if (errJson.error?.message) errorMsg = errJson.error.message
+    if (errJson.error?.message) errorMsg = appendModerationDetails(errJson.error.message, errJson.error.moderation_details)
     else if (typeof errJson.detail === 'string') errorMsg = errJson.detail
     else if (Array.isArray(errJson.detail)) errorMsg = errJson.detail.map((item: unknown) => typeof item === 'string' ? item : JSON.stringify(item)).join('\n')
     else if (typeof errJson.error === 'string') errorMsg = errJson.error
@@ -195,13 +207,16 @@ export function pickActualParams(source: unknown): Partial<TaskParams> {
   if (record.quality === 'auto' || record.quality === 'low' || record.quality === 'medium' || record.quality === 'high' || record.quality === 'xhigh' || record.quality === 'max') {
     actualParams.quality = record.quality
   }
-  if (record.output_format === 'png' || record.output_format === 'jpeg' || record.output_format === 'webp') {
-    actualParams.output_format = record.output_format
+  if (OUTPUT_FORMATS.includes(record.output_format as typeof OUTPUT_FORMATS[number])) {
+    actualParams.output_format = record.output_format as TaskParams['output_format']
   }
   if (typeof record.output_compression === 'number') actualParams.output_compression = record.output_compression
   if (record.moderation === 'auto' || record.moderation === 'low') actualParams.moderation = record.moderation
   if (record.background === 'opaque' || record.background === 'transparent') actualParams.background = record.background
   if (typeof record.n === 'number') actualParams.n = record.n
+  if (record.complexity === 'low' || record.complexity === 'medium' || record.complexity === 'high') actualParams.complexity = record.complexity
+  if (typeof record.frame_count === 'number') actualParams.frame_count = record.frame_count
+  if (typeof record.frame_duration_ms === 'number') actualParams.frame_duration_ms = record.frame_duration_ms
 
   return actualParams
 }

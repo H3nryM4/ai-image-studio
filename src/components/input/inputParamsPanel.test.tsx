@@ -72,3 +72,22 @@ it('shows WebP compression and transparency together', async () => {
   expect(el.textContent).toContain('背景')
   expect(el.textContent).toContain('压缩参数')
 })
+
+it('commits GIF frame settings when the popover closes before blur', async () => {
+  const setParams = vi.fn()
+  await render({
+    activeProfile: createDefaultOpenAIProfile({ model: 'gpt-image-2.6-sunburst', homeParams: ['output_format', 'complexity', 'frame_count', 'frame_duration_ms'] }),
+    params: { ...DEFAULT_PARAMS, output_format: 'gif' },
+    setParams,
+  })
+  const toggle = [...el.querySelectorAll('button')].find((button) => button.textContent === '更多设置')!
+  await act(async () => toggle.click())
+  expect(el.textContent).toContain('复杂度')
+  const input = el.querySelector<HTMLInputElement>('input[aria-label="每帧时长（毫秒）"]')!
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, '117')
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+  await act(async () => toggle.click())
+  expect(setParams).toHaveBeenCalledWith({ frame_duration_ms: 120 })
+})

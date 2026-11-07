@@ -9,6 +9,17 @@ import { createCustomProfileImportUrl } from './profileImportUrl'
 afterEach(() => vi.restoreAllMocks())
 
 describe('home parameters', () => {
+  it('uses Grok defaults for hidden controls and only offers quality on supported models', () => {
+    const profile = createDefaultOpenAIProfile({ connectionId: 'xai-images', homeParams: [], paramDefaults: { quality: 'medium', n: 3 } })
+    expect(normalizeHomeParams({ ...DEFAULT_PARAMS, quality: 'high', n: 7 }, profile)).toMatchObject({ quality: 'medium', n: 3, output_format: 'default' })
+    expect(getHomeParamState(profile).available).toEqual(['size', 'n', 'transparent_output', 'quality'])
+    expect(getHomeParamState({ ...profile, model: 'grok-imagine-image' }).available).not.toContain('quality')
+  })
+
+  it('preserves valid GIF defaults while bounding imported frame settings', () => {
+    const profile = normalizeSettings({ profiles: [createDefaultOpenAIProfile({ model: 'gpt-image-2.6-sunburst', paramDefaults: { output_format: 'gif', complexity: 'high', frame_count: 99, frame_duration_ms: 117 } })] }).profiles[0]
+    expect(profile.paramDefaults).toMatchObject({ output_format: 'gif', complexity: 'high', frame_count: 16, frame_duration_ms: 120 })
+  })
   it('uses a configured hidden count and exposes Gemini thinking only for supported models', () => {
     const profile = createDefaultOpenAIProfile({ homeParams: [], paramDefaults: { n: 3 } })
     expect(normalizeHomeParams({ ...DEFAULT_PARAMS, n: 7 }, profile).n).toBe(3)
@@ -24,7 +35,7 @@ describe('home parameters', () => {
   })
 
   it('validates imported defaults without accepting unrelated task fields', () => {
-    const profile = normalizeSettings({ profiles: [{ ...createDefaultOpenAIProfile(), paramDefaults: { quality: 'invalid', output_format: 'gif', n: 999, moderation: 'off', output_compression: 200, transparent_output: 'true' } }] }).profiles[0]
+    const profile = normalizeSettings({ profiles: [{ ...createDefaultOpenAIProfile(), paramDefaults: { quality: 'invalid', output_format: 'bmp', n: 999, moderation: 'off', output_compression: 200, transparent_output: 'true' } }] }).profiles[0]
     expect(profile.paramDefaults).toEqual({ ...DEFAULT_PARAMS, n: 10, output_compression: 100 })
   })
 

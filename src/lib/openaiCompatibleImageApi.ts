@@ -22,6 +22,8 @@ import {
 } from './imageApiShared'
 import { isEventStreamResponse, readJsonServerSentEvents } from './serverSentEvents'
 import { prependCodexCliSizePrompt } from './size'
+import { isVectorOrAnimatedFormat, supportsGptImage26Params } from './imageModels'
+import { getGptImage26Params } from './gptImageParams'
 
 function getStreamPartialImages(profile: ApiProfile): number {
   return profile.streamPartialImages ?? DEFAULT_STREAM_PARTIAL_IMAGES
@@ -122,7 +124,7 @@ function getStreamEventErrorMessage(event: Record<string, unknown>): string | nu
   return null
 }
 
-async function parseImagesApiResponse(payload: ImageApiResponse, mime: string, signal?: AbortSignal): Promise<CallApiResult> {
+export async function parseImagesApiResponse(payload: ImageApiResponse, mime: string, signal?: AbortSignal): Promise<CallApiResult> {
   const data = payload.data
   if (!Array.isArray(data) || !data.length) {
     const err = new Error('接口没有返回图片数据，请查看原始响应内容确认服务商实际返回的数据结构。如果使用的是中转或兼容接口，建议创建并使用「自定义服务商」配置。')
@@ -160,7 +162,10 @@ async function parseImagesApiResponse(payload: ImageApiResponse, mime: string, s
     throw err
   }
 
-  const actualParamsList = images.map((image) => mergeActualParams(pickActualParams(payload), { output_format: image.match(/^data:image\/(png|jpeg|webp);/)?.[1] as TaskParams['output_format'] | undefined }))
+  const actualParamsList = images.map((image) => {
+    const format = image.match(/^data:image\/(png|jpeg|webp|gif|svg\+xml);/)?.[1]
+    return mergeActualParams(pickActualParams(payload), { output_format: (format === 'svg+xml' ? 'svg' : format) as TaskParams['output_format'] | undefined })
+  })
   const actualParams = actualParamsList[0]
   return {
     images,
@@ -264,6 +269,13 @@ async function parseImagesApiStreamResponse(
 }
 
 export async function callOpenAICompatibleImageApi(opts: CallApiOptions, profile: ApiProfile): Promise<CallApiResult> {
+  if (isVectorOrAnimatedFormat(opts.params.output_format)) {
+    if (!supportsGptImage26Params(profile.model)) throw new Error('当前模型不支持 SVG 或 GIF 输出，请使用 GPT Image 2.6 及以上模型')
+    if (opts.params.output_format === 'svg' && opts.inputImageDataUrls.length) throw new Error('SVG 仅支持文生图，请移除参考图')
+    if (opts.params.output_format === 'svg' && opts.params.n > 1) throw new Error('SVG 每次只能生成一张图片')
+    if (opts.params.output_format === 'gif' && opts.maskDataUrl) throw new Error('GIF 不支持蒙版编辑，请移除蒙版')
+    profile = { ...profile, streamImages: false }
+  }
   const n = opts.params.n > 0 ? opts.params.n : 1
   if ((profile.codexCli || (profile.streamImages && n > 1)) && n > 1) {
     return callImagesApiConcurrent(opts, profile, n)
@@ -308,6 +320,7 @@ async function callImagesApiSingle(opts: CallApiOptions, profile: ApiProfile): P
   const useApiProxy = shouldUseApiProxy(profile.apiProxy, proxyConfig)
   const requestHeaders = createRequestHeaders(profile)
   const paths = createOpenAICompatiblePaths()
+  const extraParams = supportsGptImage26Params(profile.model) ? getGptImage26Params(params, profile) : {}
 
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), profile.timeout * 1000)
@@ -319,6 +332,7 @@ async function callImagesApiSingle(opts: CallApiOptions, profile: ApiProfile): P
       const formData = new FormData()
       formData.append('model', profile.model)
       formData.append('prompt', prompt)
+      for (const [key, value] of Object.entries(extraParams)) formData.append(key, typeof value === 'object' ? JSON.stringify(value) : String(value))
       if (!profile.codexCli && params.size !== 'default') {
         formData.append('size', params.size)
       }
@@ -356,12 +370,17 @@ async function callImagesApiSingle(opts: CallApiOptions, profile: ApiProfile): P
       }
 
       const maskBlob = opts.maskDataUrl ? await maskDataUrlToPngBlob(opts.maskDataUrl) : null
+      const markupBlob = opts.markupDataUrl && !opts.maskDataUrl ? await dataUrlToBlob(opts.markupDataUrl) : null
       if (opts.maskDataUrl) {
         assertMaskEditFileSize('遮罩主图文件', imageBlobs[0]?.size ?? 0)
         assertMaskEditFileSize('遮罩文件', maskBlob?.size ?? 0)
       }
+      if (markupBlob) {
+        assertMaskEditFileSize('标注文件', markupBlob.size)
+        formData.append('markup', markupBlob, 'markup.png')
+      }
       assertImageInputPayloadSize(
-        imageBlobs.reduce((sum, blob) => sum + blob.size, 0) + (maskBlob?.size ?? 0),
+        imageBlobs.reduce((sum, blob) => sum + blob.size, 0) + (maskBlob?.size ?? 0) + (markupBlob?.size ?? 0),
       )
 
       for (let i = 0; i < imageBlobs.length; i++) {
@@ -385,6 +404,7 @@ async function callImagesApiSingle(opts: CallApiOptions, profile: ApiProfile): P
       const body: Record<string, unknown> = {
         model: profile.model,
         prompt,
+        ...extraParams,
         ...(params.output_format !== 'default' ? { output_format: params.output_format } : {}),
         ...(params.moderation !== 'default' ? { moderation: params.moderation } : {}),
       }
@@ -433,10 +453,10 @@ async function callImagesApiSingle(opts: CallApiOptions, profile: ApiProfile): P
     }
 
     if (profile.streamImages && isEventStreamResponse(response)) {
-      return parseImagesApiStreamResponse(response, mime, opts.onPartialImage, controller.signal)
+      return await parseImagesApiStreamResponse(response, mime, opts.onPartialImage, controller.signal)
     }
 
-    return parseImagesApiResponse(await response.json() as ImageApiResponse, mime, controller.signal)
+    return await parseImagesApiResponse(await response.json() as ImageApiResponse, mime, controller.signal)
   } finally {
     clearTimeout(timeoutId)
   }
@@ -508,8 +528,12 @@ function createCustomConnectionContext(opts: CallApiOptions, profile: ApiProfile
     ...(profile.codexCli ? { size: undefined, quality: undefined } : {}),
   }
 
-  for (const key of ['size', 'quality', 'output_format', 'moderation', 'background', 'thinking_level']) {
+  for (const key of ['size', 'quality', 'output_format', 'moderation', 'background', 'thinking_level', 'complexity']) {
     if (params[key] === 'default') delete params[key]
+  }
+  if (opts.params.output_format !== 'gif') {
+    delete params.frame_count
+    delete params.frame_duration_ms
   }
   const inputImageUrls = opts.inputImageUrls?.filter(isHttpUrl) ?? []
 

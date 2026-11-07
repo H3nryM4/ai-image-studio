@@ -10,9 +10,9 @@
 [![React](https://img.shields.io/badge/React-19-20232A?style=flat-square&logo=react&logoColor=61DAFB)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 
-**基于 OpenAI gpt-image-2.5 API 的图片生成与编辑工具**
+**支持 GPT Image、Gemini 和 Grok 的图片生成与编辑工具**
 
-提供简洁精美的 Web UI，支持 OpenAI Images API、Gemini generateContent 与自定义 HTTP 接口。<br>
+提供简洁精美的 Web UI，支持 OpenAI Images API、Gemini generateContent、Grok Images API 与自定义 HTTP 接口。<br>
 支持文本生图、参考图、画板标注与遮罩编辑，数据纯本地化存储，带来流畅的历史记录与参数管理体验。
 
 <br>
@@ -83,6 +83,7 @@
 - **批量与迭代**：支持单次多图生成；一键将满意结果转为参考图，无缝开启下一轮修改。
 - **多提示词批量提交**：在“设置 - 习惯配置”中开启后，可一次粘贴多条提示词批量生成。提示词之间空两行分隔（评论等单个空行仍属于同一条提示词），参考图和参数对每条提示词都生效；支持排队或并发执行，并发数默认限制为 10，进行中可查看进度并随时停止。
 - **流式生成预览**：`Images API` 支持流式接收中间步骤图像，缓解连接超时问题。
+- **GPT Image 2.6**：支持复杂度、SVG 和 GIF 输出；GIF 可设置帧数和每帧时长。SVG 编写模型可在 API 配置中单独填写，留空使用接口默认值；具体能力以所选模型和渠道支持为准。
 - **透明背景（API 原生 / 本地后处理双模式）**：画廊模式下选择 PNG 或 WebP 格式后可开启透明背景功能，每个 API 配置可独立选择实现方式（设置入口在 API 配置页）。API 原生模式会直接请求模型返回透明通道（需当前接口和模型支持），本地后处理模式则会要求模型使用纯绿色或纯洋红色背景，并在结果返回后于浏览器中去除背景色，按所选 PNG 或 WebP 格式保存透明结果。
 
   > 本地后处理流程适用于图标、贴纸、单主体素材等场景；若主体边缘存在复杂发丝、半透明材质、强反光或与背景色接近的颜色，可能出现边缘残留或误抠。若使用 API 原生模式时接口返回“不支持透明背景”类错误，应用会提示切换为本地后处理。
@@ -105,8 +106,9 @@
 - **多种 API 接入**：在 API 配置的「接入方式」中统一选择以下接口。
   - **OpenAI Images API**：通过图片接口生成图片，支持官方及兼容接口。
   - **Gemini generateContent**：支持文生图、参考图编辑、宽高比、分辨率与按模型支持的思考强度选择。多图按次数请求，每个任务最多两个请求并发；透明背景使用本地去背景。暂不支持蒙版编辑。
+  - **Grok Images API**：支持 xAI 官方协议及相应兼容接口的文生图和参考图编辑，最多 5 张参考图、单次最多生成 10 张。可设置宽高比、1K/2K 分辨率，以及支持模型的质量；透明背景使用本地去背景，暂不支持蒙版编辑。
   - **自定义 HTTP 接口**：通过 JSON 定义请求和结果映射，支持 JSON 或 multipart 请求、同步返回或异步轮询，以及图片 URL 或 Base64 结果。
-- **API 代理**：OpenAI 兼容接口可开启同源 `/api-proxy/` 代理，交由 Docker 或本地开发环境转发至真实 API，绕开浏览器 CORS 限制。
+- **API 代理**：内置接入和同步自定义接口可开启同源 `/api-proxy/` 代理，交由 Docker 或本地开发环境转发至真实 API，绕开浏览器 CORS 限制。部署端需配置对应协议的目标地址。
 - **Codex CLI 兼容模式**：对上游为 Codex CLI 的 API，开启后应用 Codex CLI 实际支持的参数，并将多图生成拆分为并发单图。
 - **提示词约束**：Codex CLI 兼容模式可在请求文本中要求保留原提示词，是否遵循取决于模型。
 - **习惯配置**：支持设置提交后清空输入、重启后保留历史输入、临时复用历史任务 API 配置、重试方式、关闭提示词防改写等。
@@ -128,7 +130,7 @@
 |------|------|------|
 | **直接填写 API 地址** | 自动创建一个 OpenAI 兼容的默认预置配置（ID 为 `default-openai`）并注入 API URL，其余参数（模型、超时等）使用应用默认值，用户只需补充 API Key。末尾带 `/` 时直接拼接接口，不补 `/v1` 前缀。适合只提供一个配置的部署。后续如需通过 JSON 或链接更新此配置，指定 `id` 为 `default-openai` 即可。 | `https://api.openai.com/v1` |
 | **API 地址 + 查询参数** | 在地址后追加参数，可同时预填 Key、模型等字段。 | `https://api.openai.com/v1?model=gpt-image-2.5-sunburst&connectionId=openai-images` |
-| **JSON 配置文件 / 导入链接** | 通过仓库内或本地的 JSON 文件路径（如 `./config.json`）、远程 URL 或含 `?settings=` 参数的导入链接提供完整预置配置，支持预置多个配置（OpenAI Images API 或自定义 HTTP 接口）。 | 详见 [预置配置 JSON 格式](#preset-config-json) |
+| **JSON 配置文件 / 导入链接** | 通过仓库内或本地的 JSON 文件路径（如 `./config.json`）、远程 URL 或含 `?settings=` 参数的导入链接提供完整预置配置，支持预置多个内置接入或自定义 HTTP 配置。 | 详见 [预置配置 JSON 格式](#preset-config-json) |
 
 **环境变量一览**
 
@@ -395,7 +397,7 @@ npm run build
 | `apiUrl` | API Base URL | `?apiUrl=https://api.example.com/v1` |
 | `apiKey` | API Key | `?apiKey=sk-xxxx` |
 | `model` | 模型 ID，多个模型以逗号分隔，可在首页切换 | `?model=gpt-image-2.5-sunburst,gpt-image-2` |
-| `connectionId` | 接入标识，默认 `openai-images` | `?connectionId=openai-images` |
+| `connectionId` | 接入标识，默认 `openai-images`；也支持 `gemini-generate-content`、`xai-images` 或自定义接口 ID | `?connectionId=xai-images` |
 | `profileName` | 配置名称，默认“URL 参数配置” | `?profileName=我的配置` |
 | `codexCli` | Codex CLI 兼容模式 | `?codexCli=true` |
 | `streamImages` | 流式传输 | `?streamImages=true` |
@@ -418,7 +420,7 @@ https://cooksleep.github.io/gpt_image_playground?apiUrl={address}&apiKey={key}&m
 
 使用 JSON 文件或分享链接提供预置配置时，JSON 对象支持以下顶层字段：
 
-- **`customConnections`**（可选数组）：自定义 HTTP 接口定义。只使用内置接入方式（OpenAI Images API）时可省略。
+- **`customConnections`**（可选数组）：自定义 HTTP 接口定义。只使用内置的 OpenAI、Gemini 或 Grok 接入时可省略。
 - **`profiles`**（数组）：预置的 API 配置列表。每项对应用户配置页中的一个配置条目。
 
 ### 配置列表字段说明（`profiles`）
@@ -428,14 +430,15 @@ https://cooksleep.github.io/gpt_image_playground?apiUrl={address}&apiKey={key}&m
 | `id` | 部署预置时填写 | 标识部署预置配置，供后续部署同步和链接定位。普通分享会省略此字段；手动导入默认新建，不会因为 ID 相同而直接覆盖本地配置。 |
 | `name` | 是 | 配置名称，方便用户识别。 |
 | `description` | 否 | 配置说明，支持 Markdown；显示在配置详情中，可展开查看。文本可选中和复制，其中的链接可点击。 |
-| `connectionId` | 是 | 接入标识。`"openai-images"` 选择内置 Images 协议（支持兼容接口）；其他值引用 `customConnections` 中具有相同 ID 的接口定义。 |
-| `baseUrl` | 是 | API 基础地址（Base URL）。未以 `/` 结尾时遵循 OpenAI 规则自动补齐 `/v1` 前缀；以 `/` 结尾时直接基于该地址请求接口，不补 `/v1`。 |
+| `connectionId` | 是 | 接入标识。`"openai-images"` 选择 OpenAI Images 协议，`"gemini-generate-content"` 选择 Gemini 协议，`"xai-images"` 选择 Grok 协议，均支持相应兼容接口；其他值引用 `customConnections` 中具有相同 ID 的接口定义。 |
+| `baseUrl` | 是 | API 基础地址（Base URL）。未以 `/` 结尾时自动补齐 `/v1`，Gemini 则补 `/v1beta`；以 `/` 结尾时直接基于该地址请求接口，不补版本。 |
 | `apiKey` | 否 | API Key。建议省略，让用户导入后自行填写。 |
 | `model` | 是 | 模型 ID。多个模型以逗号分隔，默认使用第一个，用户可在首页切换。 |
+| `svgModel` | 否 | OpenAI Images 接入输出 SVG 时的编写模型 ID。留空使用接口默认值，仅在渠道要求指定时填写。 |
 | `isDefault` | 否 | 有多个配置时，为默认项设置 `true`（只能有一个）；只有一个配置时不填。默认项决定首次使用时自动选中的配置；允许拖动排序和删除（受保护策略控制）。 |
 | `timeout` | 否 | 请求超时秒数，默认 600。 |
 | `apiProxy` | 否 | 是否走部署端 API 代理，默认 `false`。 |
-| `transparentBackgroundMethod` | 否 | 透明背景实现方式：`"api"`（API 原生）或 `"local"`（本地后处理）。OpenAI 兼容配置默认 `"api"`，自定义服务商若生成和编辑请求都映射了 `$params.background` 模板变量则默认 `"api"`，否则默认 `"local"`。 |
+| `transparentBackgroundMethod` | 否 | 透明背景实现方式：`"api"`（API 原生）或 `"local"`（本地后处理）。OpenAI 兼容配置默认 `"api"`，Gemini 和 Grok 固定为 `"local"`。自定义服务商若生成和编辑请求都映射了 `$params.background` 模板变量则默认 `"api"`，否则默认 `"local"`。 |
 
 ### 示例：仅 OpenAI 兼容
 
@@ -500,7 +503,7 @@ VITE_DEFAULT_API_URL=https://example.com/gpt-image-config.json
 <a id="custom-connection-config"></a>
 ## 🔌 自定义供应商
 
-当 API 不是标准 OpenAI 格式时，需要在 `customConnections` 中定义请求和响应结构。每个接口定义必须有唯一的 `id`，不能使用内置标识 `openai-images`，然后由 `profiles` 中配置的 `connectionId` 字段引用。
+当 API 与内置的 OpenAI、Gemini、Grok 协议不一致时，需要在 `customConnections` 中定义请求和响应结构。每个接口定义必须有唯一的 `id`，不能使用内置标识 `openai-images`、`gemini-generate-content` 或 `xai-images`，然后由 `profiles` 中配置的 `connectionId` 字段引用。
 
 若自定义供应商的接口不在 `/v1` 路径下，请将配置中的 `baseUrl` 设置为以 `/` 结尾。例如 `baseUrl` 为 `https://api.example.com/` 且 `submit.path` 为 `api/image-tasks` 时，实际请求地址将为 `https://api.example.com/api/image-tasks`；未以 `/` 结尾时则继续按 OpenAI 规范补齐 `/v1`。
 

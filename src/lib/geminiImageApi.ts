@@ -54,6 +54,7 @@ export async function callGeminiImageApi(opts: CallApiOptions, profile: ApiProfi
   await runWithConcurrency(Array.from({ length: count }, (_, idx) => idx), 2, async (idx) => {
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), profile.timeout * 1000)
+    let rawResponsePayload: string | undefined
     try {
       const response = await fetch(url, {
         method: 'POST',
@@ -62,8 +63,12 @@ export async function callGeminiImageApi(opts: CallApiOptions, profile: ApiProfi
         signal: controller.signal,
         cache: 'no-store',
       })
-      if (!response.ok) throw new Error(await getApiErrorMessage(response))
-      const payload = await response.json() as GeminiResponse | null
+      if (!response.ok) {
+        rawResponsePayload = await response.clone().text()
+        throw new Error(await getApiErrorMessage(response))
+      }
+      rawResponsePayload = await response.text()
+      const payload = JSON.parse(rawResponsePayload) as GeminiResponse | null
       if (payload?.error) throw new Error(payload.error.message || 'Gemini 接口返回错误')
       if (payload?.promptFeedback?.blockReason) throw new Error(`Gemini 拒绝了此请求：${payload.promptFeedback.blockReason}`)
       const images: string[] = []
@@ -90,17 +95,23 @@ export async function callGeminiImageApi(opts: CallApiOptions, profile: ApiProfi
     } catch (err) {
       const message = controller.signal.aborted ? `Gemini 请求超时（${profile.timeout} 秒）` : err instanceof Error ? err.message : String(err)
       console.warn('Gemini 生图请求失败', message)
-      failures.push({ requestIndex: idx, error: message })
+      failures.push({ requestIndex: idx, error: message, ...(rawResponsePayload !== undefined ? { rawResponsePayload } : {}) })
     } finally {
       clearTimeout(timer)
     }
   })
+  failures.sort((a, b) => a.requestIndex - b.requestIndex)
   const images = results.flatMap((result) => result?.images ?? [])
-  if (!images.length) throw new Error(failures.map((item) => item.error).join('\n'))
+  if (!images.length) {
+    const rawResponsePayload = failures.length === 1
+      ? failures[0].rawResponsePayload
+      : failures.some((item) => item.rawResponsePayload !== undefined) ? JSON.stringify(failures, null, 2) : undefined
+    throw Object.assign(new Error(failures.map((item) => item.error).join('\n')), rawResponsePayload !== undefined ? { rawResponsePayload } : {})
+  }
   return {
     images,
     actualParams: results.find((result) => result)?.actualParamsList?.[0],
     actualParamsList: results.flatMap((result) => result?.actualParamsList ?? []),
-    ...(failures.length ? { failedRequests: failures.sort((a, b) => a.requestIndex - b.requestIndex) } : {}),
+    ...(failures.length ? { failedRequests: failures } : {}),
   }
 }
