@@ -17,7 +17,7 @@ export function normalizeParamsForSettings(
   if (activeProfile.connectionId === GROK_CONNECTION_ID) return normalizeGrokParams(params, activeProfile.model)
   const nextParams: TaskParams = {
     ...params,
-    size: normalizeImageSize(params.size) || DEFAULT_PARAMS.size,
+    size: normalizeImageSize(params.size === 'default' ? 'auto' : params.size) || DEFAULT_PARAMS.size,
     n: Math.min(MAX_OPENAI_OUTPUT_IMAGES, Math.max(1, Math.trunc(params.n) || DEFAULT_PARAMS.n)),
     ...normalizeGifParams(params),
   }

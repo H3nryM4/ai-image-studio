@@ -171,7 +171,7 @@ export interface TaskParams {
 export const OUTPUT_FORMATS = ['png', 'jpeg', 'webp', 'svg', 'gif'] as const
 
 export const DEFAULT_PARAMS: TaskParams = {
-  size: 'default',
+  size: 'auto',
   quality: 'default',
   output_format: 'default',
   output_compression: null,

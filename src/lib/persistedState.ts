@@ -45,7 +45,7 @@ function normalizeStringArray(value: unknown, fallback: string[]) {
 function normalizeParams(value: unknown, fallback: TaskParams): TaskParams {
   if (!isRecord(value)) return fallback
   return {
-    size: typeof value.size === 'string' ? value.size : fallback.size,
+    size: value.size === 'default' ? 'auto' : typeof value.size === 'string' ? value.size : fallback.size,
     ...(typeof value.aspect_ratio === 'string' ? { aspect_ratio: value.aspect_ratio } : {}),
     ...(typeof value.image_size === 'string' ? { image_size: value.image_size } : {}),
     thinking_level: typeof value.thinking_level === 'string' && ['default', 'minimal', 'medium', 'high'].includes(value.thinking_level) ? value.thinking_level as TaskParams['thinking_level'] : fallback.thinking_level,

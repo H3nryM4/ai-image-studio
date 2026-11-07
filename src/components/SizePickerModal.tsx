@@ -22,11 +22,10 @@ interface Props {
   currentSize: string
   onSelect: (size: string) => void
   onClose: () => void
-  allowAuto?: boolean
   codexCli?: boolean
 }
 
-type Mode = 'default' | 'auto' | 'ratio' | 'resolution'
+type Mode = 'auto' | 'ratio' | 'resolution'
 
 function parseSize(size: string) {
   const match = size.match(/^\s*(\d+)\s*[xX×]\s*(\d+)\s*$/)
@@ -46,7 +45,7 @@ function findPresetForSize(size: string) {
   return null
 }
 
-export default function SizePickerModal({ currentSize, onSelect, onClose, allowAuto = true, codexCli = false }: Props) {
+export default function SizePickerModal({ currentSize, onSelect, onClose, codexCli = false }: Props) {
   usePreventBackgroundScroll(true)
 
   const modalRef = useRef<HTMLDivElement>(null)
@@ -75,15 +74,14 @@ export default function SizePickerModal({ currentSize, onSelect, onClose, allowA
   const currentPreset = findPresetForSize(currentSize)
   const currentParsedSize = parseSize(currentSize)
   const [mode, setMode] = useState<Mode>(() => {
-    if (currentSize === 'default') return 'default'
-    if (!currentSize || currentSize === 'auto') return allowAuto ? 'auto' : 'ratio'
+    if (!currentSize || currentSize === 'auto' || currentSize === 'default') return 'auto'
     if (currentPreset) return 'ratio'
     return 'resolution'
   })
 
   // Ratio mode state
   const [tier, setTier] = useState<SizeTier>(currentPreset?.tier ?? '1K')
-  const [ratio, setRatio] = useState(currentPreset?.ratio ?? (allowAuto ? '1:1' : '4:3'))
+  const [ratio, setRatio] = useState(currentPreset?.ratio ?? '1:1')
   const [customRatio, setCustomRatio] = useState('16:9')
 
   // Resolution mode state
@@ -113,7 +111,6 @@ export default function SizePickerModal({ currentSize, onSelect, onClose, allowA
   )
 
   const previewSize = useMemo(() => {
-    if (mode === 'default') return 'default'
     if (mode === 'auto') return 'auto'
     
     if (mode === 'ratio') {
@@ -192,7 +189,7 @@ export default function SizePickerModal({ currentSize, onSelect, onClose, allowA
         <div className="mb-5 flex items-start justify-between gap-4">
           <div>
             <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100">设置图像尺寸</h3>
-            <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">当前：{currentSize || 'auto'}</p>
+            <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">当前：{currentSize === 'default' || !currentSize ? 'auto' : currentSize}</p>
           </div>
           <button
             onClick={onClose}
@@ -207,15 +204,12 @@ export default function SizePickerModal({ currentSize, onSelect, onClose, allowA
 
         <div className="space-y-6">
           <div className="flex rounded-xl bg-gray-100/80 p-1 dark:bg-white/[0.04]">
-            {allowAuto && <button onClick={() => setMode('default')} className={`flex-1 rounded-lg py-1.5 text-sm font-medium transition ${mode === 'default' ? 'bg-white text-gray-800 shadow-xs dark:bg-gray-700 dark:text-gray-100' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-200'}`}>接口默认</button>}
-            {allowAuto && (
-              <button
-                onClick={() => setMode('auto')}
-                className={`flex-1 rounded-lg py-1.5 text-sm font-medium transition ${mode === 'auto' ? 'bg-white text-gray-800 shadow-xs dark:bg-gray-700 dark:text-gray-100' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'}`}
-              >
-                自动
-              </button>
-            )}
+            <button
+              onClick={() => setMode('auto')}
+              className={`flex-1 rounded-lg py-1.5 text-sm font-medium transition ${mode === 'auto' ? 'bg-white text-gray-800 shadow-xs dark:bg-gray-700 dark:text-gray-100' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'}`}
+            >
+              自动
+            </button>
             <button
               onClick={() => setMode('ratio')}
               className={`flex-1 rounded-lg py-1.5 text-sm font-medium transition ${mode === 'ratio' ? 'bg-white text-gray-800 shadow-xs dark:bg-gray-700 dark:text-gray-100' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'}`}
@@ -231,7 +225,7 @@ export default function SizePickerModal({ currentSize, onSelect, onClose, allowA
           </div>
 
           <div className="h-[380px] max-h-[55vh] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-200 dark:scrollbar-thumb-white/10 pr-1 -mr-1 pb-2">
-            {(mode === 'auto' || mode === 'default') && (
+            {mode === 'auto' && (
               <div className="flex h-full animate-fade-in items-center justify-center pt-8 pb-4 text-center">
                 <div>
                   <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full bg-blue-50 text-blue-500 dark:bg-blue-500/10">
@@ -239,9 +233,9 @@ export default function SizePickerModal({ currentSize, onSelect, onClose, allowA
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                     </svg>
                   </div>
-                  <h4 className="text-sm font-medium text-gray-800 dark:text-gray-200">{mode === 'default' ? '接口默认' : '自动尺寸'}</h4>
+                  <h4 className="text-sm font-medium text-gray-800 dark:text-gray-200">自动尺寸</h4>
                   <p className="mt-2 text-xs text-gray-400 leading-relaxed dark:text-gray-500">
-                    {mode === 'default' ? '不发送 size 参数' : '发送 size: auto'}
+                    发送 size: auto
                     <br />
                     由模型自己决定生成尺寸
                   </p>
@@ -400,7 +394,7 @@ export default function SizePickerModal({ currentSize, onSelect, onClose, allowA
             <div className="text-xs text-gray-400 dark:text-gray-500">将使用</div>
             <div className="mt-1 flex items-center gap-2">
               <span className="font-mono text-lg font-semibold text-gray-800 dark:text-gray-100">
-                {previewSize === 'default' ? '接口默认' : previewSize || '尺寸无效'}
+                {previewSize || '尺寸无效'}
               </span>
               {isClamped && (
                 <div

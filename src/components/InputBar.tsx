@@ -240,7 +240,7 @@ export default function InputBar() {
     ? modelParams.aspect_ratio === 'auto' && modelParams.image_size === 'auto'
       ? '自动'
       : `${modelParams.aspect_ratio === 'auto' ? '自动' : modelParams.aspect_ratio} · ${modelParams.image_size === 'auto' ? '默认' : modelParams.image_size === '512' ? '0.5K' : modelParams.image_size}`
-    : params.size === 'default' ? '接口默认' : (activeProfile.codexCli ? normalizeCodexCliImageSize(params.size) : normalizeImageSize(params.size)) || DEFAULT_PARAMS.size
+    : (activeProfile.codexCli ? normalizeCodexCliImageSize(params.size) : normalizeImageSize(params.size)) || DEFAULT_PARAMS.size
 
   const qualityOptions = [
     { label: '接口默认', value: 'default' },

@@ -26,7 +26,8 @@ export function normalizeParamDefaults(value: unknown): NonNullable<ApiProfile['
   const record = value as Record<string, unknown>
   const defaults: NonNullable<ApiProfile['paramDefaults']> = {}
   if (typeof record.n === 'number' && Number.isFinite(record.n)) defaults.n = Math.min(10, Math.max(1, Math.trunc(record.n)))
-  if (typeof record.size === 'string' && /^(default|auto|\d+[xX]\d+)$/.test(record.size)) defaults.size = record.size
+  if (record.size === 'default') defaults.size = 'auto'
+  else if (typeof record.size === 'string' && /^(auto|\d+[xX]\d+)$/.test(record.size)) defaults.size = record.size
   if (typeof record.background === 'string' && ['default', 'auto', 'opaque', 'transparent'].includes(record.background)) defaults.background = record.background as TaskParams['background']
   if (typeof record.thinking_level === 'string' && ['default', 'minimal', 'medium', 'high'].includes(record.thinking_level)) defaults.thinking_level = record.thinking_level as TaskParams['thinking_level']
   if (typeof record.quality === 'string' && ['default', 'auto', 'low', 'medium', 'high', 'xhigh', 'max'].includes(record.quality)) defaults.quality = record.quality as TaskParams['quality']

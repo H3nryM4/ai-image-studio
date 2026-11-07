@@ -42,7 +42,7 @@ describe('home parameters', () => {
     const first = createDefaultOpenAIProfile({ id: 'first' })
     const second = createDefaultOpenAIProfile({ id: 'second', paramDefaults: { quality: 'low' } })
     const switched = switchHomeParams({ ...DEFAULT_PARAMS, quality: 'high', size: '1536x1024' }, {}, first, second)
-    expect(switched.params).toMatchObject({ quality: 'low', size: 'default' })
+    expect(switched.params).toMatchObject({ quality: 'low', size: 'auto' })
     expect(switchHomeParams({ ...switched.params, n: 2 }, switched.paramsByProfile, second, first).params).toMatchObject({ quality: 'high', size: '1536x1024', n: 1 })
   })
 
@@ -114,6 +114,6 @@ describe('home parameters', () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ data: [{ b64_json: 'aW1hZ2U=' }] })))
     const settings = normalizeSettings({ profiles: [createDefaultOpenAIProfile({ apiKey: 'test-key', baseUrl: 'https://example.com/v1', streamImages: false, homeParams: [] })] })
     await callImageApi({ settings, prompt: '画一只猫', inputImageDataUrls: [], params: normalizeHomeParams({ ...DEFAULT_PARAMS, ...getActiveApiProfile(settings).paramDefaults }, getActiveApiProfile(settings)) })
-    expect(JSON.parse(fetchMock.mock.calls[0][1]!.body as string)).toEqual({ model: getActiveApiProfile(settings).model, prompt: '画一只猫' })
+    expect(JSON.parse(fetchMock.mock.calls[0][1]!.body as string)).toEqual({ model: getActiveApiProfile(settings).model, prompt: '画一只猫', size: 'auto' })
   })
 })

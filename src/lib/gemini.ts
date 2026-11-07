@@ -25,7 +25,7 @@ export function normalizeGeminiParams(params: TaskParams, model: string): TaskPa
   const options = getGeminiImageOptions(model)
   return {
     ...params,
-    size: 'default',
+    size: 'auto',
     aspect_ratio: options.ratios.includes(params.aspect_ratio ?? '') ? params.aspect_ratio : 'auto',
     image_size: options.resolutions.includes(params.image_size ?? '') ? params.image_size : 'auto',
     thinking_level: options.thinkingLevels.includes(params.thinking_level ?? '') ? params.thinking_level : 'default',

@@ -18,7 +18,7 @@ export function normalizeGrokParams(params: TaskParams, model: string): TaskPara
   const options = getGrokImageOptions(model)
   return {
     ...params,
-    size: 'default',
+    size: 'auto',
     aspect_ratio: options.ratios.includes(params.aspect_ratio ?? '') ? params.aspect_ratio : 'auto',
     image_size: options.resolutions.includes(params.image_size ?? '') ? params.image_size : 'auto',
     n: Math.min(options.maxOutputImages, Math.max(1, Math.trunc(params.n) || 1)),
