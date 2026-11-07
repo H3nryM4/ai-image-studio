@@ -20,7 +20,6 @@ import {
   isPresetConnectionLocked,
 } from '../lib/presetConfig'
 import { copyTextToClipboard, getClipboardFailureMessage } from '../lib/clipboard'
-import { createCustomProfileImportUrl } from '../lib/profileImportUrl'
 import { createProfileShareJson, createProfileShareUrl } from '../lib/profileSharing'
 import { requestBrowserNotificationPermission, type BrowserNotificationPermissionResult } from '../lib/browserNotification'
 import { DEFAULT_STREAM_PARTIAL_IMAGES, type ApiProfile, type AppSettings, type CustomConnectionDefinition, type ZipDownloadRoute } from '../types'
@@ -37,7 +36,7 @@ import GeneralSettingsTab from './settings/GeneralSettingsTab'
 import AppearanceSettingsTab from './settings/AppearanceSettingsTab'
 import ApiProfileEditor from './settings/ApiProfileEditor'
 import CustomConnectionModal from './settings/CustomConnectionModal'
-import ProfileImportUrlModal, { type CopyImportUrlOptions } from './settings/ProfileImportUrlModal'
+import ProfileImportUrlModal from './settings/ProfileImportUrlModal'
 import ZipDownloadRouteModal, { ZIP_DOWNLOAD_ROUTE_OPTIONS } from './settings/ZipDownloadRouteModal'
 import MarkdownRenderer from './MarkdownRenderer'
 
@@ -47,49 +46,6 @@ function newId(prefix: string) {
 
 const PROFILE_MENU_ITEM_CLASS_NAME = 'flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs transition-colors'
 const ADD_CUSTOM_CONNECTION_VALUE = '__add_custom_connection__'
-const COPY_IMPORT_URL_OPTIONS_STORAGE_KEY = 'ai-image-studio.copy-import-url-options'
-
-const DEFAULT_COPY_IMPORT_URL_OPTIONS = {
-  useNewApiAddress: false,
-  useNewApiKey: true,
-  useNewApiModel: false,
-}
-
-type ProfileImportUrlOptions = CopyImportUrlOptions & { includeApiKey: boolean }
-
-function readCopyImportUrlOptions(): CopyImportUrlOptions {
-  if (typeof window === 'undefined') return DEFAULT_COPY_IMPORT_URL_OPTIONS
-
-  try {
-    const saved = window.localStorage.getItem(COPY_IMPORT_URL_OPTIONS_STORAGE_KEY)
-    if (!saved) return DEFAULT_COPY_IMPORT_URL_OPTIONS
-
-    const parsed = JSON.parse(saved) as Partial<CopyImportUrlOptions> | null
-    if (!parsed || typeof parsed !== 'object') return DEFAULT_COPY_IMPORT_URL_OPTIONS
-
-    return {
-      useNewApiAddress: Boolean(parsed.useNewApiAddress),
-      useNewApiKey: parsed.useNewApiKey === undefined ? true : Boolean(parsed.useNewApiKey),
-      useNewApiModel: Boolean(parsed.useNewApiModel),
-    }
-  } catch {
-    return DEFAULT_COPY_IMPORT_URL_OPTIONS
-  }
-}
-
-function saveCopyImportUrlOptions(options: CopyImportUrlOptions) {
-  if (typeof window === 'undefined') return
-
-  try {
-    window.localStorage.setItem(COPY_IMPORT_URL_OPTIONS_STORAGE_KEY, JSON.stringify({
-      useNewApiAddress: options.useNewApiAddress,
-      useNewApiKey: options.useNewApiKey,
-      useNewApiModel: options.useNewApiModel,
-    }))
-  } catch {
-    // localStorage 不可用时只保留当前会话状态。
-  }
-}
 
 function isAsyncCustomConnection(connection: CustomConnectionDefinition | null | undefined) {
   return Boolean(connection?.poll || connection?.submit.taskIdPath || connection?.editSubmit?.taskIdPath)
@@ -164,7 +120,6 @@ export default function SettingsModal({ onImportProfile }: { onImportProfile: (s
   } | null>(null)
   const profileTouchDragRef = useRef<{ id: string, startX: number, startY: number, moved: boolean } | null>(null)
   const [copyImportUrlProfile, setCopyImportUrlProfile] = useState<ApiProfile | null>(null)
-  const [copyImportUrlOptions, setCopyImportUrlOptions] = useState<CopyImportUrlOptions>(readCopyImportUrlOptions)
 
   const apiProxyConfig = readClientDevProxyConfig()
   const apiProxyAvailable = isApiProxyAvailable(apiProxyConfig)
@@ -379,54 +334,7 @@ export default function SettingsModal({ onImportProfile }: { onImportProfile: (s
     commitSettings({ ...draft, zipDownloadRoutes: nextRoutes })
   }
 
-  const updateCopyImportUrlOptions = (patch: Partial<CopyImportUrlOptions>) => {
-    setCopyImportUrlOptions((previous) => {
-      const next = { ...previous, ...patch }
-      saveCopyImportUrlOptions(next)
-      return next
-    })
-  }
-
-  const createProfileImportUrl = (profile: ApiProfile, options: ProfileImportUrlOptions) => {
-    const url = new URL(window.location.href)
-    url.search = ''
-    url.hash = ''
-
-    if (isOpenAIConnection(profile.connectionId)) {
-      const baseUrl = profile.baseUrl.trim() || DEFAULT_API_BASE_URL
-      url.searchParams.set('apiUrl', options.useNewApiAddress && !options.includeApiKey ? '{address}' : normalizeBaseUrl(baseUrl))
-      if (options.includeApiKey && profile.apiKey.trim()) {
-        url.searchParams.set('apiKey', profile.apiKey.trim())
-      } else if (!options.includeApiKey && options.useNewApiKey) {
-        url.searchParams.set('apiKey', '{key}')
-      }
-      url.searchParams.set('connectionId', profile.connectionId)
-      const model = profile.model.trim() || DEFAULT_IMAGES_MODEL
-      url.searchParams.set('model', !options.includeApiKey && options.useNewApiModel ? '{model}' : model)
-      if (profile.name.trim()) url.searchParams.set('profileName', profile.name.trim())
-      if (profile.codexCli) url.searchParams.set('codexCli', 'true')
-      if (profile.streamImages) url.searchParams.set('streamImages', 'true')
-      if (profile.streamPartialImages !== DEFAULT_STREAM_PARTIAL_IMAGES) url.searchParams.set('streamPartialImages', String(normalizeStreamPartialImages(profile.streamPartialImages)))
-      if (profile.transparentBackgroundMethod !== 'api') url.searchParams.set('transparentBackgroundMethod', profile.transparentBackgroundMethod)
-
-      let result = url.toString()
-      if (!options.includeApiKey) {
-        if (options.useNewApiAddress) result = result.replace('%7Baddress%7D', '{address}')
-        if (options.useNewApiKey) result = result.replace('%7Bkey%7D', '{key}')
-        if (options.useNewApiModel) result = result.replace('%7Bmodel%7D', '{model}')
-      }
-      return result
-    }
-
-    return createCustomProfileImportUrl(
-      window.location.href,
-      profile,
-      draft.customConnections.find((item) => item.id === profile.connectionId),
-      options,
-    )
-  }
-
-  const copyProfileImportUrl = async (profile: ApiProfile, includeApiKey: boolean, format: 'link' | 'json' | 'file' | 'new-api') => {
+  const copyProfileImportUrl = async (profile: ApiProfile, includeApiKey: boolean, format: 'link' | 'json' | 'file') => {
     try {
       const connection = draft.customConnections.find((item) => item.id === profile.connectionId)
       const json = createProfileShareJson(profile, connection, includeApiKey)
@@ -441,9 +349,7 @@ export default function SettingsModal({ onImportProfile }: { onImportProfile: (s
         window.setTimeout(() => URL.revokeObjectURL(url), 0)
         showToast('配置已导出', 'success')
       } else {
-        const text = format === 'json' ? json : format === 'new-api'
-          ? createProfileImportUrl(profile, { ...copyImportUrlOptions, includeApiKey: false })
-          : createProfileShareUrl(window.location.href, profile, connection, includeApiKey)
+        const text = format === 'json' ? json : createProfileShareUrl(window.location.href, profile, connection, includeApiKey)
         await copyTextToClipboard(text)
         showToast(format === 'json' ? '配置已复制' : '分享链接已复制', 'success')
       }
@@ -457,7 +363,6 @@ export default function SettingsModal({ onImportProfile }: { onImportProfile: (s
   const confirmCopyProfileImportUrl = (profile: ApiProfile) => {
     setProfileMenu(null)
     setCopyImportUrlProfile(profile)
-    setCopyImportUrlOptions(readCopyImportUrlOptions())
   }
 
   const getDraftWithActiveProfilePatch = (patch: Partial<ApiProfile>) => ({
@@ -1517,8 +1422,6 @@ export default function SettingsModal({ onImportProfile }: { onImportProfile: (s
           <ProfileImportUrlModal
             profile={copyImportUrlProfile}
             scrollBoundaryRef={profileShareScrollBoundaryRef}
-            options={copyImportUrlOptions}
-            onOptionsChange={updateCopyImportUrlOptions}
             onCopy={(includeApiKey, format) => void copyProfileImportUrl(copyImportUrlProfile, includeApiKey, format)}
             onClose={() => setCopyImportUrlProfile(null)}
           />

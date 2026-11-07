@@ -6,22 +6,14 @@ import { usePreventBackgroundScroll } from '../../hooks/usePreventBackgroundScro
 import { Checkbox } from '../Checkbox'
 import { CloseIcon, LinkIcon } from '../icons'
 
-export interface CopyImportUrlOptions {
-  useNewApiAddress: boolean
-  useNewApiKey: boolean
-  useNewApiModel: boolean
-}
-
 interface ProfileImportUrlModalProps {
   profile: ApiProfile
-  options: CopyImportUrlOptions
-  onOptionsChange: (patch: Partial<CopyImportUrlOptions>) => void
-  onCopy: (includeApiKey: boolean, format: 'link' | 'json' | 'file' | 'new-api') => void
+  onCopy: (includeApiKey: boolean, format: 'link' | 'json' | 'file') => void
   onClose: () => void
   scrollBoundaryRef: RefObject<HTMLDivElement | null>
 }
 
-export default function ProfileImportUrlModal({ profile, options, onOptionsChange, onCopy, onClose, scrollBoundaryRef }: ProfileImportUrlModalProps) {
+export default function ProfileImportUrlModal({ profile, onCopy, onClose, scrollBoundaryRef }: ProfileImportUrlModalProps) {
   const [includeKey, setIncludeKey] = useState(false)
   useCloseOnEscape(true, onClose)
   usePreventBackgroundScroll(true, scrollBoundaryRef)
@@ -38,17 +30,12 @@ export default function ProfileImportUrlModal({ profile, options, onOptionsChang
         <Checkbox checked={includeKey} onChange={setIncludeKey} label="包含 API Key" />
         {includeKey && <p className="mt-2 text-xs text-orange-600 dark:text-orange-400">接收方可查看并使用此密钥，请仅分享给可信的人。</p>}
         <button type="button" onClick={() => onCopy(includeKey, 'link')} className="mt-5 w-full rounded-xl bg-blue-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-600">复制分享链接</button>
-        <div className="mt-2 flex gap-2">
-          <button type="button" onClick={() => onCopy(includeKey, 'json')} className="flex-1 rounded-xl px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-white/[0.06]">复制配置</button>
-          <button type="button" onClick={() => onCopy(includeKey, 'file')} className="flex-1 rounded-xl px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-white/[0.06]">导出 JSON</button>
-        </div>
         <details className="mt-5 border-t border-gray-100 pt-4 dark:border-white/[0.08]">
-          <summary className="cursor-pointer text-xs text-gray-400">高级：New API 接入链接</summary>
-          <div className="mt-4 space-y-3">
-            <Checkbox checked={options.useNewApiAddress} onChange={(checked) => onOptionsChange({ useNewApiAddress: checked })} label="使用 {address}（不含 /v1）" />
-            <Checkbox checked={options.useNewApiKey} onChange={(checked) => onOptionsChange({ useNewApiKey: checked })} label="使用 {key}" />
-            <Checkbox checked={options.useNewApiModel} onChange={(checked) => onOptionsChange({ useNewApiModel: checked })} label="使用 {model}" />
-            <button type="button" onClick={() => onCopy(false, 'new-api')} className="w-full rounded-xl bg-gray-100 px-3 py-2 text-sm text-gray-600 hover:bg-gray-200 dark:bg-white/[0.06] dark:text-gray-300 dark:hover:bg-white/[0.1]">复制 New API 接入链接</button>
+          <summary className="cursor-pointer text-xs text-gray-400">其他方式</summary>
+          <p className="mt-3 text-xs leading-relaxed text-gray-500 dark:text-gray-400">聊天软件发长链接容易被截断，可以复制文本；部署预置或存档可以下载 JSON 文件。</p>
+          <div className="mt-3 flex gap-2">
+            <button type="button" onClick={() => onCopy(includeKey, 'json')} className="flex-1 rounded-xl px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-white/[0.06]">复制为文本</button>
+            <button type="button" onClick={() => onCopy(includeKey, 'file')} className="flex-1 rounded-xl px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-white/[0.06]">下载 JSON 文件</button>
           </div>
         </details>
       </div>

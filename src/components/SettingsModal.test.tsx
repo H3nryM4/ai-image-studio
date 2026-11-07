@@ -172,6 +172,24 @@ describe('settings modal', () => {
     expect(useStore.getState().settings.activeProfileId).toBe(copy.id)
   })
 
+  it('collapses secondary share formats and copies the profile as text', async () => {
+    const profile = createDefaultOpenAIProfile({ isDefault: true, name: '工作配置', apiKey: 'sk-local' })
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } })
+    await openSettings(normalizeSettings({ profiles: [profile], activeProfileId: profile.id }))
+    await act(async () => el.querySelector<HTMLButtonElement>('button[aria-label="选择配置"]')!.click())
+    await act(async () => el.querySelector<HTMLButtonElement>('button[aria-label="分享配置「工作配置」"]')!.click())
+    const dialog = document.getElementById('profile-share-title')!.closest<HTMLElement>('[role="dialog"]')!
+    expect(dialog.querySelector('summary')?.textContent).toBe('其他方式')
+    await act(async () => dialog.querySelector<HTMLElement>('summary')!.click())
+    const copyText = [...dialog.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent === '复制为文本')!
+    await act(async () => copyText.click())
+    expect(writeText).toHaveBeenCalledTimes(1)
+    expect(JSON.parse(writeText.mock.calls[0][0] as string).profiles[0]).toMatchObject({ name: '工作配置', apiKey: '' })
+    expect(document.getElementById('profile-share-title')).toBeNull()
+    Reflect.deleteProperty(navigator, 'clipboard')
+  })
+
   it('gives repeated copies distinct names and keeps the original unchanged', async () => {
     const source = createDefaultOpenAIProfile({ isDefault: true, name: '工作配置' })
     await openSettings(normalizeSettings({ profiles: [source], activeProfileId: source.id }))

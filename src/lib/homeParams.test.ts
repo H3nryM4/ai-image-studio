@@ -3,8 +3,7 @@ import { DEFAULT_PARAMS, HOME_PARAM_KEYS } from '../types'
 import { callImageApi } from './api'
 import { createDefaultOpenAIProfile, getActiveApiProfile, normalizeSettings } from './apiProfiles'
 import { getHomeParamState, normalizeHomeParams, switchHomeParams } from './homeParams'
-import { createProfileShareJson, readProfileImport } from './profileSharing'
-import { createCustomProfileImportUrl } from './profileImportUrl'
+import { createProfileShareJson, createProfileShareUrl, readProfileImport } from './profileSharing'
 
 afterEach(() => vi.restoreAllMocks())
 
@@ -61,7 +60,7 @@ describe('home parameters', () => {
     const profile = { ...settings.profiles[0], homeParams: [] }
     const json = createProfileShareJson(profile)
     expect(readProfileImport(json, settings).profiles[0].homeParams).toEqual([])
-    const url = createCustomProfileImportUrl('https://studio.example.com', profile, undefined, { includeApiKey: false, useNewApiAddress: false, useNewApiKey: false, useNewApiModel: false })
+    const url = createProfileShareUrl('https://studio.example.com', profile)
     expect(readProfileImport(url, settings).profiles[0].homeParams).toEqual([])
   })
 

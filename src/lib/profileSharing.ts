@@ -73,7 +73,7 @@ export function readProfileImport(text: string, current: AppSettings) {
     const next = buildSettingsFromUrlParams(base, params)
     const profile = next.profiles?.find((profile) => profile.id === next.activeProfileId)
     if (!profile) throw new Error('此部署仅支持导入匹配的预置配置')
-    return { customConnections: base.customConnections, profiles: [{ ...profile, apiKey: profile.apiKey === '{key}' ? '' : profile.apiKey }], params }
+    return { customConnections: base.customConnections, profiles: [profile], params }
   }
 
   const hasFields = [...params.keys()].some((key) => key !== 'settings' && key !== 'profileId')
@@ -93,7 +93,6 @@ export function readProfileImport(text: string, current: AppSettings) {
 
   return {
     ...imported,
-    profiles: imported.profiles.map((profile) => ({ ...profile, apiKey: profile.apiKey === '{key}' ? '' : profile.apiKey })),
     params,
   }
 }

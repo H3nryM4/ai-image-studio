@@ -43,13 +43,13 @@ describe('profile sharing', () => {
     expect(next.activeProfileId).not.toBe(saved.id)
   })
 
-  it('supports legacy JSON query links and unresolved New API keys', () => {
-    const params = new URLSearchParams({ settings: JSON.stringify({ profiles: [{ ...saved, apiKey: '{key}' }] }) })
+  it('supports legacy JSON query links', () => {
+    const params = new URLSearchParams({ settings: JSON.stringify({ profiles: [{ ...saved, apiKey: '' }] }) })
     const imported = readProfileImport(`https://studio.example/?${params}`, current)
     expect(imported.profiles).toHaveLength(1)
     expect(imported.profiles[0].apiKey).toBe('')
-    const legacy = readProfileImport('https://studio.example/?apiUrl=https://other.example/v1&apiKey={key}&model=other', current)
-    expect(legacy.profiles[0]).toMatchObject({ baseUrl: 'https://other.example/v1', apiKey: '', model: 'other' })
+    const legacy = readProfileImport('https://studio.example/?apiUrl=https://other.example/v1&apiKey=other-key&model=other', current)
+    expect(legacy.profiles[0]).toMatchObject({ baseUrl: 'https://other.example/v1', apiKey: 'other-key', model: 'other' })
   })
 
   it('adds profiles with colliding source IDs and custom connection IDs without overwriting local data', () => {

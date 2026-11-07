@@ -388,9 +388,9 @@ npm run build
 
 在 **配置管理 → 添加配置 → 导入配置** 中可以粘贴分享链接、配置 JSON，或选择 JSON 文件。新分享链接使用 `#config=` 承载配置；`?settings=` 和下面的查询参数链接也可导入，也会先显示预览。仅展示预置配置的部署只允许更新匹配预置配置中允许修改的字段。
 
-### 查询参数与 New API 集成
+### 查询参数
 
-以下参数用于查询参数链接与外部集成。需要 New API 变量时，在分享弹窗中展开 **高级：New API 接入链接**。
+以下参数用于查询参数链接与外部集成。
 
 | 参数 | 说明 | 示例 |
 |------|------|------|
@@ -404,16 +404,6 @@ npm run build
 | `streamPartialImages` | 中间步骤图像数（需配合 streamImages） | `?streamPartialImages=2` |
 | `profileId` | 链接的目标配置 ID，用于解析预览；普通导入仍需明确选择是否覆盖 | `?profileId=my-service` |
 | `transparentBackgroundMethod` | 透明背景实现方式：`api`（原生）或 `local`（本地后处理） | `?transparentBackgroundMethod=local` |
-
-集成示例（New API 聊天系统，以下为上游在线体验地址，自行部署时替换为自己的地址）：
-
-```text
-https://gpt-image-playground.cooksleep.dev?apiUrl={address}&apiKey={key}&model={model}
-```
-
-```text
-https://cooksleep.github.io/gpt_image_playground?apiUrl={address}&apiKey={key}&model={model}
-```
 
 <a id="preset-config-json"></a>
 ## 📋 预置配置 JSON 格式
